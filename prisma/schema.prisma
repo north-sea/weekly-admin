@@ -1,0 +1,252 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model categories {
+  id          Int       @id @default(autoincrement())
+  name        String    @db.VarChar(100)
+  slug        String    @db.VarChar(100)
+  parent_id   Int?
+  sort_order  Int?      @default(0)
+  description String?   @db.Text
+  created_at  DateTime? @default(now()) @db.Timestamp(0)
+  updated_at  DateTime? @default(now()) @db.Timestamp(0)
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model content_attributes {
+  id              Int                                @id @default(autoincrement())
+  content_id      BigInt
+  attribute_name  String                             @db.VarChar(100)
+  attribute_value String?                            @db.Text
+  attribute_type  content_attributes_attribute_type? @default(string)
+  created_at      DateTime?                          @default(now()) @db.Timestamp(0)
+  updated_at      DateTime?                          @default(now()) @db.Timestamp(0)
+
+  @@unique([content_id, attribute_name], map: "unique_content_attribute")
+  @@index([attribute_name], map: "idx_attribute_name")
+  @@index([content_id], map: "idx_content_id")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model content_relations {
+  id                Int                             @id @default(autoincrement())
+  source_content_id BigInt
+  target_content_id BigInt
+  relation_type     content_relations_relation_type
+  relation_strength Int?                            @default(5) @db.TinyInt
+  bidirectional     Boolean?                        @default(false)
+  created_at        DateTime?                       @default(now()) @db.Timestamp(0)
+  updated_at        DateTime?                       @default(now()) @db.Timestamp(0)
+
+  @@unique([source_content_id, target_content_id, relation_type], map: "unique_content_relation")
+  @@index([relation_type], map: "idx_relation_type")
+  @@index([source_content_id], map: "idx_source_content_id")
+  @@index([target_content_id], map: "idx_target_content_id")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model content_tags {
+  id         Int       @id @default(autoincrement())
+  content_id BigInt
+  tag_id     Int
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+
+  @@unique([content_id, tag_id], map: "unique_content_tag")
+  @@index([content_id], map: "idx_content_id")
+  @@index([tag_id], map: "idx_tag_id")
+}
+
+model content_types {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique(map: "name") @db.VarChar(50)
+  slug        String    @unique(map: "slug") @db.VarChar(50)
+  description String?   @db.Text
+  created_at  DateTime? @default(now()) @db.Timestamp(0)
+  updated_at  DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model content_versions {
+  id              Int       @id @default(autoincrement())
+  content_id      BigInt
+  version_number  Int
+  title           String?   @db.VarChar(500)
+  content         String?   @db.LongText
+  description     String?   @db.Text
+  source          String?   @db.VarChar(200)
+  source_url      String?   @db.VarChar(1000)
+  changes_summary String?   @db.Text
+  created_by      Int
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@unique([content_id, version_number], map: "unique_content_version")
+  @@index([content_id], map: "idx_content_id")
+  @@index([created_by], map: "idx_created_by")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model contents {
+  id               BigInt                   @id @default(autoincrement())
+  content_type_id  Int
+  category_id      Int?
+  title            String                   @db.VarChar(500)
+  slug             String                   @db.VarChar(500)
+  description      String?                  @db.Text
+  content          String                   @db.LongText
+  content_format   contents_content_format? @default(mdx)
+  status           contents_status?         @default(draft)
+  published_at     DateTime?                @db.Timestamp(0)
+  meta_title       String?                  @db.VarChar(500)
+  meta_description String?                  @db.Text
+  word_count       Int?                     @default(0)
+  reading_time     Int?                     @default(0)
+  view_count       BigInt?                  @default(0)
+  source           String?                  @db.VarChar(200)
+  source_url       String?                  @db.VarChar(1000)
+  screenshot_api   contents_screenshot_api? @default(manual)
+  sort_order       Int?                     @default(0)
+  featured         Boolean?                 @default(false)
+  created_at       DateTime?                @default(now()) @db.Timestamp(0)
+  updated_at       DateTime?                @default(now()) @db.Timestamp(0)
+  user_id          Int?
+}
+
+model operation_logs {
+  id                Int                           @id @default(autoincrement())
+  user_id           Int
+  operation_type    operation_logs_operation_type
+  resource_type     String                        @db.VarChar(50)
+  resource_id       Int?
+  operation_details String?                       @db.Text
+  ip_address        String?                       @db.VarChar(45)
+  user_agent        String?                       @db.Text
+  created_at        DateTime?                     @default(now()) @db.Timestamp(0)
+
+  @@index([operation_type], map: "idx_operation_type")
+  @@index([resource_type], map: "idx_resource_type")
+  @@index([user_id], map: "idx_user_id")
+}
+
+model tags {
+  id         Int       @id @default(autoincrement())
+  name       String    @unique(map: "name") @db.VarChar(100)
+  slug       String    @unique(map: "slug") @db.VarChar(100)
+  count      Int?      @default(0)
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model users {
+  id             Int           @id @default(autoincrement())
+  username       String        @unique(map: "username") @db.VarChar(100)
+  password_hash  String        @db.VarChar(255)
+  email          String?       @db.VarChar(255)
+  display_name   String?       @db.VarChar(100)
+  role           users_role?   @default(EDITOR)
+  status         users_status? @default(ACTIVE)
+  last_login_at  DateTime?     @db.Timestamp(0)
+  login_attempts Int?          @default(0)
+  locked_until   DateTime?     @db.Timestamp(0)
+  created_at     DateTime?     @default(now()) @db.Timestamp(0)
+  updated_at     DateTime?     @default(now()) @db.Timestamp(0)
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model weekly_content_items {
+  id              Int       @id @default(autoincrement())
+  weekly_issue_id Int
+  content_id      BigInt
+  sort_order      Int?      @default(0)
+  section         String?   @db.VarChar(100)
+  featured        Boolean?  @default(false)
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@unique([weekly_issue_id, content_id], map: "unique_weekly_content")
+  @@index([content_id], map: "idx_content_id")
+  @@index([sort_order], map: "idx_sort_order")
+  @@index([weekly_issue_id], map: "idx_weekly_issue_id")
+}
+
+model weekly_issues {
+  id               Int                   @id @default(autoincrement())
+  issue_number     Int                   @unique(map: "issue_number")
+  title            String                @db.VarChar(500)
+  slug             String                @unique(map: "slug") @db.VarChar(100)
+  description      String?               @db.Text
+  start_date       DateTime              @db.Date
+  end_date         DateTime              @db.Date
+  published_at     DateTime?             @db.Timestamp(0)
+  total_items      Int?                  @default(0)
+  total_word_count Int?                  @default(0)
+  reading_time     Int?                  @default(0)
+  status           weekly_issues_status? @default(draft)
+  created_at       DateTime?             @default(now()) @db.Timestamp(0)
+  updated_at       DateTime?             @default(now()) @db.Timestamp(0)
+  created_by       Int?                  @default(1)
+}
+
+enum operation_logs_operation_type {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+}
+
+enum content_relations_relation_type {
+  related
+  reference
+  series
+  parent_child
+  similar
+}
+
+enum content_attributes_attribute_type {
+  string
+  number
+  boolean
+  json
+  date
+}
+
+enum users_role {
+  ADMIN
+  EDITOR
+}
+
+enum users_status {
+  ACTIVE
+  INACTIVE
+}
+
+enum contents_content_format {
+  markdown
+  mdx
+  html
+  plain
+}
+
+enum contents_status {
+  draft
+  published
+  archived
+  hidden
+}
+
+enum weekly_issues_status {
+  draft
+  published
+  archived
+}
+
+enum contents_screenshot_api {
+  ScreenshotLayer
+  HCTI
+  manual
+}
