@@ -1,5 +1,6 @@
 import { ContentInput, ContentQuery, ContentUpdate, BatchOperation } from '@/lib/validations/content';
 import { prisma } from '@/lib/db';
+import { syncContentToSearch, removeContentFromSearch } from '@/lib/search';
 
 export interface ContentWithRelations {
   id: bigint;
@@ -257,6 +258,14 @@ export class ContentService {
     if (!result) {
       throw new Error('Failed to retrieve created content');
     }
+    
+    // Sync to search index
+    try {
+      await syncContentToSearch(result);
+    } catch (error) {
+      console.error('Failed to sync new content to search:', error);
+    }
+    
     return result;
   }
   
@@ -301,6 +310,14 @@ export class ContentService {
     if (!result) {
       throw new Error('Failed to retrieve updated content');
     }
+    
+    // Sync to search index
+    try {
+      await syncContentToSearch(result);
+    } catch (error) {
+      console.error('Failed to sync updated content to search:', error);
+    }
+    
     return result;
   }
   
@@ -325,6 +342,13 @@ export class ContentService {
     
     // 删除内容
     await prisma.contents.delete({ where: { id: contentId } });
+    
+    // Remove from search index
+    try {
+      await removeContentFromSearch(id);
+    } catch (error) {
+      console.error('Failed to remove content from search:', error);
+    }
   }
   
   // 批量操作

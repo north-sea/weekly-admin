@@ -16,6 +16,9 @@ model categories {
   description String?   @db.Text
   created_at  DateTime? @default(now()) @db.Timestamp(0)
   updated_at  DateTime? @default(now()) @db.Timestamp(0)
+
+  // Relations
+  contents contents[]
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -56,6 +59,10 @@ model content_tags {
   content_id BigInt
   tag_id     Int
   created_at DateTime? @default(now()) @db.Timestamp(0)
+
+  // Relations
+  content contents @relation(fields: [content_id], references: [id], onDelete: Cascade)
+  tag     tags     @relation(fields: [tag_id], references: [id], onDelete: Cascade)
 
   @@unique([content_id, tag_id], map: "unique_content_tag")
   @@index([content_id], map: "idx_content_id")
@@ -114,6 +121,11 @@ model contents {
   created_at       DateTime?                @default(now()) @db.Timestamp(0)
   updated_at       DateTime?                @default(now()) @db.Timestamp(0)
   user_id          Int?
+
+  // Relations
+  categories           categories?            @relation(fields: [category_id], references: [id])
+  content_tags         content_tags[]
+  weekly_content_items weekly_content_items[]
 }
 
 model operation_logs {
@@ -139,6 +151,9 @@ model tags {
   count      Int?      @default(0)
   created_at DateTime? @default(now()) @db.Timestamp(0)
   updated_at DateTime? @default(now()) @db.Timestamp(0)
+
+  // Relations
+  content_tags content_tags[]
 }
 
 model users {
@@ -167,6 +182,10 @@ model weekly_content_items {
   created_at      DateTime? @default(now()) @db.Timestamp(0)
   updated_at      DateTime? @default(now()) @db.Timestamp(0)
 
+  // Relations
+  weekly_issue weekly_issues @relation(fields: [weekly_issue_id], references: [id], onDelete: Cascade)
+  content      contents      @relation(fields: [content_id], references: [id], onDelete: Cascade)
+
   @@unique([weekly_issue_id, content_id], map: "unique_weekly_content")
   @@index([content_id], map: "idx_content_id")
   @@index([sort_order], map: "idx_sort_order")
@@ -189,6 +208,9 @@ model weekly_issues {
   created_at       DateTime?             @default(now()) @db.Timestamp(0)
   updated_at       DateTime?             @default(now()) @db.Timestamp(0)
   created_by       Int?                  @default(1)
+
+  // Relations
+  weekly_content_items weekly_content_items[]
 }
 
 enum operation_logs_operation_type {
