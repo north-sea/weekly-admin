@@ -38,7 +38,19 @@ export async function POST(request: NextRequest) {
       message: 'Logged out successfully',
     };
 
-    return NextResponse.json(response);
+    // 创建响应并清除 cookie
+    const jsonResponse = NextResponse.json(response);
+    
+    // 清除 auth-token cookie
+    jsonResponse.cookies.set('auth-token', '', {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 0, // 立即过期
+      path: '/',
+    });
+
+    return jsonResponse;
 
   } catch (error) {
     console.error('Logout API error:', error);

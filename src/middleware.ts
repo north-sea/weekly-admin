@@ -4,6 +4,7 @@ import { verifyToken } from './lib/auth-middleware';
 // Define protected routes
 const protectedRoutes = [
   '/dashboard',
+  '/content',
   '/contents',
   '/weekly',
   '/analytics',
@@ -23,7 +24,7 @@ const adminRoutes = [
   '/settings/system',
 ];
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Allow public routes
@@ -61,7 +62,7 @@ export function middleware(request: NextRequest) {
 
   try {
     // Verify token
-    const payload = verifyToken(token);
+    const payload = await verifyToken(token);
     
     // Check admin routes
     if (adminRoutes.some(route => pathname.startsWith(route))) {
@@ -113,7 +114,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Temporarily disable middleware to test API endpoints
-    // '/((?!_next/static|_next/image|favicon.ico|public/).*)',
+    '/((?!_next/static|_next/image|favicon.ico|public/).*)',
   ],
 };

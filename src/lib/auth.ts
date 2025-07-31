@@ -2,15 +2,10 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { NextRequest } from 'next/server';
 import { prisma } from './db';
+import { verifyToken as verifyJWTToken, MyJWTPayload } from './jwt-utils';
 
-// JWT payload interface
-export interface JWTPayload {
-  userId: number;
-  username: string;
-  role: string;
-  iat?: number;
-  exp?: number;
-}
+// 导出 MyJWTPayload 类型以保持兼容性
+export type { MyJWTPayload as JWTPayload };
 
 // User interface for authentication
 export interface AuthUser {
@@ -26,26 +21,27 @@ export interface AuthUser {
  * Generate JWT token for user
  */
 export function generateToken(user: AuthUser): string {
-  const payload: JWTPayload = {
+  const payload: MyJWTPayload = {
     userId: user.id,
     username: user.username,
     role: user.role,
   };
 
-  return jwt.sign(payload, process.env.JWT_SECRET!, {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET is not defined');
+  }
+  
+  return jwt.sign(payload, secret, {
     expiresIn: process.env.JWT_EXPIRES_IN || '8h',
-  });
+  } as jwt.SignOptions);
 }
 
 /**
- * Verify JWT token and return payload
+ * 验证 JWT token 并返回 payload (现在使用统一的 JWT 工具)
  */
-export function verifyToken(token: string): JWTPayload {
-  try {
-    return jwt.verify(token, process.env.JWT_SECRET!) as JWTPayload;
-  } catch (error) {
-    throw new Error('Invalid or expired token');
-  }
+export async function verifyToken(token: string): Promise<MyJWTPayload> {
+  return await verifyJWTToken(token);
 }
 
 /**
@@ -80,7 +76,7 @@ export function extractTokenFromHeader(request: NextRequest): string | null {
  */
 export async function getCurrentUser(token: string): Promise<AuthUser | null> {
   try {
-    const payload = verifyToken(token);
+    const payload = await verifyToken(token);
     
     const user = await prisma.users.findUnique({
       where: { id: payload.userId },
@@ -105,7 +101,7 @@ export async function getCurrentUser(token: string): Promise<AuthUser | null> {
       role: user.role || 'EDITOR',
       status: user.status || 'ACTIVE',
     };
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -144,8 +140,8 @@ export async function authenticateUser(
     }
 
     // Check if account is locked
-    if (user.lockedUntil && user.lockedUntil > new Date()) {
-      const remainingTime = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 1000 / 60);
+    if (user.locked_until && user.locked_until > new Date()) {
+      const remainingTime = Math.ceil((user.locked_until.getTime() - Date.now()) / 1000 / 60);
       return { 
         success: false, 
         error: `Account is locked. Try again in ${remainingTime} minutes.` 
@@ -189,6 +185,7 @@ export async function authenticateUser(
     });
 
     // Return user without password hash
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password_hash, login_attempts, locked_until, ...authUser } = user;
     // Map database field names to expected field names
     const mappedUser = {
@@ -242,7 +239,7 @@ export async function authenticateRequest(request: NextRequest): Promise<{
     }
 
     return { success: true, user };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Authentication failed' };
   }
 }

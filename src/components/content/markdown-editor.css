@@ -1,0 +1,269 @@
+/* Markdown Editor Styles */
+.markdown-editor-container {
+  width: 100%;
+}
+
+/* 修复光标位置问题 */
+.markdown-editor-container .w-md-editor-text-textarea {
+  caret-color: #1890ff !important;
+  cursor: text !important;
+}
+
+.markdown-editor-container .w-md-editor {
+  background-color: #fff;
+}
+
+.markdown-editor-container .w-md-editor-text-textarea,
+.markdown-editor-container .w-md-editor-text-input,
+.markdown-editor-container .w-md-editor-text {
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace !important;
+}
+
+.markdown-editor-container .w-md-editor-text-textarea {
+  padding: 16px !important;
+  position: relative !important;
+  z-index: 1 !important;
+  background: transparent !important;
+}
+
+.markdown-editor-container .w-md-editor-preview {
+  padding: 16px !important;
+}
+
+/* 自定义滚动条 */
+.markdown-editor-container .w-md-editor-text-textarea::-webkit-scrollbar,
+.markdown-editor-container .w-md-editor-preview::-webkit-scrollbar {
+  width: 8px;
+}
+
+.markdown-editor-container .w-md-editor-text-textarea::-webkit-scrollbar-track,
+.markdown-editor-container .w-md-editor-preview::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.markdown-editor-container .w-md-editor-text-textarea::-webkit-scrollbar-thumb,
+.markdown-editor-container .w-md-editor-preview::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.markdown-editor-container .w-md-editor-text-textarea::-webkit-scrollbar-thumb:hover,
+.markdown-editor-container .w-md-editor-preview::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* 预览区域样式 */
+.markdown-editor-container .w-md-editor-preview h1,
+.markdown-editor-container .w-md-editor-preview h2,
+.markdown-editor-container .w-md-editor-preview h3,
+.markdown-editor-container .w-md-editor-preview h4,
+.markdown-editor-container .w-md-editor-preview h5,
+.markdown-editor-container .w-md-editor-preview h6 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.markdown-editor-container .w-md-editor-preview h1 {
+  font-size: 2em;
+  border-bottom: 1px solid #eaecef;
+  padding-bottom: 0.3em;
+}
+
+.markdown-editor-container .w-md-editor-preview h2 {
+  font-size: 1.5em;
+  border-bottom: 1px solid #eaecef;
+  padding-bottom: 0.3em;
+}
+
+.markdown-editor-container .w-md-editor-preview h3 {
+  font-size: 1.25em;
+}
+
+.markdown-editor-container .w-md-editor-preview h4 {
+  font-size: 1em;
+}
+
+.markdown-editor-container .w-md-editor-preview h5 {
+  font-size: 0.875em;
+}
+
+.markdown-editor-container .w-md-editor-preview h6 {
+  font-size: 0.85em;
+  color: #6a737d;
+}
+
+.markdown-editor-container .w-md-editor-preview p {
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.markdown-editor-container .w-md-editor-preview blockquote {
+  padding: 0 1em;
+  color: #6a737d;
+  border-left: 0.25em solid #dfe2e5;
+  margin: 16px 0;
+}
+
+.markdown-editor-container .w-md-editor-preview blockquote > :first-child {
+  margin-top: 0;
+}
+
+.markdown-editor-container .w-md-editor-preview blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-editor-container .w-md-editor-preview code {
+  padding: 0.2em 0.4em;
+  margin: 0;
+  font-size: 85%;
+  background-color: rgba(27, 31, 35, 0.05);
+  border-radius: 3px;
+  font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', 'Menlo', monospace;
+}
+
+.markdown-editor-container .w-md-editor-preview pre {
+  padding: 16px;
+  overflow: auto;
+  font-size: 85%;
+  line-height: 1.45;
+  background-color: #f6f8fa;
+  border-radius: 6px;
+  margin: 16px 0;
+}
+
+.markdown-editor-container .w-md-editor-preview pre code {
+  display: inline;
+  max-width: auto;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+  line-height: inherit;
+  word-wrap: normal;
+  background-color: transparent;
+  border: 0;
+}
+
+.markdown-editor-container .w-md-editor-preview table {
+  border-spacing: 0;
+  border-collapse: collapse;
+  margin: 16px 0;
+  width: 100%;
+}
+
+.markdown-editor-container .w-md-editor-preview table th,
+.markdown-editor-container .w-md-editor-preview table td {
+  padding: 6px 13px;
+  border: 1px solid #dfe2e5;
+}
+
+.markdown-editor-container .w-md-editor-preview table th {
+  font-weight: 600;
+  background-color: #f6f8fa;
+}
+
+.markdown-editor-container .w-md-editor-preview table tr {
+  background-color: #fff;
+  border-top: 1px solid #c6cbd1;
+}
+
+.markdown-editor-container .w-md-editor-preview table tr:nth-child(2n) {
+  background-color: #f6f8fa;
+}
+
+.markdown-editor-container .w-md-editor-preview ul,
+.markdown-editor-container .w-md-editor-preview ol {
+  padding-left: 2em;
+  margin: 16px 0;
+}
+
+.markdown-editor-container .w-md-editor-preview li {
+  margin: 0.25em 0;
+}
+
+.markdown-editor-container .w-md-editor-preview li > p {
+  margin: 0;
+}
+
+.markdown-editor-container .w-md-editor-preview img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 16px 0;
+}
+
+.markdown-editor-container .w-md-editor-preview hr {
+  height: 0.25em;
+  padding: 0;
+  margin: 24px 0;
+  background-color: #e1e4e8;
+  border: 0;
+}
+
+/* 全屏模式样式 */
+.markdown-editor-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  background: #fff;
+  padding: 16px;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .markdown-editor-container .w-md-editor-text-textarea,
+  .markdown-editor-container .w-md-editor-text-input,
+  .markdown-editor-container .w-md-editor-text {
+    font-size: 16px !important;
+  }
+  
+  .markdown-editor-container .w-md-editor-text-textarea {
+    padding: 12px !important;
+  }
+  
+  .markdown-editor-container .w-md-editor-preview {
+    padding: 12px !important;
+  }
+}
+
+/* 语法高亮主题覆盖 */
+.markdown-editor-container .w-md-editor-preview pre code.hljs {
+  background: transparent;
+}
+
+/* 工具栏按钮样式 */
+.markdown-editor-toolbar .ant-btn-group .ant-btn {
+  border-radius: 0;
+}
+
+.markdown-editor-toolbar .ant-btn-group .ant-btn:first-child {
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+}
+
+.markdown-editor-toolbar .ant-btn-group .ant-btn:last-child {
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+
+/* 状态指示器 */
+.markdown-editor-status {
+  font-size: 12px;
+  color: #666;
+  padding: 4px 0;
+}
+
+.markdown-editor-status .unsaved {
+  color: #faad14;
+}
+
+.markdown-editor-status .saved {
+  color: #52c41a;
+}

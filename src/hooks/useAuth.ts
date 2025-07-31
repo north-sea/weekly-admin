@@ -3,16 +3,29 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth';
 
 export function useAuth(requireAuth: boolean = true) {
-  const { user, token, isAuthenticated, logout, setUser } = useAuthStore();
+  const { user, token, isAuthenticated, logout, setUser, hasHydrated } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
     const validateToken = async () => {
+      // 等待 store hydration 完成
+      if (!hasHydrated) {
+        return;
+      }
+
       if (!token || !isAuthenticated) {
         setLoading(false);
         if (requireAuth) {
-          router.replace('/login');
+          // 添加延迟确保路由准备就绪
+          setTimeout(() => {
+            try {
+              router.replace('/login');
+            } catch (error) {
+              console.warn('router.replace 失败，使用 window.location:', error);
+              window.location.href = '/login';
+            }
+          }, 100);
         }
         return;
       }
@@ -38,7 +51,14 @@ export function useAuth(requireAuth: boolean = true) {
         console.error('Token validation error:', error);
         logout();
         if (requireAuth) {
-          router.replace('/login');
+          setTimeout(() => {
+            try {
+              router.replace('/login');
+            } catch (error) {
+              console.warn('router.replace 失败，使用 window.location:', error);
+              window.location.href = '/login';
+            }
+          }, 100);
         }
       } finally {
         setLoading(false);
@@ -46,7 +66,7 @@ export function useAuth(requireAuth: boolean = true) {
     };
 
     validateToken();
-  }, [token, isAuthenticated, requireAuth, router, logout, setUser]);
+  }, [token, isAuthenticated, requireAuth, router, logout, setUser, hasHydrated]);
 
   return {
     user,

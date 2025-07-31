@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/auth';
 export default function Home() {
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
-
+  console.log('Home', isAuthenticated);
   useEffect(() => {
     if (isAuthenticated) {
       router.replace('/dashboard');

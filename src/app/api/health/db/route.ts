@@ -1,30 +1,26 @@
 import { NextResponse } from 'next/server';
-import { checkDatabaseHealth, testDatabaseConnection } from '@/lib/db';
+import { prisma } from '@/lib/db';
 
 export async function GET() {
   try {
-    const [healthCheck, connectionTest] = await Promise.all([
-      checkDatabaseHealth(),
-      testDatabaseConnection(),
-    ]);
-
+    // Simple database connection test
+    await prisma.$queryRaw`SELECT 1`;
+    
     const response = {
       database: {
-        ...healthCheck,
-        connection: connectionTest,
+        status: 'healthy',
+        message: 'Database connection successful',
+        timestamp: new Date(),
       },
     };
 
-    // Return appropriate status code based on health
-    const statusCode = healthCheck.status === 'healthy' ? 200 : 503;
-
-    return NextResponse.json(response, { status: statusCode });
+    return NextResponse.json(response, { status: 200 });
   } catch (error) {
     return NextResponse.json(
       {
         database: {
           status: 'unhealthy',
-          message: error instanceof Error ? error.message : 'Health check failed',
+          message: error instanceof Error ? error.message : 'Database connection failed',
           timestamp: new Date(),
         },
       },

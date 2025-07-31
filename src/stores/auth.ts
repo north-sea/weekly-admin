@@ -26,7 +26,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       user: null,
       token: null,
       isAuthenticated: false,
@@ -83,8 +83,10 @@ export const useAuthStore = create<AuthState>()(
         isAuthenticated: state.isAuthenticated,
       }),
       onRehydrateStorage: () => (state) => {
-        // 立即设置 hydrated 状态
-        state?.setHasHydrated(true);
+        // 使用 setTimeout 确保状态完全同步后再设置 hydrated
+        setTimeout(() => {
+          state?.setHasHydrated(true);
+        }, 50);
       },
       skipHydration: false,
     }

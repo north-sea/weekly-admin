@@ -6,6 +6,7 @@ import zhCN from 'antd/locale/zh_CN';
 import ClientProvider from '@/components/providers/ClientProvider';
 import ErrorBoundary from '@/components/providers/ErrorBoundary';
 import NoSSR from '@/components/providers/NoSSR';
+import QueryProvider from '@/components/providers/QueryProvider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -32,9 +33,11 @@ export default function RootLayout({
                                 }
                             }}>
                             <App>
-                                <NoSSR>
-                                    <ClientProvider>{children}</ClientProvider>
-                                </NoSSR>
+                                <QueryProvider>
+                                    <NoSSR>
+                                        <ClientProvider>{children}</ClientProvider>
+                                    </NoSSR>
+                                </QueryProvider>
                             </App>
                         </ConfigProvider>
                     </AntdRegistry>

@@ -1,26 +1,11 @@
-import jwt from 'jsonwebtoken';
+import { verifyToken as verifyJWTToken, MyJWTPayload } from './jwt-utils';
 
-// JWT payload interface
-export interface JWTPayload {
-  userId: number;
-  username: string;
-  role: string;
-  iat?: number;
-  exp?: number;
-}
+// 导出 MyJWTPayload 接口以保持兼容性
+export type { MyJWTPayload as JWTPayload };
 
 /**
- * Verify JWT token and return payload (Edge Runtime compatible)
+ * 验证 JWT token 并返回 payload (Edge Runtime 兼容)
  */
-export function verifyToken(token: string): JWTPayload {
-  try {
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      throw new Error('JWT_SECRET not configured');
-    }
-    return jwt.verify(token, secret) as JWTPayload;
-  } catch (error) {
-    console.error('Token verification error:', error);
-    throw new Error('Invalid or expired token');
-  }
+export async function verifyToken(token: string): Promise<MyJWTPayload> {
+  return await verifyJWTToken(token);
 }

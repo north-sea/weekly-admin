@@ -86,7 +86,19 @@ export async function POST(request: NextRequest) {
       },
     };
 
-    return NextResponse.json(response);
+    // 创建响应并设置 cookie
+    const jsonResponse = NextResponse.json(response);
+    
+    // 设置 auth-token cookie，middleware 可以读取
+    jsonResponse.cookies.set('auth-token', token, {
+      httpOnly: false, // 允许客户端访问，因为前端需要在 localStorage 中存储
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: expiresIn,
+      path: '/',
+    });
+
+    return jsonResponse;
 
   } catch (error) {
     console.error('Login API error:', error);
