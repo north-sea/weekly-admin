@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Layout, Row, Col, Card, Space, Button, Typography, Affix } from 'antd';
+import { Row, Col, Card, Space, Button, Typography, Affix } from 'antd';
 import { FilterOutlined, SortAscendingOutlined } from '@ant-design/icons';
+import { PageContainer } from '@ant-design/pro-components';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSearch } from '@/hooks/useSearch';
 import SearchInput from '@/components/search/SearchInput';
@@ -10,7 +11,6 @@ import SearchResults from '@/components/search/SearchResults';
 import AdvancedFilters from '@/components/search/AdvancedFilters';
 import { useQuery } from '@tanstack/react-query';
 
-const { Content } = Layout;
 const { Title } = Typography;
 
 // Mock data - in real app, these would come from API
@@ -175,97 +175,91 @@ export default function SearchPage() {
   };
   
   return (
-    <Layout style={{ minHeight: '100vh', background: '#f5f5f5' }}>
-      <Content style={{ padding: '24px' }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-          {/* Header */}
-          <div style={{ marginBottom: 24 }}>
-            <Title level={2} style={{ marginBottom: 16 }}>
-              内容搜索
-            </Title>
-            
-            {/* Search Input */}
-            <SearchInput
-              value={searchOptions.query}
-              placeholder="搜索标题、内容、描述..."
-              onSearch={handleSearch}
-              onInstantSearch={handleInstantSearch}
-              searchHistory={searchHistory}
-              onApplyHistory={applyHistorySearch}
-              onRemoveHistory={removeFromHistory}
-              onClearHistory={clearHistory}
-              size="large"
-            />
-          </div>
-          
-          <Row gutter={24}>
-            {/* Filters Sidebar */}
-            <Col xs={24} lg={6}>
-              <Affix offsetTop={24}>
-                <div style={{ marginBottom: 16 }}>
-                  <AdvancedFilters
-                    filters={searchOptions.filters || {}}
-                    onFiltersChange={handleFiltersChange}
-                    onApplyFilters={handleApplyFilters}
-                    onClearFilters={handleClearFilters}
-                    categories={mockCategories}
-                    tags={mockTags}
-                    sources={mockSources}
-                    users={mockUsers}
-                    loading={isSearching}
-                  />
-                </div>
-              </Affix>
-            </Col>
-            
-            {/* Main Content */}
-            <Col xs={24} lg={18}>
-              {/* Toolbar */}
-              <Card size="small" style={{ marginBottom: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Space>
-                    <Button
-                      icon={<FilterOutlined />}
-                      onClick={() => setShowFilters(!showFilters)}
-                      type={showFilters ? 'primary' : 'default'}
-                      className="lg:hidden"
-                    >
-                      筛选
-                    </Button>
-                  </Space>
-                  
-                  <Space>
-                    <span>排序：</span>
-                    {sortOptions.map(option => (
-                      <Button
-                        key={option.label}
-                        type={JSON.stringify(currentSort) === JSON.stringify(option.value) ? 'primary' : 'text'}
-                        size="small"
-                        onClick={() => handleSortChange(option.value)}
-                      >
-                        {option.label}
-                      </Button>
-                    ))}
-                  </Space>
-                </div>
-              </Card>
-              
-              {/* Search Results */}
-              <SearchResults
-                hits={searchResult?.hits || []}
-                total={searchResult?.total || 0}
-                page={searchResult?.page || 1}
-                limit={searchResult?.limit || 20}
-                processingTimeMs={searchResult?.processingTimeMs || 0}
-                query={searchResult?.query || ''}
+    <PageContainer
+      title="内容搜索"
+      subTitle="搜索和筛选Blog和Weekly内容"
+    >
+      <div style={{ marginBottom: 24 }}>
+        {/* Search Input */}
+        <SearchInput
+          value={searchOptions.query}
+          placeholder="搜索标题、内容、描述..."
+          onSearch={handleSearch}
+          onInstantSearch={handleInstantSearch}
+          searchHistory={searchHistory}
+          onApplyHistory={applyHistorySearch}
+          onRemoveHistory={removeFromHistory}
+          onClearHistory={clearHistory}
+          size="large"
+        />
+      </div>
+      
+      <Row gutter={24}>
+        {/* Filters Sidebar */}
+        <Col xs={24} lg={6}>
+          <Affix offsetTop={24}>
+            <div style={{ marginBottom: 16 }}>
+              <AdvancedFilters
+                filters={searchOptions.filters || {}}
+                onFiltersChange={handleFiltersChange}
+                onApplyFilters={handleApplyFilters}
+                onClearFilters={handleClearFilters}
+                categories={mockCategories}
+                tags={mockTags}
+                sources={mockSources}
+                users={mockUsers}
                 loading={isSearching}
-                onPageChange={handlePageChange}
-                onItemClick={handleItemClick}
               />
-            </Col>
-          </Row>
-        </div>
-      </Content>
-    </Layout>
+            </div>
+          </Affix>
+        </Col>
+        
+        {/* Main Content */}
+        <Col xs={24} lg={18}>
+          {/* Toolbar */}
+          <Card size="small" style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Space>
+                <Button
+                  icon={<FilterOutlined />}
+                  onClick={() => setShowFilters(!showFilters)}
+                  type={showFilters ? 'primary' : 'default'}
+                  className="lg:hidden"
+                >
+                  筛选
+                </Button>
+              </Space>
+              
+              <Space>
+                <span>排序：</span>
+                {sortOptions.map(option => (
+                  <Button
+                    key={option.label}
+                    type={JSON.stringify(currentSort) === JSON.stringify(option.value) ? 'primary' : 'text'}
+                    size="small"
+                    onClick={() => handleSortChange(option.value)}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+              </Space>
+            </div>
+          </Card>
+          
+          {/* Search Results */}
+          <SearchResults
+            hits={searchResult?.hits || []}
+            total={searchResult?.total || 0}
+            page={searchResult?.page || 1}
+            limit={searchResult?.limit || 20}
+            processingTimeMs={searchResult?.processingTimeMs || 0}
+            query={searchResult?.query || ''}
+            loading={isSearching}
+            onPageChange={handlePageChange}
+            onItemClick={handleItemClick}
+          />
+        </Col>
+      </Row>
+    </PageContainer>
   );
 }

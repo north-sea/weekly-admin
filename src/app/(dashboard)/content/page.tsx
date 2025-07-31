@@ -1,14 +1,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Card, Modal } from 'antd';
+import { Card, Modal, Button } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
+import { PageContainer } from '@ant-design/pro-components';
 import { useNotification } from '@/hooks/useNotification';
 import ContentList from '@/components/content/ContentList';
 import ContentForm from '@/components/content/ContentForm';
 import MarkdownPreview from '@/components/content/MarkdownPreview';
 import { ContentWithRelations } from '@/lib/services/content-api';
 import { apiClient } from '@/lib/api-client';
-import AuthDebug from '@/components/debug/AuthDebug';
+
 
 export default function ContentPage() {
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -88,8 +90,31 @@ export default function ContentPage() {
   };
 
   return (
-    <div style={{ padding: '24px' }}>
-      <AuthDebug />
+    <PageContainer
+      title="内容管理"
+      subTitle="管理Blog和Weekly内容"
+      breadcrumb={{
+        items: [
+          { title: '首页', href: '/dashboard' },
+          { title: '内容管理' },
+        ],
+      }}
+      extra={[
+        <Button 
+          key="create" 
+          type="primary" 
+          icon={<PlusOutlined />}
+          onClick={handleCreate}
+        >
+          创建内容
+        </Button>,
+      ]}
+      tabList={[
+        { tab: '全部内容', key: 'all' },
+        { tab: 'Blog', key: 'blog' },
+        { tab: 'Weekly', key: 'weekly' },
+      ]}
+    >
       <Card>
         <ContentList
           onEdit={handleEdit}
@@ -165,6 +190,6 @@ export default function ContentPage() {
           />
         )}
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

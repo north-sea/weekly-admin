@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Space, message, Spin } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
-import { ProTable } from '@ant-design/pro-components';
+import { ProTable, PageContainer } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
 import { useRouter } from 'next/navigation';
 
@@ -145,38 +145,38 @@ const WeeklyManagePage: React.FC = () => {
   };
 
   return (
-    <div style={{ padding: '24px' }}>
-      <Card>
-        <ProTable<WeeklyIssue>
-          headerTitle="周刊管理"
-          columns={columns}
-          request={fetchWeeklyIssues}
-          rowKey="id"
-          search={{
-            labelWidth: 'auto',
-          }}
-          pagination={{
-            defaultPageSize: 10,
-            showSizeChanger: true,
-          }}
-          toolBarRender={() => [
-            <Button
-              key="create"
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={handleCreateIssue}
-            >
-              创建周刊
-            </Button>,
-          ]}
-          options={{
-            setting: true,
-            reload: true,
-            density: true,
-          }}
-        />
-      </Card>
-    </div>
+    <PageContainer
+      title="周刊管理"
+      subTitle="管理周刊期号和内容"
+      extra={[
+        <Button
+          key="create"
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={handleCreateIssue}
+        >
+          创建周刊
+        </Button>,
+      ]}
+    >
+      <ProTable<WeeklyIssue>
+        columns={columns}
+        request={fetchWeeklyIssues}
+        rowKey="id"
+        search={{
+          labelWidth: 'auto',
+        }}
+        pagination={{
+          defaultPageSize: 10,
+          showSizeChanger: true,
+        }}
+        options={{
+          setting: true,
+          reload: true,
+          density: true,
+        }}
+      />
+    </PageContainer>
   );
 };
 

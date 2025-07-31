@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { OperationLogService } from '@/lib/services/operation-log';
-import { authenticateRequest } from '@/lib/auth';
+import { authMiddleware } from '@/lib/auth-middleware';
 import { prepareApiResponse } from '@/lib/utils/serialization';
 import { z } from 'zod';
 
@@ -19,14 +19,17 @@ const OperationLogQuerySchema = z.object({
 // GET /api/operation-logs - 获取操作日志列表
 export async function GET(request: NextRequest) {
   try {
-    const authResult = await authenticateRequest(request);
-    if (!authResult.success || !authResult.user) {
-      return NextResponse.json({ error: '未授权访问' }, { status: 401 });
-    }
+    const user = await authMiddleware(request);
 
     // 只有管理员可以查看操作日志
-    if (authResult.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: '权限不足' }, { status: 403 });
+    if (user.role !== 'ADMIN') {
+      return NextResponse.json({ 
+        success: false, 
+        error: { 
+          code: 'INSUFFICIENT_PERMISSIONS',
+          message: '权限不足，需要管理员权限' 
+        } 
+      }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -56,14 +59,45 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, data: serializedResult });
   } catch (error) {
     console.error('获取操作日志失败:', error);
+    
+    // 处理认证错误
+    if (error instanceof Error && error.message.includes('认证')) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: { 
+            code: 'AUTHENTICATION_REQUIRED', 
+            message: '请先登录' 
+          } 
+        },
+        { status: 401 }
+      );
+    }
+    
+    // 处理参数验证错误
     if (error instanceof Error && error.name === 'ZodError') {
       return NextResponse.json(
-        { error: '参数验证失败', details: error.message },
+        { 
+          success: false, 
+          error: { 
+            code: 'VALIDATION_ERROR', 
+            message: '参数验证失败', 
+            details: error.message 
+          } 
+        },
         { status: 400 }
       );
     }
+    
+    // 其他错误
     return NextResponse.json(
-      { error: '获取操作日志失败' },
+      { 
+        success: false, 
+        error: { 
+          code: 'GET_OPERATION_LOGS_ERROR', 
+          message: '获取操作日志失败' 
+        } 
+      },
       { status: 500 }
     );
   }

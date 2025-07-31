@@ -2,7 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 import { ProTable, ActionType, ProColumns } from '@ant-design/pro-components';
-import { Button, Tag, Space, Dropdown, MenuProps } from 'antd';
+import { Button, Tag, Space, Dropdown, MenuProps, Tooltip } from 'antd';
 import { useNotification } from '@/hooks/useNotification';
 import { 
   PlusOutlined, 
@@ -297,43 +297,43 @@ export default function ContentList({ onEdit, onView, onCreate }: ContentListPro
     {
       title: '操作',
       key: 'action',
-      width: 150,
+      width: 120,
       search: false,
       render: (_, record) => (
-        <Space>
-          <Button
-            type="link"
-            size="small"
-            icon={<EyeOutlined />}
-            onClick={() => onView?.(record)}
-          >
-            预览
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => onEdit?.(record)}
-          >
-            编辑
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={<HistoryOutlined />}
-            onClick={() => handleShowVersionHistory(Number(record.id))}
-          >
-            版本
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(Number(record.id))}
-          >
-            删除
-          </Button>
+        <Space size="small">
+          <Tooltip title="预览">
+            <Button
+              type="link"
+              size="small"
+              icon={<EyeOutlined />}
+              onClick={() => onView?.(record)}
+            />
+          </Tooltip>
+          <Tooltip title="编辑">
+            <Button
+              type="link"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => onEdit?.(record)}
+            />
+          </Tooltip>
+          <Tooltip title="版本历史">
+            <Button
+              type="link"
+              size="small"
+              icon={<HistoryOutlined />}
+              onClick={() => handleShowVersionHistory(Number(record.id))}
+            />
+          </Tooltip>
+          <Tooltip title="删除">
+            <Button
+              type="link"
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => handleDelete(Number(record.id))}
+            />
+          </Tooltip>
         </Space>
       )
     }

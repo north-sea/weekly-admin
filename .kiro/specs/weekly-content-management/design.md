@@ -59,6 +59,8 @@ graph TB
 - **Next.js 15**: React全栈框架，支持SSR/SSG，API Routes
 - **TypeScript**: 类型安全，提升开发效率和代码质量
 - **Ant Design + Pro-component**: 企业级UI组件库，专业中后台解决方案
+- **ProLayout**: 标准中后台布局组件，提供侧边栏+顶部导航的专业布局
+- **PageContainer**: 页面容器组件，提供统一的页面结构和面包屑导航
 - **React Hook Form + Zod**: 高性能表单处理和运行时类型验证
 - **Zustand**: 轻量级状态管理，简单易用
 
@@ -83,12 +85,12 @@ src/
 │   ├── (auth)/            # 认证相关页面
 │   │   ├── login/
 │   │   └── layout.tsx
-│   ├── (dashboard)/       # 主要功能页面
+│   ├── (dashboard)/       # 主要功能页面（使用ProLayout）
 │   │   ├── contents/      # 内容管理
 │   │   ├── weekly/        # 周刊管理
 │   │   ├── analytics/     # 数据分析
 │   │   ├── settings/      # 系统设置
-│   │   └── layout.tsx
+│   │   └── layout.tsx     # ProLayout布局配置
 │   ├── api/               # API路由
 │   │   ├── auth/
 │   │   ├── contents/
@@ -98,6 +100,10 @@ src/
 │   ├── globals.css
 │   └── layout.tsx
 ├── components/            # 共享组件
+│   ├── layout/           # 布局相关组件
+│   │   ├── ProLayoutWrapper.tsx  # ProLayout包装组件
+│   │   ├── MenuConfig.tsx        # 菜单配置
+│   │   └── HeaderActions.tsx     # 顶部操作组件
 │   ├── ui/               # 基础UI组件
 │   ├── forms/            # 表单组件
 │   ├── editors/          # 编辑器组件
@@ -247,6 +253,218 @@ erDiagram
     
     weekly_issue_contents }o--|| weekly_issues : part_of
     weekly_issue_contents }o--|| contents : includes
+```
+
+## 布局设计
+
+### ProLayout配置
+
+系统采用ProLayout作为主要布局框架，提供标准的中后台管理界面。
+
+#### 布局结构
+
+```typescript
+// components/layout/ProLayoutWrapper.tsx
+import { ProLayout } from '@ant-design/pro-components';
+import { MenuDataItem } from '@ant-design/pro-components';
+
+interface ProLayoutWrapperProps {
+  children: React.ReactNode;
+}
+
+const ProLayoutWrapper: React.FC<ProLayoutWrapperProps> = ({ children }) => {
+  const menuData: MenuDataItem[] = [
+    {
+      path: '/dashboard',
+      name: '仪表板',
+      icon: 'DashboardOutlined',
+    },
+    {
+      path: '/content',
+      name: '内容管理',
+      icon: 'FileTextOutlined',
+      children: [
+        {
+          path: '/content',
+          name: '内容列表',
+        },
+        {
+          path: '/content/create',
+          name: '创建内容',
+        },
+      ],
+    },
+    {
+      path: '/weekly',
+      name: '周刊管理',
+      icon: 'CalendarOutlined',
+      children: [
+        {
+          path: '/weekly',
+          name: '周刊列表',
+        },
+        {
+          path: '/weekly/editor',
+          name: '周刊编辑',
+        },
+      ],
+    },
+    {
+      path: '/search',
+      name: '搜索',
+      icon: 'SearchOutlined',
+    },
+    {
+      path: '/analytics',
+      name: '数据分析',
+      icon: 'BarChartOutlined',
+      children: [
+        {
+          path: '/analytics',
+          name: '基础统计',
+        },
+        {
+          path: '/analytics/advanced',
+          name: '高级分析',
+        },
+        {
+          path: '/analytics/sources',
+          name: '来源分析',
+        },
+      ],
+    },
+    {
+      path: '/operation-logs',
+      name: '操作日志',
+      icon: 'AuditOutlined',
+    },
+    {
+      path: '/settings',
+      name: '系统设置',
+      icon: 'SettingOutlined',
+      children: [
+        {
+          path: '/settings/users',
+          name: '用户管理',
+        },
+        {
+          path: '/settings/categories',
+          name: '分类管理',
+        },
+        {
+          path: '/settings/tags',
+          name: '标签管理',
+        },
+      ],
+    },
+  ];
+
+  return (
+    <ProLayout
+      title="Weekly内容管理系统"
+      logo="/logo.svg"
+      layout="mix"
+      navTheme="light"
+      primaryColor="#1890ff"
+      fixedHeader
+      fixSiderbar
+      menu={{
+        type: 'group',
+        request: async () => menuData,
+      }}
+      avatarProps={{
+        src: '/avatar.png',
+        title: '管理员',
+        size: 'small',
+      }}
+      actionsRender={() => [
+        <HeaderActions key="actions" />,
+      ]}
+      menuFooterRender={(props) => (
+        <div style={{ textAlign: 'center', paddingBlockStart: 12 }}>
+          <div>Weekly CMS v1.0</div>
+        </div>
+      )}
+    >
+      {children}
+    </ProLayout>
+  );
+};
+```
+
+#### PageContainer使用规范
+
+每个功能页面都必须使用PageContainer包装：
+
+```typescript
+// 页面组件示例
+import { PageContainer } from '@ant-design/pro-components';
+
+const ContentListPage: React.FC = () => {
+  return (
+    <PageContainer
+      title="内容管理"
+      subTitle="管理Blog和Weekly内容"
+      breadcrumb={{
+        items: [
+          { title: '首页', href: '/dashboard' },
+          { title: '内容管理' },
+        ],
+      }}
+      extra={[
+        <Button key="create" type="primary" href="/content/create">
+          创建内容
+        </Button>,
+      ]}
+      tabList={[
+        { tab: '全部内容', key: 'all' },
+        { tab: 'Blog', key: 'blog' },
+        { tab: 'Weekly', key: 'weekly' },
+      ]}
+      onTabChange={(key) => handleTabChange(key)}
+    >
+      <ContentList />
+    </PageContainer>
+  );
+};
+```
+
+#### 响应式布局配置
+
+```typescript
+// ProLayout响应式配置
+const layoutSettings = {
+  // 桌面端配置
+  breakpoint: {
+    xs: 480,
+    sm: 576,
+    md: 768,
+    lg: 992,
+    xl: 1200,
+    xxl: 1600,
+  },
+  
+  // 移动端适配
+  isMobile: false,
+  collapsed: false,
+  
+  // 布局配置
+  layout: 'mix', // 混合布局
+  contentWidth: 'Fluid', // 流式宽度
+  fixedHeader: true, // 固定头部
+  fixSiderbar: true, // 固定侧边栏
+  
+  // 主题配置
+  navTheme: 'light',
+  headerTheme: 'light',
+  primaryColor: '#1890ff',
+  
+  // 多标签页配置
+  multiTab: false,
+  
+  // 面包屑配置
+  breadcrumb: true,
+};
 ```
 
 ## 组件设计

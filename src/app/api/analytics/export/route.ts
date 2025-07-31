@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
             AVG(word_count) as avg_word_count,
             SUM(view_count) as total_views
           FROM contents
-          WHERE content_type_id = 4
+          WHERE content_type_id = 3  -- 周刊 (weekly)
             AND created_at >= ${startDate}
             AND created_at <= ${endDate}
           GROUP BY source
@@ -115,8 +115,8 @@ export async function POST(request: NextRequest) {
         }>>`
           SELECT 
             CASE 
-              WHEN content_type_id = 3 THEN 'Blog'
-              WHEN content_type_id = 4 THEN 'Weekly'
+                          WHEN content_type_id = 4 THEN 'Blog'    -- 博客
+            WHEN content_type_id = 3 THEN 'Weekly'  -- 周刊
               ELSE 'Other'
             END as content_type,
             AVG(word_count) as avg_word_count,

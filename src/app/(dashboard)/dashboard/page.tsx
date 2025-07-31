@@ -17,6 +17,7 @@ import {
   Divider,
   Alert
 } from 'antd';
+import { PageContainer } from '@ant-design/pro-components';
 import { 
   LogoutOutlined, 
   UserOutlined, 
@@ -110,51 +111,33 @@ export default function DashboardPage() {
   }
 
   return (
-    <div style={{ 
-      minHeight: '100vh', 
-      padding: '24px',
-      background: '#f0f2f5'
-    }}>
-      <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-        {/* Header */}
-        <Card style={{ marginBottom: '24px' }}>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center'
-          }}>
-            <div>
-              <Title level={2} style={{ margin: 0 }}>
-                <BarChartOutlined style={{ marginRight: '8px' }} />
-                数据仪表板
-              </Title>
-              <Text type="secondary">
-                Weekly 内容管理系统 - 欢迎回来，{user.displayName || user.username}！
-              </Text>
-            </div>
-            <Space>
-              <Select
-                value={timeRange}
-                onChange={handleTimeRangeChange}
-                style={{ width: 120 }}
-                options={[
-                  { label: '最近7天', value: 7 },
-                  { label: '最近30天', value: 30 },
-                  { label: '最近90天', value: 90 },
-                  { label: '最近365天', value: 365 },
-                ]}
-              />
-              <Button 
-                type="primary" 
-                danger 
-                icon={<LogoutOutlined />}
-                onClick={handleLogout}
-              >
-                退出登录
-              </Button>
-            </Space>
-          </div>
-        </Card>
+    <PageContainer
+      title="数据仪表板"
+      subTitle={`欢迎回来，${user.displayName || user.username}！`}
+      extra={[
+        <Select
+          key="timeRange"
+          value={timeRange}
+          onChange={handleTimeRangeChange}
+          style={{ width: 120 }}
+          options={[
+            { label: '最近7天', value: 7 },
+            { label: '最近30天', value: 30 },
+            { label: '最近90天', value: 90 },
+            { label: '最近365天', value: 365 },
+          ]}
+        />,
+        <Button 
+          key="logout"
+          type="primary" 
+          danger 
+          icon={<LogoutOutlined />}
+          onClick={handleLogout}
+        >
+          退出登录
+        </Button>,
+      ]}
+    >
 
         {analyticsError && (
           <Alert
@@ -404,7 +387,6 @@ export default function DashboardPage() {
             </Card>
           </Col>
         </Row>
-      </div>
-    </div>
+    </PageContainer>
   );
 }

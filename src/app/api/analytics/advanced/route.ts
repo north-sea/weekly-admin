@@ -27,8 +27,8 @@ export async function GET(request: NextRequest) {
     }>>`
       SELECT 
         CASE 
-          WHEN content_type_id = 3 THEN 'Blog'
-          WHEN content_type_id = 4 THEN 'Weekly'
+          WHEN content_type_id = 4 THEN 'Blog'    -- 博客
+          WHEN content_type_id = 3 THEN 'Weekly'  -- 周刊
           ELSE 'Other'
         END as content_type,
         AVG(word_count) as avg_word_count,
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
           (CASE WHEN word_count >= 500 THEN 1 ELSE 0 END * 0.3) +
           (CASE WHEN description IS NOT NULL AND description != '' THEN 1 ELSE 0 END * 0.2) +
           (CASE WHEN view_count >= 10 THEN 1 ELSE 0 END * 0.2) +
-          (CASE WHEN content_type_id = 4 AND source IS NOT NULL AND source != '' THEN 1 ELSE 0 END * 0.3)
+          (CASE WHEN content_type_id = 3 AND source IS NOT NULL AND source != '' THEN 1 ELSE 0 END * 0.3)  -- 周刊
         ) as quality_score,
         COUNT(*) as total_contents,
         COUNT(CASE 
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
             (CASE WHEN word_count >= 500 THEN 1 ELSE 0 END * 0.3) +
             (CASE WHEN description IS NOT NULL AND description != '' THEN 1 ELSE 0 END * 0.2) +
             (CASE WHEN view_count >= 10 THEN 1 ELSE 0 END * 0.2) +
-            (CASE WHEN content_type_id = 4 AND source IS NOT NULL AND source != '' THEN 1 ELSE 0 END * 0.3)
+            (CASE WHEN content_type_id = 3 AND source IS NOT NULL AND source != '' THEN 1 ELSE 0 END * 0.3)  -- 周刊
           ) >= 0.7 THEN 1 
         END) as high_quality_contents,
         COUNT(CASE 
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
             (CASE WHEN word_count >= 500 THEN 1 ELSE 0 END * 0.3) +
             (CASE WHEN description IS NOT NULL AND description != '' THEN 1 ELSE 0 END * 0.2) +
             (CASE WHEN view_count >= 10 THEN 1 ELSE 0 END * 0.2) +
-            (CASE WHEN content_type_id = 4 AND source IS NOT NULL AND source != '' THEN 1 ELSE 0 END * 0.3)
+            (CASE WHEN content_type_id = 3 AND source IS NOT NULL AND source != '' THEN 1 ELSE 0 END * 0.3)  -- 周刊
           ) < 0.3 THEN 1 
         END) as low_quality_contents
       FROM contents
@@ -183,8 +183,8 @@ export async function GET(request: NextRequest) {
         co.id,
         co.title,
         CASE 
-          WHEN co.content_type_id = 3 THEN 'Blog'
-          WHEN co.content_type_id = 4 THEN 'Weekly'
+                      WHEN co.content_type_id = 4 THEN 'Blog'    -- 博客
+            WHEN co.content_type_id = 3 THEN 'Weekly'  -- 周刊
           ELSE 'Other'
         END as content_type,
         co.word_count,

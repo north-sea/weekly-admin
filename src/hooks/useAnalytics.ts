@@ -84,20 +84,16 @@ export const useAnalytics = (timeRange: number = 30) => {
       setLoading(true);
       setError(null);
       
-      const response = await apiClient.get(`/api/analytics?timeRange=${timeRange}`);
+      // apiClient.get() 直接返回解析后的 JSON 数据
+      const result = await apiClient.get(`/api/analytics?timeRange=${timeRange}`);
       
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          setData(result.data);
-        } else {
-          setError(result.error?.message || '获取统计数据失败');
-        }
+      if (result.success) {
+        setData(result.data);
       } else {
-        const errorResult = await response.json();
-        setError(errorResult.error?.message || '获取统计数据失败');
+        setError(result.error?.message || '获取统计数据失败');
       }
     } catch (err) {
+      // apiClient 会在请求失败时抛出异常
       setError(err instanceof Error ? err.message : '获取统计数据失败');
     } finally {
       setLoading(false);

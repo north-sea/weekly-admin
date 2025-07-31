@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
         SUM(view_count) as total_views,
         MAX(created_at) as latest_content_date
       FROM contents
-      WHERE content_type_id = 4
+      WHERE content_type_id = 3  -- 周刊 (weekly)
         AND created_at >= ${startDate}
         AND created_at <= ${endDate}
       GROUP BY source
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
           ((COUNT(CASE WHEN source_url IS NOT NULL AND source_url != '' THEN 1 END) * 100.0 / COUNT(*)) / 100.0 * 0.2)
         ) as quality_score
       FROM contents
-      WHERE content_type_id = 4
+      WHERE content_type_id = 3  -- 周刊 (weekly)
         AND status = 'published'
         AND created_at >= ${startDate}
         AND created_at <= ${endDate}
@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
           (CASE WHEN description IS NOT NULL AND description != '' THEN 1 ELSE 0 END * 0.3)
         ) as avg_quality
       FROM contents
-      WHERE content_type_id = 4
+      WHERE content_type_id = 3  -- 周刊 (weekly)
         AND status = 'published'
         AND created_at >= ${startDate}
         AND created_at <= ${endDate}
@@ -152,9 +152,9 @@ export async function GET(request: NextRequest) {
       source: string;
       first_content_date: Date;
       last_content_date: Date;
-      active_days: number;
+      active_days: bigint | number;  // DATEDIFF 可能返回 bigint
       content_frequency: number;
-      is_active: boolean;
+      is_active: bigint | boolean;   // MySQL 布尔表达式可能返回 bigint
     }>>`
       SELECT 
         COALESCE(source, '未知来源') as source,
@@ -164,7 +164,7 @@ export async function GET(request: NextRequest) {
         COUNT(*) / (DATEDIFF(MAX(created_at), MIN(created_at)) + 1) as content_frequency,
         (DATEDIFF(NOW(), MAX(created_at)) <= 30) as is_active
       FROM contents
-      WHERE content_type_id = 4
+      WHERE content_type_id = 3  -- 周刊 (weekly)
         AND status = 'published'
       GROUP BY source
       HAVING COUNT(*) >= 3
@@ -212,14 +212,27 @@ export async function GET(request: NextRequest) {
         contentCount: Number(item.content_count),
         avgQuality: Math.round((item.avg_quality || 0) * 100) / 100,
       })),
-      activity: sourceActivity.map(item => ({
-        source: item.source,
-        firstContentDate: item.first_content_date,
-        lastContentDate: item.last_content_date,
-        activeDays: item.active_days,
-        contentFrequency: Math.round((item.content_frequency || 0) * 100) / 100,
-        isActive: Boolean(item.is_active),
-      })),
+      activity: sourceActivity.map(item => {
+        // 调试日志：检查 BigInt 类型的字段
+        if (process.env.NODE_ENV === 'development') {
+          const debugInfo = {
+            active_days_type: typeof item.active_days,
+            active_days_value: item.active_days,
+            is_active_type: typeof item.is_active,
+            is_active_value: item.is_active,
+          };
+          console.log('Source Activity Debug:', item.source, debugInfo);
+        }
+
+        return {
+          source: item.source,
+          firstContentDate: item.first_content_date,
+          lastContentDate: item.last_content_date,
+          activeDays: Number(item.active_days),  // 强制转换为数字
+          contentFrequency: Math.round((item.content_frequency || 0) * 100) / 100,
+          isActive: Boolean(Number(item.is_active)),  // 先转换为数字再转换为布尔值
+        };
+      }),
       timeRange: {
         days,
         startDate: startDate.toISOString(),

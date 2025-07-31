@@ -15,9 +15,11 @@ import {
   Statistic,
   Alert,
   Tooltip,
+  Popover,
   Modal,
   message
 } from 'antd';
+import { PageContainer } from '@ant-design/pro-components';
 import { 
   SearchOutlined, 
   DownloadOutlined, 
@@ -274,20 +276,56 @@ const OperationLogsPage: React.FC = () => {
       ellipsis: true,
       render: (details) => {
         if (!details) return '-';
+        
+        // 格式化显示内容
+        let formattedContent;
         try {
           const parsed = JSON.parse(details);
-          return (
-            <Tooltip title={<pre>{JSON.stringify(parsed, null, 2)}</pre>}>
-              <span>{details.substring(0, 50)}...</span>
-            </Tooltip>
-          );
+          formattedContent = JSON.stringify(parsed, null, 2);
         } catch {
-          return (
-            <Tooltip title={details}>
-              <span>{details.substring(0, 50)}...</span>
-            </Tooltip>
-          );
+          formattedContent = details;
         }
+        
+        // Popover 内容组件
+        const popoverContent = (
+          <div style={{ maxWidth: 400, maxHeight: 300, overflow: 'auto' }}>
+            <pre 
+              style={{
+                margin: 0,
+                padding: '8px',
+                backgroundColor: '#f5f5f5',
+                borderRadius: '4px',
+                fontSize: '12px',
+                lineHeight: '1.4',
+                wordWrap: 'break-word',
+                whiteSpace: 'pre-wrap',
+                overflow: 'auto'
+              }}
+            >
+              {formattedContent}
+            </pre>
+          </div>
+        );
+        
+        return (
+          <Popover
+            content={popoverContent}
+            title="操作详情"
+            placement="topLeft"
+            trigger="hover"
+            overlayStyle={{ maxWidth: 450 }}
+          >
+            <span 
+              style={{ 
+                cursor: 'pointer',
+                color: '#1890ff',
+                borderBottom: '1px dashed #1890ff'
+              }}
+            >
+              {details.substring(0, 50)}...
+            </span>
+          </Popover>
+        );
       }
     },
     {
@@ -312,9 +350,10 @@ const OperationLogsPage: React.FC = () => {
   ];
 
   return (
-    <div style={{ padding: '24px' }}>
-      <h1>操作日志管理</h1>
-      
+    <PageContainer
+      title="操作日志"
+      subTitle="查看系统操作记录和用户活动"
+    >
       {/* 异常操作告警 */}
       {showAnomalousAlert && anomalousOperations.length > 0 && (
         <Alert
@@ -478,7 +517,7 @@ const OperationLogsPage: React.FC = () => {
           scroll={{ x: 1200 }}
         />
       </Card>
-    </div>
+    </PageContainer>
   );
 };
 

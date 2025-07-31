@@ -3,123 +3,152 @@ import { prisma } from '@/lib/db';
 import { authMiddleware } from '@/lib/auth-middleware';
 
 export async function GET(request: NextRequest) {
+  const startTime = Date.now();
+  
   try {
     const user = await authMiddleware(request);
     const { searchParams } = new URL(request.url);
     const timeRange = searchParams.get('timeRange') || '30'; // 默认30天
     const days = parseInt(timeRange);
 
+    // 限制时间范围，避免查询过大数据集
+    if (days > 365) {
+      return NextResponse.json(
+        { success: false, error: { code: 'INVALID_TIME_RANGE', message: '时间范围不能超过365天' } },
+        { status: 400 }
+      );
+    }
+
     // 计算时间范围
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    // 基础统计
-    const [
-      totalContents,
-      totalBlogContents,
-      totalWeeklyContents,
-      publishedContents,
-      draftContents,
-      totalCategories,
-      totalTags,
-      totalWeeklyIssues,
-      publishedWeeklyIssues,
-    ] = await Promise.all([
-      // 总内容数
-      prisma.contents.count(),
-      // Blog内容数
-      prisma.contents.count({
-        where: { content_type_id: 3 }
-      }),
-      // Weekly内容数
-      prisma.contents.count({
-        where: { content_type_id: 4 }
-      }),
-      // 已发布内容数
-      prisma.contents.count({
-        where: { status: 'published' }
-      }),
-      // 草稿内容数
-      prisma.contents.count({
-        where: { status: 'draft' }
-      }),
-      // 分类总数
+    // 基础统计 - 使用单个查询获取内容统计，减少数据库往返
+    const contentStats = await prisma.$queryRaw<Array<{
+      content_type_id: number,
+      status: string,
+      count: bigint
+    }>>`
+      SELECT 
+        content_type_id,
+        status,
+        COUNT(*) as count
+      FROM contents
+      GROUP BY content_type_id, status
+    `;
+
+    // 其他基础统计
+    const [totalCategories, totalTags, totalWeeklyIssues, publishedWeeklyIssues] = await Promise.all([
       prisma.categories.count(),
-      // 标签总数
       prisma.tags.count(),
-      // 周刊期号总数
       prisma.weekly_issues.count(),
-      // 已发布周刊期号数
-      prisma.weekly_issues.count({
-        where: { status: 'published' }
-      }),
+      prisma.weekly_issues.count({ where: { status: 'published' } }),
     ]);
 
-    // 发布趋势分析（按日统计）
-    const publishTrend = await prisma.$queryRaw<Array<{date: string, count: bigint}>>`
-      SELECT 
-        DATE(created_at) as date,
-        COUNT(*) as count
-      FROM contents 
-      WHERE created_at >= ${startDate}
-        AND created_at <= ${endDate}
-        AND status = 'published'
-      GROUP BY DATE(created_at)
-      ORDER BY date ASC
-    `;
+    // 从聚合结果中计算各项统计
+    const totalContents = contentStats.reduce((sum, stat) => sum + Number(stat.count), 0);
+    const totalBlogContents = contentStats
+      .filter(stat => stat.content_type_id === 4)  // 博客 (blog)
+      .reduce((sum, stat) => sum + Number(stat.count), 0);
+    const totalWeeklyContents = contentStats
+      .filter(stat => stat.content_type_id === 3)  // 周刊 (weekly)
+      .reduce((sum, stat) => sum + Number(stat.count), 0);
+    const publishedContents = contentStats
+      .filter(stat => stat.status === 'published')
+      .reduce((sum, stat) => sum + Number(stat.count), 0);
+    const draftContents = contentStats
+      .filter(stat => stat.status === 'draft')
+      .reduce((sum, stat) => sum + Number(stat.count), 0);
 
-    // 内容类型分布
-    const contentTypeDistribution = await prisma.$queryRaw<Array<{type: string, count: bigint}>>`
-      SELECT 
-        CASE 
-          WHEN content_type_id = 3 THEN 'Blog'
-          WHEN content_type_id = 4 THEN 'Weekly'
-          ELSE 'Other'
-        END as type,
-        COUNT(*) as count
-      FROM contents
-      GROUP BY content_type_id
-    `;
+    // 第一组查询：趋势和分布分析
+    const [publishTrend, contentTypeDistribution] = await Promise.all([
+      // 发布趋势分析（按日统计）
+      prisma.$queryRaw<Array<{date: string, count: bigint}>>`
+        SELECT 
+          DATE(created_at) as date,
+          COUNT(*) as count
+        FROM contents 
+        WHERE created_at >= ${startDate}
+          AND created_at <= ${endDate}
+          AND status = 'published'
+        GROUP BY DATE(created_at)
+        ORDER BY date ASC
+      `,
+      // 内容类型分布
+      prisma.$queryRaw<Array<{type: string, count: bigint}>>`
+        SELECT 
+          CASE 
+            WHEN content_type_id = 4 THEN 'Blog'    -- 博客
+            WHEN content_type_id = 3 THEN 'Weekly'  -- 周刊
+            ELSE 'Other'
+          END as type,
+          COUNT(*) as count
+        FROM contents
+        GROUP BY content_type_id
+      `
+    ]);
 
-    // 分类使用统计（前10）
-    const categoryStats = await prisma.$queryRaw<Array<{name: string, count: bigint}>>`
-      SELECT 
-        c.name,
-        COUNT(co.id) as count
-      FROM categories c
-      LEFT JOIN contents co ON c.id = co.category_id
-      GROUP BY c.id, c.name
-      ORDER BY count DESC
-      LIMIT 10
-    `;
+    // 第二组查询：分类和标签统计
+    const [categoryStats, tagStats] = await Promise.all([
+      // 分类使用统计（前10）
+      prisma.$queryRaw<Array<{name: string, count: bigint}>>`
+        SELECT 
+          c.name,
+          COUNT(co.id) as count
+        FROM categories c
+        LEFT JOIN contents co ON c.id = co.category_id
+        GROUP BY c.id, c.name
+        ORDER BY count DESC
+        LIMIT 10
+      `,
+      // 标签使用统计（前20）
+      prisma.$queryRaw<Array<{name: string, count: bigint}>>`
+        SELECT 
+          t.name,
+          COUNT(ct.content_id) as count
+        FROM tags t
+        LEFT JOIN content_tags ct ON t.id = ct.tag_id
+        GROUP BY t.id, t.name
+        ORDER BY count DESC
+        LIMIT 20
+      `
+    ]);
 
-    // 标签使用统计（前20）
-    const tagStats = await prisma.$queryRaw<Array<{name: string, count: bigint}>>`
-      SELECT 
-        t.name,
-        COUNT(ct.content_id) as count
-      FROM tags t
-      LEFT JOIN content_tags ct ON t.id = ct.tag_id
-      GROUP BY t.id, t.name
-      ORDER BY count DESC
-      LIMIT 20
-    `;
+    // 第三组查询：来源统计和质量分析
+    const [sourceStats, qualityAnalysis] = await Promise.all([
+      // Weekly来源统计（前10）
+      prisma.$queryRaw<Array<{source: string, count: bigint}>>`
+        SELECT 
+          COALESCE(source, '未知来源') as source,
+          COUNT(*) as count
+        FROM contents
+        WHERE content_type_id = 3  -- 周刊 (weekly)
+          AND status = 'published'
+        GROUP BY source
+        ORDER BY count DESC
+        LIMIT 10
+      `,
+      // 内容质量分析
+      prisma.$queryRaw<Array<{
+        avg_word_count: number,
+        avg_reading_time: number,
+        total_views: bigint,
+        contents_with_description: bigint,
+        contents_with_source: bigint
+      }>>`
+        SELECT 
+          AVG(word_count) as avg_word_count,
+          AVG(reading_time) as avg_reading_time,
+          SUM(view_count) as total_views,
+          COUNT(CASE WHEN description IS NOT NULL AND description != '' THEN 1 END) as contents_with_description,
+          COUNT(CASE WHEN source IS NOT NULL AND source != '' THEN 1 END) as contents_with_source
+        FROM contents
+        WHERE status = 'published'
+      `
+    ]);
 
-    // Weekly来源统计（前10）
-    const sourceStats = await prisma.$queryRaw<Array<{source: string, count: bigint}>>`
-      SELECT 
-        COALESCE(source, '未知来源') as source,
-        COUNT(*) as count
-      FROM contents
-      WHERE content_type_id = 4
-        AND status = 'published'
-      GROUP BY source
-      ORDER BY count DESC
-      LIMIT 10
-    `;
-
-    // 最近活动（最近10条操作日志）
+    // 最后查询：最近活动（较轻量的查询）
     const recentActivities = await prisma.operation_logs.findMany({
       take: 10,
       orderBy: { created_at: 'desc' },
@@ -132,24 +161,6 @@ export async function GET(request: NextRequest) {
         }
       }
     });
-
-    // 内容质量分析
-    const qualityAnalysis = await prisma.$queryRaw<Array<{
-      avg_word_count: number,
-      avg_reading_time: number,
-      total_views: bigint,
-      contents_with_description: bigint,
-      contents_with_source: bigint
-    }>>`
-      SELECT 
-        AVG(word_count) as avg_word_count,
-        AVG(reading_time) as avg_reading_time,
-        SUM(view_count) as total_views,
-        COUNT(CASE WHEN description IS NOT NULL AND description != '' THEN 1 END) as contents_with_description,
-        COUNT(CASE WHEN source IS NOT NULL AND source != '' THEN 1 END) as contents_with_source
-      FROM contents
-      WHERE status = 'published'
-    `;
 
     const stats = {
       overview: {
@@ -230,18 +241,41 @@ export async function GET(request: NextRequest) {
       },
     };
 
+    const executionTime = Date.now() - startTime;
+    
+    // 性能监控日志
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Analytics API executed in ${executionTime}ms for ${days} days range`);
+    }
+
     return NextResponse.json({
       success: true,
       data: stats,
+      meta: {
+        executionTime,
+        timeRange: days,
+        queriedAt: new Date().toISOString(),
+      },
     });
   } catch (error) {
-    console.error('Get analytics error:', error);
+    const executionTime = Date.now() - startTime;
+    
+    console.error('Get analytics error:', {
+      error: error instanceof Error ? error.message : error,
+      executionTime,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    
     return NextResponse.json(
       {
         success: false,
         error: {
           code: 'GET_ANALYTICS_ERROR',
           message: error instanceof Error ? error.message : '获取统计数据失败',
+        },
+        meta: {
+          executionTime,
+          failedAt: new Date().toISOString(),
         },
       },
       { status: 500 }
