@@ -1,6 +1,9 @@
 import { ContentInput, ContentQuery, ContentUpdate, BatchOperation } from '@/lib/validations/content';
 import { prisma } from '@/lib/db';
 import { syncContentToSearch, removeContentFromSearch } from '@/lib/search';
+import { VersionService } from './version';
+import { OperationLogger } from '@/lib/middleware/operation-logger';
+import { NextRequest } from 'next/server';
 
 export interface ContentWithRelations {
   id: bigint;
@@ -225,7 +228,7 @@ export class ContentService {
   }
   
   // 创建内容
-  static async createContent(data: ContentInput, userId: number): Promise<ContentWithRelations> {
+  static async createContent(data: ContentInput, userId: number, request?: NextRequest): Promise<ContentWithRelations> {
     const { tag_ids, ...contentData } = data;
     
     // 生成slug
@@ -259,6 +262,41 @@ export class ContentService {
       throw new Error('Failed to retrieve created content');
     }
     
+    // 创建初始版本
+    try {
+      await VersionService.createVersion(
+        content.id,
+        {
+          title: data.title,
+          content: data.content,
+          description: data.description,
+          source: data.source,
+          source_url: data.source_url,
+          changes_summary: '初始版本'
+        },
+        userId
+      );
+    } catch (error) {
+      console.error('Failed to create initial version:', error);
+    }
+    
+    // 记录操作日志
+    try {
+      await OperationLogger.logContentOperation(
+        userId,
+        'CREATE',
+        Number(content.id),
+        {
+          title: data.title,
+          contentType: data.content_type_id === 3 ? 'weekly' : 'blog',
+          status: data.status
+        },
+        request
+      );
+    } catch (error) {
+      console.error('Failed to log content creation:', error);
+    }
+    
     // Sync to search index
     try {
       await syncContentToSearch(result);
@@ -270,9 +308,18 @@ export class ContentService {
   }
   
   // 更新内容
-  static async updateContent(data: ContentUpdate): Promise<ContentWithRelations> {
+  static async updateContent(data: ContentUpdate, userId: number, request?: NextRequest): Promise<ContentWithRelations> {
     const { id, tag_ids, ...updateData } = data;
     const contentId = BigInt(id);
+    
+    // 获取更新前的内容以便比较变化
+    const oldContent = await prisma.contents.findUnique({
+      where: { id: contentId }
+    });
+    
+    if (!oldContent) {
+      throw new Error('Content not found');
+    }
     
     // 更新基本信息
     await prisma.contents.update({
@@ -311,6 +358,46 @@ export class ContentService {
       throw new Error('Failed to retrieve updated content');
     }
     
+    // 创建版本历史
+    try {
+      const changes = this.detectChanges(oldContent, updateData);
+      const changesSummary = this.generateChangesSummary(changes);
+      
+      await VersionService.createVersion(
+        contentId,
+        {
+          title: updateData.title || oldContent.title,
+          content: updateData.content || oldContent.content,
+          description: updateData.description || oldContent.description,
+          source: updateData.source || oldContent.source,
+          source_url: updateData.source_url || oldContent.source_url,
+          changes_summary: changesSummary
+        },
+        userId
+      );
+    } catch (error) {
+      console.error('Failed to create version:', error);
+    }
+    
+    // 记录操作日志
+    try {
+      const changes = this.detectChanges(oldContent, updateData);
+      await OperationLogger.logContentOperation(
+        userId,
+        'UPDATE',
+        id,
+        {
+          title: updateData.title || oldContent.title,
+          contentType: oldContent.content_type_id === 3 ? 'weekly' : 'blog',
+          status: updateData.status || oldContent.status,
+          changes
+        },
+        request
+      );
+    } catch (error) {
+      console.error('Failed to log content update:', error);
+    }
+    
     // Sync to search index
     try {
       await syncContentToSearch(result);
@@ -322,8 +409,14 @@ export class ContentService {
   }
   
   // 删除内容
-  static async deleteContent(id: number): Promise<void> {
+  static async deleteContent(id: number, userId: number, request?: NextRequest): Promise<void> {
     const contentId = BigInt(id);
+    
+    // 获取内容信息用于日志记录
+    const content = await prisma.contents.findUnique({
+      where: { id: contentId },
+      select: { title: true, content_type_id: true, status: true }
+    });
     
     // 删除相关数据
     await Promise.all([
@@ -343,6 +436,25 @@ export class ContentService {
     // 删除内容
     await prisma.contents.delete({ where: { id: contentId } });
     
+    // 记录操作日志
+    if (content) {
+      try {
+        await OperationLogger.logContentOperation(
+          userId,
+          'DELETE',
+          id,
+          {
+            title: content.title,
+            contentType: content.content_type_id === 3 ? 'weekly' : 'blog',
+            status: content.status || 'unknown'
+          },
+          request
+        );
+      } catch (error) {
+        console.error('Failed to log content deletion:', error);
+      }
+    }
+    
     // Remove from search index
     try {
       await removeContentFromSearch(id);
@@ -352,14 +464,14 @@ export class ContentService {
   }
   
   // 批量操作
-  static async batchOperation(operation: BatchOperation): Promise<void> {
+  static async batchOperation(operation: BatchOperation, userId: number, request?: NextRequest): Promise<void> {
     const { ids, operation: op } = operation;
     const contentIds = ids.map(id => BigInt(id));
     
     switch (op) {
       case 'delete':
         for (const id of ids) {
-          await this.deleteContent(id);
+          await this.deleteContent(id, userId, request);
         }
         break;
         
@@ -397,6 +509,23 @@ export class ContentService {
           data: { featured: false }
         });
         break;
+    }
+    
+    // 记录批量操作日志
+    try {
+      await OperationLogger.logBatchOperation(
+        userId,
+        op === 'delete' ? 'DELETE' : 'UPDATE',
+        'content',
+        {
+          operation: op,
+          resourceIds: ids,
+          affectedCount: ids.length
+        },
+        request
+      );
+    } catch (error) {
+      console.error('Failed to log batch operation:', error);
     }
   }
   
@@ -445,5 +574,59 @@ export class ContentService {
       .replace(/[\s_-]+/g, '-')
       .replace(/^-+|-+$/g, '')
       .substring(0, 100);
+  }
+  
+  // 检测内容变化
+  private static detectChanges(
+    oldContent: any,
+    newData: Partial<ContentUpdate>
+  ): Record<string, { old: any; new: any }> {
+    const changes: Record<string, { old: any; new: any }> = {};
+    
+    const fieldsToCheck = ['title', 'content', 'description', 'status', 'source', 'source_url'];
+    
+    fieldsToCheck.forEach(field => {
+      if (newData[field as keyof ContentUpdate] !== undefined && 
+          newData[field as keyof ContentUpdate] !== oldContent[field]) {
+        changes[field] = {
+          old: oldContent[field],
+          new: newData[field as keyof ContentUpdate]
+        };
+      }
+    });
+    
+    return changes;
+  }
+  
+  // 生成变化摘要
+  private static generateChangesSummary(changes: Record<string, { old: any; new: any }>): string {
+    const changeDescriptions: string[] = [];
+    
+    Object.keys(changes).forEach(field => {
+      switch (field) {
+        case 'title':
+          changeDescriptions.push('修改了标题');
+          break;
+        case 'content':
+          changeDescriptions.push('修改了内容');
+          break;
+        case 'description':
+          changeDescriptions.push('修改了描述');
+          break;
+        case 'status':
+          changeDescriptions.push(`状态从 ${changes[field].old} 改为 ${changes[field].new}`);
+          break;
+        case 'source':
+          changeDescriptions.push('修改了来源');
+          break;
+        case 'source_url':
+          changeDescriptions.push('修改了来源链接');
+          break;
+        default:
+          changeDescriptions.push(`修改了 ${field}`);
+      }
+    });
+    
+    return changeDescriptions.length > 0 ? changeDescriptions.join(', ') : '内容更新';
   }
 }

@@ -58,7 +58,7 @@ export async function PUT(
     const body = await request.json();
     const validatedData = ContentUpdateSchema.parse({ ...body, id });
     
-    const content = await ContentService.updateContent(validatedData);
+    const content = await ContentService.updateContent(validatedData, authResult.user.id, request);
     
     // 处理 BigInt 序列化问题
     const serializedContent = prepareApiResponse(content);
@@ -95,7 +95,7 @@ export async function DELETE(
       return NextResponse.json({ error: '无效的内容ID' }, { status: 400 });
     }
 
-    await ContentService.deleteContent(id);
+    await ContentService.deleteContent(id, authResult.user.id, request);
     
     return NextResponse.json({ message: '内容删除成功' });
   } catch (error) {

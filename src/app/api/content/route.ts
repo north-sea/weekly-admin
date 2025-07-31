@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = ContentSchema.parse(body);
     
-    const content = await ContentService.createContent(validatedData, authResult.user.id);
+    const content = await ContentService.createContent(validatedData, authResult.user.id, request);
     
     // 处理 BigInt 序列化问题
     const serializedContent = prepareApiResponse(content);

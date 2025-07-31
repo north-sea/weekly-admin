@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = BatchOperationSchema.parse(body);
     
-    await ContentService.batchOperation(validatedData);
+    await ContentService.batchOperation(validatedData, authResult.user.id, request);
     
     return NextResponse.json({ message: '批量操作执行成功' });
   } catch (error) {

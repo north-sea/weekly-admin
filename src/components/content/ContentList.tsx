@@ -10,10 +10,12 @@ import {
   DeleteOutlined, 
   EyeOutlined,
   MoreOutlined,
-  StarFilled
+  StarFilled,
+  HistoryOutlined
 } from '@ant-design/icons';
 import { ContentWithRelations } from '@/lib/services/content-api';
 import { apiClient } from '@/lib/api-client';
+import VersionHistory from './VersionHistory';
 
 // API 响应类型定义
 interface ContentListResponse {
@@ -36,6 +38,8 @@ export default function ContentList({ onEdit, onView, onCreate }: ContentListPro
   const actionRef = useRef<ActionType>(null);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [loading, setLoading] = useState(false);
+  const [versionHistoryVisible, setVersionHistoryVisible] = useState(false);
+  const [selectedContentId, setSelectedContentId] = useState<number | null>(null);
   const { message, modal } = useNotification();
 
   // 状态标签颜色映射
@@ -149,6 +153,12 @@ export default function ContentList({ onEdit, onView, onCreate }: ContentListPro
         }
       }
     });
+  };
+
+  // 显示版本历史
+  const handleShowVersionHistory = (contentId: number) => {
+    setSelectedContentId(contentId);
+    setVersionHistoryVisible(true);
   };
 
   // 批量操作菜单
@@ -310,6 +320,14 @@ export default function ContentList({ onEdit, onView, onCreate }: ContentListPro
           <Button
             type="link"
             size="small"
+            icon={<HistoryOutlined />}
+            onClick={() => handleShowVersionHistory(Number(record.id))}
+          >
+            版本
+          </Button>
+          <Button
+            type="link"
+            size="small"
             danger
             icon={<DeleteOutlined />}
             onClick={() => handleDelete(Number(record.id))}
@@ -322,6 +340,7 @@ export default function ContentList({ onEdit, onView, onCreate }: ContentListPro
   ];
 
   return (
+    <>
     <ProTable<ContentWithRelations>
       columns={columns}
       actionRef={actionRef}
@@ -378,5 +397,21 @@ export default function ContentList({ onEdit, onView, onCreate }: ContentListPro
         }
       }}
     />
+    
+    {/* 版本历史对话框 */}
+    {selectedContentId && (
+      <VersionHistory
+        contentId={selectedContentId}
+        visible={versionHistoryVisible}
+        onClose={() => {
+          setVersionHistoryVisible(false);
+          setSelectedContentId(null);
+        }}
+        onVersionRestored={() => {
+          actionRef.current?.reload();
+        }}
+      />
+    )}
+  </>
   );
 }
