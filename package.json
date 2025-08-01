@@ -10,7 +10,8 @@
     "lint": "next lint",
     "db:generate": "pnpm prisma generate",
     "db:pull": "pnpm prisma db pull",
-    "db:migrate": "pnpm tsx scripts/migrate-db.ts"
+    "db:migrate": "pnpm tsx scripts/migrate-db.ts",
+    "validate-startup": "tsx scripts/validate-startup.ts"
   },
   "dependencies": {
     "@ant-design/charts": "^2.6.1",

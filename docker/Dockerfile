@@ -49,8 +49,23 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD node docker/healthcheck.js
 
-# Start the application
-CMD ["pnpm", "start"]
+# Create startup script that validates environment before starting the application
+RUN echo '#!/bin/sh\n\
+echo "🚀 Starting Weekly Content Management System..."\n\
+echo "📋 Validating startup configuration..."\n\
+\n\
+# Run startup validation\n\
+if ! pnpm validate-startup; then\n\
+  echo "❌ Startup validation failed - exiting"\n\
+  exit 1\n\
+fi\n\
+\n\
+echo "✅ Startup validation passed - starting application"\n\
+exec pnpm start\n\
+' > /app/docker-entrypoint.sh && chmod +x /app/docker-entrypoint.sh
+
+# Start the application with validation
+CMD ["/app/docker-entrypoint.sh"]

@@ -189,13 +189,57 @@ networks:
    docker-compose up -d app
    ```
 
-## 健康检查和监控
+## 启动验证和健康检查
 
-应用程序包含健康检查端点：
+### 启动验证
+
+应用程序在启动时会自动验证所有必需的配置和服务连接：
+
+1. **环境变量验证**
+   - 检查所有必需的环境变量是否存在
+   - 验证配置格式和有效性
+   - 提供详细的错误信息
+
+2. **数据库连接验证**
+   - 测试数据库连接
+   - 验证数据库访问权限
+   - 检查数据库架构
+
+3. **Meilisearch 连接验证**
+   - 测试搜索服务连接
+   - 验证 API 密钥（如果配置）
+   - 检查服务可用性
+
+4. **图片上传服务验证**
+   - 验证上传 URL 格式
+   - 检查认证令牌配置
+   - 提供配置状态反馈
+
+### 手动验证
+
+在部署前，可以手动运行启动验证：
 
 ```bash
-# 检查应用状态
+# 在本地验证配置
+npm run validate-startup
+
+# 在 Docker 容器中验证
+docker run --rm -it --env-file .env weekly-content-management:latest npm run validate-startup
+```
+
+### 健康检查端点
+
+应用程序提供多个健康检查端点：
+
+```bash
+# 完整健康检查（包括启动验证）
 curl http://localhost:3000/api/health
+
+# 启动验证专用端点
+curl http://localhost:3000/api/health/startup
+
+# 数据库健康检查
+curl http://localhost:3000/api/health/db
 
 # 查看容器状态
 docker-compose ps
@@ -204,23 +248,72 @@ docker-compose ps
 docker-compose logs -f app
 ```
 
+### 健康检查响应示例
+
+**成功响应：**
+```json
+{
+  "success": true,
+  "status": "healthy",
+  "message": "Application initialized successfully and all services are connected",
+  "timestamp": "2024-01-01T12:00:00.000Z",
+  "initialized": true,
+  "environment": "production",
+  "services": {
+    "database": "connected",
+    "meilisearch": "connected",
+    "imageUpload": "configured"
+  }
+}
+```
+
+**失败响应：**
+```json
+{
+  "success": false,
+  "status": "unhealthy",
+  "message": "Application startup validation failed",
+  "error": "Database connection refused. Check if the database server is running and accessible.",
+  "timestamp": "2024-01-01T12:00:00.000Z",
+  "initialized": false
+}
+```
+
 ## 故障排除
 
 ### 常见问题
 
-1. **数据库连接失败**
-   - 检查 `DB_HOST` 是否正确
-   - 确认 MySQL 容器正在运行
-   - 验证网络连接
+1. **启动验证失败**
+   - **环境变量缺失**：检查 `.env` 文件是否包含所有必需变量
+   - **配置格式错误**：验证 URL 格式、端口号等配置项
+   - **JWT 密钥过短**：确保 JWT_SECRET 至少 32 个字符
 
-2. **Meilisearch 连接失败**
-   - 检查 `MEILISEARCH_HOST` 配置
-   - 确认 Meilisearch 容器正在运行
-   - 验证 master key 是否正确
+2. **数据库连接失败**
+   - 检查 `DATABASE_URL` 和 `DB_HOST` 是否正确
+   - 确认 MySQL 容器正在运行：`docker ps | grep mysql`
+   - 验证网络连接：`docker network ls`
+   - 检查数据库凭据和权限
 
-3. **镜像拉取失败**
+3. **Meilisearch 连接失败**
+   - 检查 `MEILISEARCH_HOST` 配置格式
+   - 确认 Meilisearch 容器正在运行：`docker ps | grep meilisearch`
+   - 验证 master key 是否正确（如果启用认证）
+   - 测试网络连接：`curl http://meilisearch_host:7700/health`
+
+4. **图片上传服务配置问题**
+   - 验证 `IMAGE_UPLOAD_URL` 格式是否正确
+   - 检查 `IMAGE_UPLOAD_TOKEN` 是否配置
+   - 注意：图片上传服务是可选的，配置错误不会阻止应用启动
+
+5. **镜像拉取失败**
    - 检查镜像名称和版本
    - 确认 Docker registry 访问权限
+   - 验证网络连接
+
+6. **容器启动失败**
+   - 查看启动日志：`docker-compose logs app`
+   - 检查端口冲突：`netstat -tulpn | grep 3000`
+   - 验证文件权限和用户配置
 
 ### 日志查看
 

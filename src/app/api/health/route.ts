@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import client from '@/lib/search';
+import { initializeApplication, isApplicationInitialized } from '@/lib/startup';
 
 interface HealthStatus {
   status: 'healthy' | 'unhealthy';
@@ -15,9 +16,11 @@ interface HealthCheckResponse {
     database: HealthStatus;
     search: HealthStatus;
     application: HealthStatus;
+    startup: HealthStatus;
   };
   timestamp: Date;
   uptime: number;
+  initialized: boolean;
 }
 
 export async function GET() {
@@ -44,10 +47,44 @@ export async function GET() {
         timestamp,
         responseTime: 0,
       },
+      startup: {
+        status: 'unhealthy',
+        message: 'Not checked',
+        timestamp,
+      },
     },
     timestamp,
     uptime: process.uptime(),
+    initialized: false,
   };
+
+  // Check startup validation first
+  try {
+    const startupStartTime = Date.now();
+    
+    if (!isApplicationInitialized()) {
+      // Try to initialize if not already done
+      await initializeApplication();
+    }
+    
+    const startupResponseTime = Date.now() - startupStartTime;
+    
+    healthCheck.services.startup = {
+      status: 'healthy',
+      message: 'Application startup validation successful',
+      timestamp,
+      responseTime: startupResponseTime,
+    };
+    healthCheck.initialized = true;
+  } catch (error) {
+    healthCheck.services.startup = {
+      status: 'unhealthy',
+      message: error instanceof Error ? error.message : 'Application startup validation failed',
+      timestamp,
+    };
+    healthCheck.overall = 'unhealthy';
+    healthCheck.initialized = false;
+  }
 
   // Check database connection
   try {

@@ -7,6 +7,7 @@ import ClientProvider from '@/components/providers/ClientProvider';
 import ErrorBoundary from '@/components/providers/ErrorBoundary';
 import NoSSR from '@/components/providers/NoSSR';
 import QueryProvider from '@/components/providers/QueryProvider';
+import StartupProvider from '@/components/providers/StartupProvider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -35,7 +36,9 @@ export default function RootLayout({
                             <App>
                                 <QueryProvider>
                                     <NoSSR>
-                                        <ClientProvider>{children}</ClientProvider>
+                                        <StartupProvider>
+                                            <ClientProvider>{children}</ClientProvider>
+                                        </StartupProvider>
                                     </NoSSR>
                                 </QueryProvider>
                             </App>
