@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  app:
+    image: ${DOCKER_REGISTRY:-}weekly-content-management:${APP_VERSION:-latest}
+    container_name: weekly-content-app
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    env_file:
+      - .env
+    networks:
+      - existing-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  existing-network:
+    external: true
+    name: ${EXISTING_NETWORK_NAME:-bridge}
+    # 注意: 应用容器需要能够访问karakeep-meilisearch容器
+    # 如果连接失败，可以尝试使用host网络模式或确保容器在同一网络中

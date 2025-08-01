@@ -1,3 +1,58 @@
+# Weekly内容管理系统
+
+本项目是基于Next.js的周刊内容管理系统，支持内容创建、编辑、搜索和周刊发布等功能。
+
+## 🚀 快速开始
+
+### 本地开发环境
+
+**不需要Docker！** 本地开发直接运行Node.js应用。
+
+#### 1. 环境准备
+
+```bash
+# 安装依赖
+pnpm install
+
+# 复制开发环境配置（用于本地开发）
+cp env.development.example .env
+
+# 编辑配置文件
+vim .env
+```
+
+#### 2. 配置外部服务连接
+
+确保以下服务正在运行：
+- **MySQL数据库**：NAS服务器 (100.113.231.101:3306)
+- **Meilisearch**：本地容器 (localhost:7700)
+
+#### 3. 启动开发服务器
+
+```bash
+# 生成Prisma客户端
+pnpm db:generate
+
+# 启动开发服务器
+pnpm dev
+
+# 或使用Turbopack（更快的热重载）
+pnpm dev:turbo
+```
+
+访问 [http://localhost:3000](http://localhost:3000) 开始开发。
+
+**📋 详细开发指南：[本地开发指南.md](本地开发指南.md)**
+
+### 生产环境部署
+
+**使用Docker容器化部署到NAS服务器。** 详细部署说明请查看：
+
+📋 **[Docker部署文档](docker/README.md)**
+📋 **[快速部署指南](docker/快速部署指南.md)**
+
+---
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started

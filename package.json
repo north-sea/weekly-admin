@@ -33,6 +33,7 @@
     "antd-img-crop": "^4.25.0",
     "bcryptjs": "^3.0.2",
     "dayjs": "^1.11.13",
+    "dotenv": "^17.2.1",
     "jose": "^6.0.12",
     "jsonwebtoken": "^9.0.2",
     "ky": "^1.8.2",

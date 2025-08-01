@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  app:
+    image: ${DOCKER_REGISTRY:-}weekly-content-management:${APP_VERSION:-latest}
+    container_name: weekly-content-app
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    env_file:
+      - .env
+    networks:
+      - weekly-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # depends_on:
+    #   - mysql
+    #   - meilisearch
+    # 注释掉依赖，因为MySQL和Meilisearch已在外部运行
+
+  # MySQL 服务已在NAS服务器运行 (100.113.231.101)
+  # mysql:
+  #   image: mysql:8.0
+  #   container_name: weekly-mysql
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+  #     MYSQL_DATABASE: ${DB_NAME}
+  #     MYSQL_USER: ${DB_USER}
+  #     MYSQL_PASSWORD: ${DB_PASSWORD}
+  #   volumes:
+  #     - mysql_data:/var/lib/mysql
+  #   networks:
+  #     - weekly-network
+  #   restart: unless-stopped
+  #   external: true
+
+  # Meilisearch 服务已运行 (容器名: karakeep-meilisearch)
+  # meilisearch:
+  #   image: getmeili/meilisearch:latest
+  #   container_name: weekly-meilisearch
+  #   environment:
+  #     MEILI_MASTER_KEY: ${MEILISEARCH_MASTER_KEY}
+  #   volumes:
+  #     - meilisearch_data:/meili_data
+  #   networks:
+  #     - weekly-network
+  #   restart: unless-stopped
+  #   external: true
+
+# volumes:
+  # mysql_data:
+  #   external: true  # MySQL 在 NAS 服务器运行，不需要本地卷
+  # meilisearch_data:
+  #   external: true  # Meilisearch 已运行，不需要本地卷
+
+networks:
+  weekly-network:
+    driver: bridge
+    # 应用容器使用自己的网络，通过主机网络连接外部服务

@@ -8,7 +8,7 @@ import rehypeRaw from 'rehype-raw';
 import { Card, Typography, Divider, Tag, Space } from 'antd';
 import { CalendarOutlined, UserOutlined, EyeOutlined, LinkOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import 'highlight.js/styles/github.css';
+// import 'highlight.js/styles/github.css'; // 已移除highlight.js依赖
 
 const { Title, Text, Paragraph } = Typography;
 

@@ -18,14 +18,60 @@ export interface ImageUploadOptions {
 
 // 图片上传服务
 export class ImageUploadService {
-  private static readonly UPLOAD_URL = 'https://img.mengpeng.tech/api/v1/upload';
-  private static readonly AUTH_TOKEN = '3|RVzaqcbY5tCspfmpwc32gPVfW3K18sfjepbS2APA';
+  /**
+   * 获取上传 URL
+   */
+  private static getUploadUrl(): string | undefined {
+    return process.env.IMAGE_UPLOAD_URL;
+  }
+
+  /**
+   * 获取认证令牌
+   */
+  private static getAuthToken(): string | undefined {
+    return process.env.IMAGE_UPLOAD_TOKEN;
+  }
+
+  /**
+   * 验证图片上传服务配置
+   */
+  static validateConfig(): void {
+    const uploadUrl = this.getUploadUrl();
+    const authToken = this.getAuthToken();
+
+    if (!uploadUrl) {
+      throw new Error('图片上传服务未配置：缺少 IMAGE_UPLOAD_URL 环境变量');
+    }
+    
+    if (!authToken) {
+      throw new Error('图片上传服务未配置：缺少 IMAGE_UPLOAD_TOKEN 环境变量');
+    }
+
+    // 验证 URL 格式
+    try {
+      new URL(uploadUrl);
+    } catch (error) {
+      throw new Error('图片上传服务配置错误：IMAGE_UPLOAD_URL 不是有效的 URL 格式');
+    }
+  }
+
+  /**
+   * 检查图片上传服务是否可用
+   */
+  static isConfigured(): boolean {
+    const uploadUrl = this.getUploadUrl();
+    const authToken = this.getAuthToken();
+    return !!(uploadUrl && authToken);
+  }
 
   /**
    * 上传图片到远程服务
    */
   static async uploadImage({ file, onProgress }: ImageUploadOptions): Promise<ImageUploadResponse> {
     try {
+      // 验证服务配置
+      this.validateConfig();
+
       // 验证文件类型
       if (!this.isValidImageType(file)) {
         throw new Error('不支持的图片格式，请上传 JPG、PNG、GIF 或 WebP 格式的图片');
@@ -39,20 +85,34 @@ export class ImageUploadService {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await ky.post(this.UPLOAD_URL, {
+      const uploadUrl = this.getUploadUrl()!;
+      const authToken = this.getAuthToken()!;
+
+      const response = await ky.post(uploadUrl, {
         body: formData,
         headers: {
-          'Authorization': `Bearer ${this.AUTH_TOKEN}`,
+          'Authorization': `Bearer ${authToken}`,
         },
-        onUploadProgress: onProgress ? (progress) => {
-          onProgress(Math.round((progress.loaded / progress.total) * 100));
+        onUploadProgress: onProgress ? (progress: any) => {
+          if (progress.loaded && progress.total) {
+            onProgress(Math.round((progress.loaded / progress.total) * 100));
+          }
         } : undefined,
       }).json<ImageUploadResponse>();
 
       return response;
     } catch (error) {
       console.error('Image upload failed:', error);
-      throw new Error(error instanceof Error ? error.message : '图片上传失败');
+      
+      // 提供更具体的错误信息
+      if (error instanceof Error) {
+        if (error.message.includes('图片上传服务未配置')) {
+          throw error; // 重新抛出配置错误
+        }
+        throw new Error(error.message);
+      }
+      
+      throw new Error('图片上传失败');
     }
   }
 

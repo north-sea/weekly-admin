@@ -14,11 +14,12 @@ const UpdateWeeklyContentsSchema = z.object({
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await authMiddleware(request);
-    const issueId = parseInt(params.id);
+    const resolvedParams = await params;
+    const issueId = parseInt(resolvedParams.id);
     const body = await request.json();
 
     if (isNaN(issueId)) {
@@ -176,11 +177,12 @@ export async function PUT(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await authMiddleware(request);
-    const issueId = parseInt(params.id);
+    const resolvedParams = await params;
+    const issueId = parseInt(resolvedParams.id);
 
     if (isNaN(issueId)) {
       return NextResponse.json(
