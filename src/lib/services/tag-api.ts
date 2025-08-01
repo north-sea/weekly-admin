@@ -1,6 +1,6 @@
 // 标签 API 调用服务
+// 重构为纯函数形式，配合react-query使用
 
-import { apiClient } from '@/lib/api-client';
 import { TagInput, TagUpdate, TagQuery, TagMerge } from '@/lib/validations/tag';
 
 export interface TagWithStats {
@@ -12,61 +12,106 @@ export interface TagWithStats {
   updated_at?: string;
 }
 
+// 构建标签查询参数的工具函数
+export function buildTagQueryParams(query: TagQuery): string {
+  const params = new URLSearchParams();
+  
+  Object.entries(query).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      params.set(key, value.toString());
+    }
+  });
+
+  return params.toString();
+}
+
+// 标签 API 端点常量
+export const TAG_ENDPOINTS = {
+  list: '/api/tags',
+  all: '/api/tags/all',
+  detail: (id: string | number) => `/api/tags/${id}`,
+  create: '/api/tags',
+  update: (id: string | number) => `/api/tags/${id}`,
+  delete: (id: string | number) => `/api/tags/${id}`,
+  merge: '/api/tags/merge',
+  updateCounts: '/api/tags/update-counts',
+  stats: '/api/tags/stats',
+  popular: '/api/tags/popular',
+  trends: '/api/tags/trends',
+  related: '/api/tags/related',
+  batchDelete: '/api/tags/batch-delete',
+  import: '/api/tags/import',
+} as const;
+
+// 保持向后兼容的类形式（标记为已废弃）
+/** @deprecated Use useTagQueries hooks instead */
 export class TagApiService {
-  // 获取标签列表
-  static async getTagList(query: TagQuery = {}): Promise<TagWithStats[]> {
-    const params = new URLSearchParams();
-    
-    Object.entries(query).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        params.set(key, value.toString());
-      }
-    });
-
-    return apiClient.get<TagWithStats[]>(`/api/tags?${params.toString()}`);
+  /** @deprecated Use useTagList hook instead */
+  static async getTagList(query: TagQuery = { sort_by: 'name', sort_order: 'asc' }): Promise<TagWithStats[]> {
+    console.warn('TagApiService.getTagList is deprecated. Use useTagList hook instead.');
+    const { apiClient } = await import('@/lib/api-client');
+    const queryString = buildTagQueryParams(query);
+    return apiClient.get<TagWithStats[]>(`${TAG_ENDPOINTS.list}?${queryString}`);
   }
 
-  // 获取单个标签
+  /** @deprecated Use useTagDetail hook instead */
   static async getTagById(id: number): Promise<TagWithStats> {
-    return apiClient.get<TagWithStats>(`/api/tags/${id}`);
+    console.warn('TagApiService.getTagById is deprecated. Use useTagDetail hook instead.');
+    const { apiClient } = await import('@/lib/api-client');
+    return apiClient.get<TagWithStats>(TAG_ENDPOINTS.detail(id));
   }
 
-  // 创建标签
+  /** @deprecated Use useCreateTag hook instead */
   static async createTag(data: TagInput): Promise<TagWithStats> {
-    return apiClient.post<TagWithStats>('/api/tags', data);
+    console.warn('TagApiService.createTag is deprecated. Use useCreateTag hook instead.');
+    const { apiClient } = await import('@/lib/api-client');
+    return apiClient.post<TagWithStats>(TAG_ENDPOINTS.create, data);
   }
 
-  // 更新标签
+  /** @deprecated Use useUpdateTag hook instead */
   static async updateTag(data: TagUpdate): Promise<TagWithStats> {
+    console.warn('TagApiService.updateTag is deprecated. Use useUpdateTag hook instead.');
+    const { apiClient } = await import('@/lib/api-client');
     const { id, ...updateData } = data;
-    return apiClient.put<TagWithStats>(`/api/tags/${id}`, updateData);
+    return apiClient.put<TagWithStats>(TAG_ENDPOINTS.update(id), updateData);
   }
 
-  // 删除标签
+  /** @deprecated Use useDeleteTag hook instead */
   static async deleteTag(id: number): Promise<void> {
-    return apiClient.delete<void>(`/api/tags/${id}`);
+    console.warn('TagApiService.deleteTag is deprecated. Use useDeleteTag hook instead.');
+    const { apiClient } = await import('@/lib/api-client');
+    return apiClient.delete<void>(TAG_ENDPOINTS.delete(id));
   }
 
-  // 合并标签
+  /** @deprecated Use useMergeTags hook instead */
   static async mergeTags(data: TagMerge): Promise<void> {
-    return apiClient.post<void>('/api/tags/merge', data);
+    console.warn('TagApiService.mergeTags is deprecated. Use useMergeTags hook instead.');
+    const { apiClient } = await import('@/lib/api-client');
+    return apiClient.post<void>(TAG_ENDPOINTS.merge, data);
   }
 
-  // 更新标签使用计数
+  /** @deprecated Use useUpdateTagCounts hook instead */
   static async updateTagCounts(): Promise<void> {
-    return apiClient.post<void>('/api/tags/update-counts');
+    console.warn('TagApiService.updateTagCounts is deprecated. Use useUpdateTagCounts hook instead.');
+    const { apiClient } = await import('@/lib/api-client');
+    return apiClient.post<void>(TAG_ENDPOINTS.updateCounts);
   }
 
-  // 获取标签使用统计
+  /** @deprecated Use useTagStats hook instead */
   static async getTagStats(): Promise<Array<{ tag: TagWithStats; content_count: number }>> {
-    return apiClient.get<Array<{ tag: TagWithStats; content_count: number }>>('/api/tags/stats');
+    console.warn('TagApiService.getTagStats is deprecated. Use useTagStats hook instead.');
+    const { apiClient } = await import('@/lib/api-client');
+    return apiClient.get<Array<{ tag: TagWithStats; content_count: number }>>(TAG_ENDPOINTS.stats);
   }
 
-  // 获取热门标签
+  /** @deprecated Use usePopularTags hook instead */
   static async getPopularTags(limit: number = 10): Promise<TagWithStats[]> {
-    return apiClient.get<TagWithStats[]>(`/api/tags/popular?limit=${limit}`);
+    console.warn('TagApiService.getPopularTags is deprecated. Use usePopularTags hook instead.');
+    const { apiClient } = await import('@/lib/api-client');
+    return apiClient.get<TagWithStats[]>(`${TAG_ENDPOINTS.popular}?limit=${limit}`);
   }
 }
 
 // 导出别名以保持向后兼容
+/** @deprecated Use useTagQueries hooks instead */
 export const TagService = TagApiService;

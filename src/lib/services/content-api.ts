@@ -1,7 +1,6 @@
 // 内容 API 调用服务
-// 这个文件替换直接的数据库调用，改为调用 API 端点
+// 重构为纯函数形式，配合react-query使用
 
-import { apiClient } from '@/lib/api-client';
 import { ContentInput, ContentQuery, ContentUpdate, BatchOperation } from '@/lib/validations/content';
 
 // 内容数据类型
@@ -48,53 +47,91 @@ export interface ContentListResponse {
   };
 }
 
-// 内容 API 服务类
-export class ContentApiService {
-  // 获取内容列表
-  static async getContentList(query: ContentQuery): Promise<ContentListResponse> {
-    const params = new URLSearchParams();
-    
-    // 构建查询参数
-    Object.entries(query).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        if (Array.isArray(value)) {
-          value.forEach(v => params.append(key, v.toString()));
-        } else {
-          params.set(key, value.toString());
-        }
+// 内容 API 纯函数服务
+// 这些函数现在主要由 useContentQueries hooks 使用
+
+// 构建查询参数的工具函数
+export function buildContentQueryParams(query: ContentQuery): string {
+  const params = new URLSearchParams();
+  
+  Object.entries(query).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      if (Array.isArray(value)) {
+        value.forEach(v => params.append(key, v.toString()));
+      } else {
+        params.set(key, value.toString());
       }
-    });
+    }
+  });
 
-    return apiClient.get<ContentListResponse>(`/api/content?${params.toString()}`);
+  return params.toString();
+}
+
+// 内容 API 端点常量
+export const CONTENT_ENDPOINTS = {
+  list: '/api/content',
+  detail: (id: string | number) => `/api/content/${id}`,
+  create: '/api/content',
+  update: (id: string | number) => `/api/content/${id}`,
+  delete: (id: string | number) => `/api/content/${id}`,
+  batch: '/api/content/batch',
+  versions: (id: string | number) => `/api/content/${id}/versions`,
+  versionDetail: (id: string | number, version: number) => `/api/content/${id}/versions/${version}`,
+  versionCompare: (id: string | number) => `/api/content/${id}/versions/compare`,
+  rollback: (id: string | number) => `/api/content/${id}/rollback`,
+  stats: '/api/content/stats',
+} as const;
+
+// 保持向后兼容的类形式（标记为已废弃）
+/** @deprecated Use useContentQueries hooks instead */
+export class ContentApiService {
+  /** @deprecated Use useContentList hook instead */
+  static async getContentList(query: ContentQuery): Promise<ContentListResponse> {
+    console.warn('ContentApiService.getContentList is deprecated. Use useContentList hook instead.');
+    // 为了兼容性保留实现，但建议使用新的hooks
+    const { apiClient } = await import('@/lib/api-client');
+    const queryString = buildContentQueryParams(query);
+    return apiClient.get<ContentListResponse>(`${CONTENT_ENDPOINTS.list}?${queryString}`);
   }
 
-  // 获取单个内容
+  /** @deprecated Use useContentDetail hook instead */
   static async getContentById(id: string | number): Promise<ContentWithRelations> {
-    return apiClient.get<ContentWithRelations>(`/api/content/${id}`);
+    console.warn('ContentApiService.getContentById is deprecated. Use useContentDetail hook instead.');
+    const { apiClient } = await import('@/lib/api-client');
+    return apiClient.get<ContentWithRelations>(CONTENT_ENDPOINTS.detail(id));
   }
 
-  // 创建内容
+  /** @deprecated Use useCreateContent hook instead */
   static async createContent(data: ContentInput): Promise<ContentWithRelations> {
-    return apiClient.post<ContentWithRelations>('/api/content', data);
+    console.warn('ContentApiService.createContent is deprecated. Use useCreateContent hook instead.');
+    const { apiClient } = await import('@/lib/api-client');
+    return apiClient.post<ContentWithRelations>(CONTENT_ENDPOINTS.create, data);
   }
 
-  // 更新内容
+  /** @deprecated Use useUpdateContent hook instead */
   static async updateContent(data: ContentUpdate): Promise<ContentWithRelations> {
+    console.warn('ContentApiService.updateContent is deprecated. Use useUpdateContent hook instead.');
+    const { apiClient } = await import('@/lib/api-client');
     const { id, ...updateData } = data;
-    const response = await apiClient.put<{ success: boolean; data: ContentWithRelations }>(`/api/content/${id}`, updateData);
+    const response = await apiClient.put<{ success: boolean; data: ContentWithRelations }>(CONTENT_ENDPOINTS.update(id), updateData);
     return response.data;
   }
 
-  // 删除内容
+  /** @deprecated Use useDeleteContent hook instead */
   static async deleteContent(id: string | number): Promise<void> {
-    return apiClient.delete<void>(`/api/content/${id}`);
+    console.warn('ContentApiService.deleteContent is deprecated. Use useDeleteContent hook instead.');
+    const { apiClient } = await import('@/lib/api-client');
+    return apiClient.delete<void>(CONTENT_ENDPOINTS.delete(id));
   }
 
-  // 批量操作
+  /** @deprecated Use useBatchContentOperation hook instead */
   static async batchOperation(operation: BatchOperation): Promise<void> {
-    return apiClient.post<void>('/api/content/batch', operation);
+    console.warn('ContentApiService.batchOperation is deprecated. Use useBatchContentOperation hook instead.');
+    const { apiClient } = await import('@/lib/api-client');
+    return apiClient.post<void>(CONTENT_ENDPOINTS.batch, operation);
   }
 }
 
 // 导出别名以保持向后兼容
+/** @deprecated Use useContentQueries hooks instead */
 export const ContentService = ContentApiService;

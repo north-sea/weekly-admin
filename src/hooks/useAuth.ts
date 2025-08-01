@@ -30,6 +30,12 @@ export function useAuth(requireAuth: boolean = true) {
         return;
       }
 
+      // 如果已经有用户信息且token有效，跳过验证
+      if (user && token && isAuthenticated) {
+        setLoading(false);
+        return;
+      }
+
       try {
         const response = await fetch('/api/auth/me', {
           headers: {
@@ -66,7 +72,7 @@ export function useAuth(requireAuth: boolean = true) {
     };
 
     validateToken();
-  }, [token, isAuthenticated, requireAuth, router, logout, setUser, hasHydrated]);
+  }, [hasHydrated, token, isAuthenticated, user, requireAuth]);
 
   return {
     user,

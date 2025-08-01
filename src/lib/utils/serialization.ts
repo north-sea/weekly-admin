@@ -3,6 +3,7 @@
  */
 
 import dayjs from 'dayjs';
+import { NextResponse } from 'next/server';
 
 /**
  * 递归转换对象中的特殊类型为可序列化的格式
@@ -182,3 +183,116 @@ export function containsSpecialTypes(obj: unknown): boolean {
  * @deprecated 使用 containsSpecialTypes 替代
  */
 export const containsBigInt = containsSpecialTypes;
+
+/**
+ * 统一API响应格式
+ */
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: {
+    code: string;
+    message: string;
+    details?: any;
+  };
+  meta?: {
+    timestamp?: string;
+    [key: string]: any;
+  };
+}
+
+/**
+ * 创建成功响应
+ */
+export function createSuccessResponse<T>(
+  data: T,
+  status = 200,
+  meta?: Record<string, any>
+): Response {
+  const response: ApiResponse<T> = {
+    success: true,
+    data: prepareApiResponse(data),
+  };
+  
+  if (meta) {
+    response.meta = {
+      timestamp: new Date().toISOString(),
+      ...meta,
+    };
+  }
+  
+  return Response.json(response, { status });
+}
+
+/**
+ * 创建错误响应
+ */
+export function createErrorResponse(
+  code: string,
+  message: string,
+  status = 500,
+  details?: any
+): Response {
+  const response: ApiResponse = {
+    success: false,
+    error: {
+      code,
+      message,
+      ...(details && { details }),
+    },
+    meta: {
+      timestamp: new Date().toISOString(),
+    },
+  };
+  
+  return Response.json(response, { status });
+}
+
+// NextResponse版本的统一响应函数
+
+/**
+ * 创建成功响应 (NextResponse版本)
+ */
+export function createNextSuccessResponse<T>(
+  data: T,
+  status = 200,
+  meta?: Record<string, any>
+): NextResponse {
+  const response: ApiResponse<T> = {
+    success: true,
+    data: prepareApiResponse(data),
+  };
+  
+  if (meta) {
+    response.meta = {
+      timestamp: new Date().toISOString(),
+      ...meta,
+    };
+  }
+  
+  return NextResponse.json(response, { status });
+}
+
+/**
+ * 创建错误响应 (NextResponse版本)
+ */
+export function createNextErrorResponse(
+  code: string,
+  message: string,
+  status = 500,
+  details?: any
+): NextResponse {
+  const response: ApiResponse = {
+    success: false,
+    error: {
+      code,
+      message,
+      ...(details && { details }),
+    },
+    meta: {
+      timestamp: new Date().toISOString(),
+    },
+  };
+  
+  return NextResponse.json(response, { status });
+}

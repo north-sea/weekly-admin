@@ -92,7 +92,7 @@ export default function AnalyticsPage() {
           showIcon
           style={{ marginBottom: '24px' }}
           action={
-            <Button size="small" onClick={refetch}>
+            <Button size="small" onClick={() => refetch()}>
               重试
             </Button>
           }
@@ -215,7 +215,7 @@ export default function AnalyticsPage() {
         <Col xs={24} lg={12}>
           <Card title="热门标签" loading={loading} size="small">
             <div style={{ minHeight: 200 }}>
-              {analytics?.tags.stats.length ? (
+              {analytics?.tags?.stats?.length ? (
                 <Space wrap>
                   {analytics.tags.stats.slice(0, 15).map((tag, index) => (
                     <Tag 

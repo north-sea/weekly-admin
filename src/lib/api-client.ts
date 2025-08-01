@@ -1,4 +1,5 @@
 import ky, { Options as KyOptions } from 'ky';
+import type { ApiResponse, ApiSuccessResponse, ApiErrorResponse } from '@/types';
 import { useAuthStore } from '@/stores/auth';
 
 // 扩展 Ky 选项类型以支持 Next.js 缓存选项
@@ -83,7 +84,17 @@ class ApiClient {
   // GET 请求
   async get<T = unknown>(url: string, options: ApiOptions = {}): Promise<T> {
     const response = await this.kyInstance.get(url, options);
-    return response.json<T>();
+    const json = await response.json() as ApiResponse<T>;
+    
+    // 统一API响应格式处理
+    if (json.success) {
+      return json.data as T;
+    } else {
+      const error = new Error(json.error?.message || 'API请求失败');
+      (error as any).code = json.error?.code;
+      (error as any).details = json.error?.details;
+      throw error;
+    }
   }
 
   // POST 请求
@@ -93,7 +104,17 @@ class ApiClient {
       json: data,
     };
     const response = await this.kyInstance.post(url, requestOptions);
-    return response.json<T>();
+    const json = await response.json() as ApiResponse<T>;
+    
+    // 统一API响应格式处理
+    if (json.success) {
+      return json.data as T;
+    } else {
+      const error = new Error(json.error?.message || 'API请求失败');
+      (error as any).code = json.error?.code;
+      (error as any).details = json.error?.details;
+      throw error;
+    }
   }
 
   // PUT 请求
@@ -103,13 +124,33 @@ class ApiClient {
       json: data,
     };
     const response = await this.kyInstance.put(url, requestOptions);
-    return response.json<T>();
+    const json = await response.json() as ApiResponse<T>;
+    
+    // 统一API响应格式处理
+    if (json.success) {
+      return json.data as T;
+    } else {
+      const error = new Error(json.error?.message || 'API请求失败');
+      (error as any).code = json.error?.code;
+      (error as any).details = json.error?.details;
+      throw error;
+    }
   }
 
   // DELETE 请求
   async delete<T = unknown>(url: string, options: ApiOptions = {}): Promise<T> {
     const response = await this.kyInstance.delete(url, options);
-    return response.json<T>();
+    const json = await response.json() as ApiResponse<T>;
+    
+    // 统一API响应格式处理
+    if (json.success) {
+      return json.data as T;
+    } else {
+      const error = new Error(json.error?.message || 'API请求失败');
+      (error as any).code = json.error?.code;
+      (error as any).details = json.error?.details;
+      throw error;
+    }
   }
 
   // PATCH 请求
@@ -119,7 +160,17 @@ class ApiClient {
       json: data,
     };
     const response = await this.kyInstance.patch(url, requestOptions);
-    return response.json<T>();
+    const json = await response.json() as ApiResponse<T>;
+    
+    // 统一API响应格式处理
+    if (json.success) {
+      return json.data as T;
+    } else {
+      const error = new Error(json.error?.message || 'API请求失败');
+      (error as any).code = json.error?.code;
+      (error as any).details = json.error?.details;
+      throw error;
+    }
   }
 
   // 获取原始 Response 对象（用于特殊处理）

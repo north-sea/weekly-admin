@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { useAdvancedAnalytics as useAdvancedAnalyticsQuery } from '@/hooks/queries';
 
-interface AdvancedAnalyticsData {
+// 重新导出高级分析数据类型以保持向后兼容
+export interface AdvancedAnalyticsData {
   contentQuality: Array<{
     contentType: string;
     avgWordCount: number;
@@ -75,40 +75,73 @@ interface AdvancedAnalyticsData {
   };
 }
 
+/**
+ * 高级分析数据查询钩子 - 重构为使用react-query
+ * @param timeRange 时间范围（天数），默认30天
+ * @returns 高级分析数据、加载状态、错误信息和重新获取函数
+ */
 export const useAdvancedAnalytics = (timeRange: number = 30) => {
-  const [data, setData] = useState<AdvancedAnalyticsData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: rawData, isLoading, error, refetch } = useAdvancedAnalyticsQuery(timeRange);
 
-  const fetchAdvancedAnalytics = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // apiClient.get() 直接返回解析后的 JSON 数据
-      const result = await apiClient.get(`/api/analytics/advanced?timeRange=${timeRange}`);
-      
-      if (result.success) {
-        setData(result.data);
-      } else {
-        setError(result.error?.message || '获取高级分析数据失败');
-      }
-    } catch (err) {
-      // apiClient 会在请求失败时抛出异常
-      setError(err instanceof Error ? err.message : '获取高级分析数据失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchAdvancedAnalytics();
-  }, [timeRange]);
+  // 适配旧的数据结构以保持向后兼容
+  const adaptedData: AdvancedAnalyticsData | null = rawData ? {
+    contentQuality: rawData.content?.qualityMetrics ? [{
+      contentType: 'all',
+      avgWordCount: rawData.content.qualityMetrics.avg_word_count,
+      avgReadingTime: rawData.content.qualityMetrics.avg_reading_time,
+      avgViewCount: 0,
+      qualityScore: rawData.content.qualityMetrics.content_richness_score,
+      totalContents: 0,
+      highQualityContents: 0,
+      lowQualityContents: 0,
+      qualityRate: 0,
+    }] : [],
+    userActivity: rawData.user?.authorActivity?.map(author => ({
+      username: author.author,
+      displayName: author.author,
+      totalOperations: author.content_count,
+      contentCreated: author.content_count,
+      contentUpdated: 0,
+      lastActivity: new Date().toISOString(),
+      activityScore: author.avg_quality,
+      avgDailyOperations: author.content_count / timeRange,
+      isActive: author.productivity_trend === 'up',
+    })) || [],
+    contentCorrelation: [], // 需要从其他数据计算
+    trendPrediction: rawData.predictions?.contentDemand?.map(item => ({
+      date: new Date().toISOString(),
+      actualCount: 0,
+      predictedCount: item.predicted_demand,
+      trendDirection: item.confidence > 0.7 ? 'up' : 'stable',
+      accuracy: `${Math.round(item.confidence * 100)}%`,
+    })) || [],
+    contentPerformance: rawData.performance?.topContent?.map(item => ({
+      id: item.id,
+      title: item.title,
+      contentType: 'article',
+      wordCount: 0,
+      viewCount: item.views,
+      readingTime: 0,
+      performanceScore: item.engagement_rate,
+      createdAt: new Date().toISOString(),
+      categoryName: null,
+      tagCount: 0,
+    })) || [],
+    timeAnalysis: {
+      hourly: [], // 需要从其他数据计算
+      weekly: [], // 需要从其他数据计算
+    },
+    timeRange: {
+      days: timeRange,
+      startDate: new Date(Date.now() - timeRange * 24 * 60 * 60 * 1000).toISOString(),
+      endDate: new Date().toISOString(),
+    },
+  } : null;
 
   return {
-    data,
-    loading,
-    error,
-    refetch: fetchAdvancedAnalytics,
+    data: adaptedData,
+    loading: isLoading,
+    error: error?.message || null,
+    refetch,
   };
 };

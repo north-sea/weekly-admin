@@ -3,17 +3,20 @@
 import React from 'react';
 import { QueryClient, QueryClientProvider, MutationCache, QueryCache } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { message } from 'antd';
+import { ErrorHandler, queryErrorHandler, mutationErrorHandler } from '@/lib/error-handler';
 
 // 创建查询客户端实例
 function makeQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        // 数据被认为是新鲜的时间 (5分钟)
+        // 根据数据类型优化缓存时间
+        // 静态数据 (分类、标签) - 较长缓存时间
+        // 动态数据 (内容列表、分析数据) - 较短缓存时间
+        // 默认: 数据被认为是新鲜的时间 (5分钟)
         staleTime: 5 * 60 * 1000,
-        // 数据在内存中的缓存时间 (10分钟)
-        gcTime: 10 * 60 * 1000,
+        // 默认: 数据在内存中的缓存时间 (30分钟)  
+        gcTime: 30 * 60 * 1000,
         // 重试配置
         retry: (failureCount, error) => {
           // 对于客户端错误 (4xx) 不重试
@@ -42,31 +45,33 @@ function makeQueryClient() {
     },
     queryCache: new QueryCache({
       onError: (error, query) => {
-        // 全局查询错误处理
+        // 使用统一的错误处理机制
         console.error('查询错误:', error, query);
-        
-        // 对于用户界面显示的错误
-        if (error instanceof Error) {
-          // 避免在开发环境中显示过多错误提示
-          if (process.env.NODE_ENV === 'production') {
-            message.error(`数据获取失败: ${error.message}`);
-          }
-        }
+        queryErrorHandler(error);
       },
     }),
     mutationCache: new MutationCache({
       onError: (error, variables, context, mutation) => {
-        // 全局突变错误处理
+        // 使用统一的错误处理机制
         console.error('突变错误:', error, { variables, context, mutation });
-        
-        if (error instanceof Error) {
-          message.error(`操作失败: ${error.message}`);
-        }
+        mutationErrorHandler(error);
       },
       onSuccess: (data, variables, context, mutation) => {
         // 全局突变成功处理
         if (process.env.NODE_ENV === 'development') {
           console.log('突变成功:', { data, variables, context, mutation });
+        }
+        
+        // 根据操作类型显示不同的成功消息
+        const mutationKey = mutation.options.mutationKey?.[0];
+        if (typeof mutationKey === 'string') {
+          if (mutationKey.includes('create')) {
+            ErrorHandler.showSuccess('创建成功');
+          } else if (mutationKey.includes('update')) {
+            ErrorHandler.showSuccess('更新成功');
+          } else if (mutationKey.includes('delete')) {
+            ErrorHandler.showSuccess('删除成功');
+          }
         }
       },
     }),

@@ -9,7 +9,7 @@ import ContentList from '@/components/content/ContentList';
 import ContentForm from '@/components/content/ContentForm';
 import MarkdownPreview from '@/components/content/MarkdownPreview';
 import { ContentWithRelations } from '@/lib/services/content-api';
-import { apiClient } from '@/lib/api-client';
+import { useCreateContent, useUpdateContent } from '@/hooks/queries';
 
 
 export default function ContentPage() {
@@ -17,8 +17,11 @@ export default function ContentPage() {
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [viewModalVisible, setViewModalVisible] = useState(false);
   const [currentContent, setCurrentContent] = useState<ContentWithRelations | null>(null);
-  const [loading, setLoading] = useState(false);
   const { message } = useNotification();
+  
+  // React Query mutations
+  const createContentMutation = useCreateContent();
+  const updateContentMutation = useUpdateContent();
 
   // 安全的日期转换函数，兼容Date和string类型
   const toISOStringSafe = (date?: Date | string): string | undefined => {
@@ -46,47 +49,40 @@ export default function ContentPage() {
     setCreateModalVisible(true);
   };
 
-  // 提交创建表单
+  // 提交创建表单 - 使用react-query mutation
   const handleCreateSubmit = async (values: Record<string, unknown>) => {
-    try {
-      setLoading(true);
-      await apiClient.post('/api/content', values);
-
-      message.success('创建成功');
-      setCreateModalVisible(false);
-      // 刷新列表 - 这里可以通过ref或状态管理来实现
-      window.location.reload();
-    } catch (error) {
-      message.error(error instanceof Error ? error.message : '创建失败');
-      throw error;
-    } finally {
-      setLoading(false);
-    }
+    createContentMutation.mutate(values, {
+      onSuccess: () => {
+        message.success('创建成功');
+        setCreateModalVisible(false);
+        // react-query会自动更新缓存，不需要手动刷新
+      },
+      onError: (error) => {
+        message.error(error instanceof Error ? error.message : '创建失败');
+        throw error;
+      }
+    });
   };
 
-  // 提交编辑表单
+  // 提交编辑表单 - 使用react-query mutation
   const handleEditSubmit = async (values: Record<string, unknown>) => {
     if (!currentContent) return;
 
-    try {
-      setLoading(true);
-      const response = await apiClient.put<{ success: boolean; data: any }>(`/api/content/${currentContent.id}`, values);
-
-      if (!response.success) {
-        throw new Error('更新失败');
+    updateContentMutation.mutate({ 
+      id: currentContent.id, 
+      ...values 
+    }, {
+      onSuccess: () => {
+        message.success('更新成功');
+        setEditModalVisible(false);
+        setCurrentContent(null);
+        // react-query会自动更新缓存
+      },
+      onError: (error) => {
+        message.error(error instanceof Error ? error.message : '更新失败');
+        throw error;
       }
-
-      message.success('更新成功');
-      setEditModalVisible(false);
-      setCurrentContent(null);
-      // 刷新列表
-      window.location.reload();
-    } catch (error) {
-      message.error(error instanceof Error ? error.message : '更新失败');
-      throw error;
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   return (
@@ -135,7 +131,7 @@ export default function ContentPage() {
         <ContentForm
           onSubmit={handleCreateSubmit}
           onCancel={() => setCreateModalVisible(false)}
-          loading={loading}
+          loading={createContentMutation.isPending}
         />
       </Modal>
 
@@ -159,7 +155,7 @@ export default function ContentPage() {
               setEditModalVisible(false);
               setCurrentContent(null);
             }}
-            loading={loading}
+            loading={updateContentMutation.isPending}
           />
         )}
       </Modal>

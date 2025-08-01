@@ -37,7 +37,6 @@ import {
 import { useAuthStore } from '@/stores/auth';
 import { useAuth } from '@/hooks/useAuth';
 import { useAnalytics } from '@/hooks/useAnalytics';
-import { apiClient } from '@/lib/api-client';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { PublishTrendChart } from '@/components/charts/PublishTrendChart';
 import { ContentTypeChart } from '@/components/charts/ContentTypeChart';
@@ -270,7 +269,7 @@ export default function DashboardPage() {
           <Col xs={24} lg={12}>
             <Card title="热门标签" loading={analyticsLoading} size="small">
               <div style={{ minHeight: 200 }}>
-                {analytics?.tags.stats.length ? (
+                {analytics?.tags?.stats?.length ? (
                   <Space wrap>
                     {analytics.tags.stats.slice(0, 15).map((tag, index) => (
                       <Tag 

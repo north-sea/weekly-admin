@@ -14,19 +14,10 @@ import {
   HistoryOutlined
 } from '@ant-design/icons';
 import { ContentWithRelations } from '@/lib/services/content-api';
-import { apiClient } from '@/lib/api-client';
+import { useContentList, useDeleteContent, useBatchContentOperation } from '@/hooks/queries';
 import VersionHistory from './VersionHistory';
 
-// API 响应类型定义
-interface ContentListResponse {
-  data: ContentWithRelations[];
-  pagination: {
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-  };
-}
+// 注意：ContentListResponse 类型定义已移到 hooks/queries 中
 
 interface ContentListProps {
   onEdit?: (record: ContentWithRelations) => void;
@@ -37,10 +28,25 @@ interface ContentListProps {
 export default function ContentList({ onEdit, onView, onCreate }: ContentListProps) {
   const actionRef = useRef<ActionType>(null);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
-  const [loading, setLoading] = useState(false);
   const [versionHistoryVisible, setVersionHistoryVisible] = useState(false);
   const [selectedContentId, setSelectedContentId] = useState<number | null>(null);
+  const [queryParams, setQueryParams] = useState({
+    page: 1,
+    pageSize: 20,
+    sortBy: 'created_at',
+    sortOrder: 'desc' as 'asc' | 'desc'
+  });
   const { message, modal } = useNotification();
+  
+  // React Query hooks
+  const { data: contentData, isLoading, error } = useContentList(queryParams);
+  const deleteContentMutation = useDeleteContent();
+  const batchOperationMutation = useBatchContentOperation();
+
+  // 处理错误
+  if (error) {
+    message.error('获取内容列表失败: ' + (error as Error).message);
+  }
 
   // 状态标签颜色映射
   const statusColorMap = {
@@ -60,42 +66,27 @@ export default function ContentList({ onEdit, onView, onCreate }: ContentListPro
 
 
 
-  // 获取内容列表数据
-  const fetchContentList = async (params: Record<string, unknown>) => {
-    try {
-      const queryParamsObj: Record<string, string> = {
-        page: params.current?.toString() || '1',
-        pageSize: params.pageSize?.toString() || '20',
-        contentType: (params.contentType as string) || 'all',
-        sortBy: (params.sortBy as string) || 'created_at',
-        sortOrder: (params.sortOrder as string) || 'desc'
-      };
-      
-      if (params.status) queryParamsObj.status = params.status as string;
-      if (params.category_id) queryParamsObj.category_id = params.category_id.toString();
-      if (params.keyword) queryParamsObj.keyword = params.keyword as string;
-      if (params.featured !== undefined && params.featured !== null) queryParamsObj.featured = params.featured.toString();
-      
-      const queryParams = new URLSearchParams(queryParamsObj);
+  // 处理ProTable的搜索和分页参数变化
+  const handleParamsChange = (params: Record<string, unknown>) => {
+    const page = Number(params.current) || 1;
+    const pageSize = Number(params.pageSize) || 20;
+    
+    const newQueryParams = {
+      page,
+      pageSize,
+      status: params.status as string,
+      category_id: params.category_id ? Number(params.category_id) : undefined,
+      search: params.keyword as string,
+      featured: params.featured as boolean,
+      sortBy: (params.sortBy as string) || 'created_at',
+      sortOrder: (params.sortOrder as 'asc' | 'desc') || 'desc',
+    };
 
-      const result = await apiClient.get<ContentListResponse>(`/api/content?${queryParams}`);
-      
-      return {
-        data: result.data,
-        success: true,
-        total: result.pagination.total
-      };
-    } catch (error) {
-      message.error('获取内容列表失败');
-      return {
-        data: [],
-        success: false,
-        total: 0
-      };
-    }
+    // 更新查询参数，触发react-query重新获取
+    setQueryParams(newQueryParams);
   };
 
-  // 删除内容
+  // 删除内容 - 使用react-query mutation
   const handleDelete = async (id: number) => {
     modal.confirm({
       title: '确认删除',
@@ -103,18 +94,20 @@ export default function ContentList({ onEdit, onView, onCreate }: ContentListPro
       okText: '确定',
       cancelText: '取消',
       onOk: async () => {
-        try {
-          await apiClient.delete(`/api/content/${id}`);
-          message.success('删除成功');
-          actionRef.current?.reload();
-        } catch (error) {
-          message.error('删除失败');
-        }
+        deleteContentMutation.mutate({ id }, {
+          onSuccess: () => {
+            message.success('删除成功');
+            actionRef.current?.reload();
+          },
+          onError: () => {
+            message.error('删除失败');
+          }
+        });
       }
     });
   };
 
-  // 批量操作
+  // 批量操作 - 使用react-query mutation
   const handleBatchOperation = async (operation: string) => {
     if (selectedRowKeys.length === 0) {
       message.warning('请先选择要操作的内容');
@@ -136,21 +129,20 @@ export default function ContentList({ onEdit, onView, onCreate }: ContentListPro
       okText: '确定',
       cancelText: '取消',
       onOk: async () => {
-        try {
-          setLoading(true);
-          await apiClient.post('/api/content/batch', {
-            ids: selectedRowKeys.map(key => parseInt(key.toString())),
-            operation
-          });
-
-          message.success('操作成功');
-          setSelectedRowKeys([]);
-          actionRef.current?.reload();
-        } catch (error) {
-          message.error('操作失败');
-        } finally {
-          setLoading(false);
-        }
+        batchOperationMutation.mutate({
+          action: operation as 'create' | 'update' | 'delete',
+          ids: selectedRowKeys.map(key => parseInt(key.toString())),
+          data: { operation }
+        }, {
+          onSuccess: () => {
+            message.success('操作成功');
+            setSelectedRowKeys([]);
+            actionRef.current?.reload();
+          },
+          onError: () => {
+            message.error('操作失败');
+          }
+        });
       }
     });
   };
@@ -344,16 +336,25 @@ export default function ContentList({ onEdit, onView, onCreate }: ContentListPro
     <ProTable<ContentWithRelations>
       columns={columns}
       actionRef={actionRef}
-      request={fetchContentList}
+      dataSource={contentData?.data || []}
+      loading={isLoading}
       rowKey="id"
       search={{
         labelWidth: 'auto',
         defaultCollapsed: false
       }}
+      onSubmit={(values: Record<string, any>) => {
+        handleParamsChange({ ...queryParams, ...values, current: 1 });
+      }}
       pagination={{
-        defaultPageSize: 20,
+        current: queryParams.page,
+        pageSize: queryParams.pageSize,
+        total: contentData?.pagination?.total || 0,
         showSizeChanger: true,
-        showQuickJumper: true
+        showQuickJumper: true,
+        onChange: (page, pageSize) => {
+          handleParamsChange({ ...queryParams, current: page, pageSize });
+        }
       }}
       dateFormatter="string"
       headerTitle="内容管理"
@@ -385,7 +386,7 @@ export default function ContentList({ onEdit, onView, onCreate }: ContentListPro
       tableAlertOptionRender={() => (
         <Space size={16}>
           <Dropdown menu={{ items: batchMenuItems }} placement="bottomLeft">
-            <Button loading={loading}>
+            <Button loading={batchOperationMutation.isPending}>
               批量操作 <MoreOutlined />
             </Button>
           </Dropdown>

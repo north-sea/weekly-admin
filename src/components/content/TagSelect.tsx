@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Select, Tag, message, Modal, Form, Input, Button, Space } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
-import { TagWithStats } from '@/lib/services/tag';
-import { apiClient } from '@/lib/api-client';
+import { TagWithStats } from '@/lib/services/tag-api';
+import { useAllTags, useCreateTag } from '@/hooks/queries';
 
 interface TagSelectProps {
   value?: number[];
@@ -21,48 +21,33 @@ export default function TagSelect({
   disabled = false,
   maxTagCount = 10
 }: TagSelectProps) {
-  const [tags, setTags] = useState<TagWithStats[]>([]);
-  const [loading, setLoading] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [createForm] = Form.useForm();
-  const [createLoading, setCreateLoading] = useState(false);
+  
+  // 使用react-query获取标签数据
+  const { data: tags = [], isLoading: loading } = useAllTags({
+    sort_by: 'count',
+    sort_order: 'desc'
+  });
+  
+  const createTagMutation = useCreateTag();
 
-  // 获取标签数据
-  const fetchTags = async () => {
-    try {
-      setLoading(true);
-      const data = await apiClient.get<TagWithStats[]>('/api/tags?sort_by=count&sort_order=desc');
-      setTags(data);
-    } catch (error) {
-      console.error('获取标签失败:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchTags();
-  }, []);
-
-  // 创建新标签
+  // 创建新标签 - 使用react-query mutation
   const handleCreateTag = async (values: { name: string; slug: string }) => {
-    try {
-      setCreateLoading(true);
-      const newTag = await apiClient.post<TagWithStats>('/api/tags', values);
-      setTags(prev => [...prev, newTag]);
-      
-      // 自动选中新创建的标签
-      const newValue = [...value, newTag.id];
-      onChange?.(newValue);
-      
-      message.success('标签创建成功');
-      setCreateModalVisible(false);
-      createForm.resetFields();
-    } catch (error) {
-      message.error('创建标签失败');
-    } finally {
-      setCreateLoading(false);
-    }
+    createTagMutation.mutate(values, {
+      onSuccess: (newTag) => {
+        // 自动选中新创建的标签
+        const newValue = [...value, newTag.id];
+        onChange?.(newValue);
+        
+        message.success('标签创建成功');
+        setCreateModalVisible(false);
+        createForm.resetFields();
+      },
+      onError: () => {
+        message.error('创建标签失败');
+      }
+    });
   };
 
   // 生成slug
@@ -190,7 +175,7 @@ export default function TagSelect({
               }}>
                 取消
               </Button>
-              <Button type="primary" htmlType="submit" loading={createLoading}>
+                              <Button type="primary" htmlType="submit" loading={createTagMutation.isPending}>
                 创建
               </Button>
             </Space>
