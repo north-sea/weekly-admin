@@ -363,9 +363,17 @@ export async function validateApplicationStartup(): Promise<EnvironmentConfig> {
     await validateDatabaseConnection(config);
     console.log('');
 
-    // Step 3: Validate Meilisearch connection
+    // Step 3: Validate Meilisearch connection (optional)
     console.log('📋 Step 3: Validating Meilisearch connection...');
-    await validateMeilisearchConnection(config);
+    try {
+      await validateMeilisearchConnection(config);
+    } catch (error) {
+      console.log('⚠️  Meilisearch connection failed - Search functionality will be disabled');
+      console.log('   The application will continue to run with limited search capabilities');
+      if (config.nodeEnv === 'development') {
+        console.log(`   Error details: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
     console.log('');
 
     // Step 4: Validate image upload service (optional)

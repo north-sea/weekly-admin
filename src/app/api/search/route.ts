@@ -135,11 +135,21 @@ export async function GET(request: NextRequest) {
     
   } catch (error) {
     console.error('Search API error:', error);
+    
+    // Check if it's a Meilisearch connection error
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const isMeilisearchDown = errorMessage.includes('ECONNREFUSED') || 
+                              errorMessage.includes('ENOTFOUND') || 
+                              errorMessage.includes('fetch failed');
+    
     return NextResponse.json({
       success: false,
-      error: 'Search failed',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    }, { status: 500 });
+      error: isMeilisearchDown ? 'Search service unavailable' : 'Search failed',
+      message: isMeilisearchDown 
+        ? 'Meilisearch service is not available. Please contact the administrator to enable search functionality.'
+        : errorMessage,
+      searchDisabled: isMeilisearchDown,
+    }, { status: isMeilisearchDown ? 503 : 500 });
   }
 }
 
@@ -187,10 +197,20 @@ export async function POST(request: NextRequest) {
     
   } catch (error) {
     console.error('Search API error:', error);
+    
+    // Check if it's a Meilisearch connection error
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const isMeilisearchDown = errorMessage.includes('ECONNREFUSED') || 
+                              errorMessage.includes('ENOTFOUND') || 
+                              errorMessage.includes('fetch failed');
+    
     return NextResponse.json({
       success: false,
-      error: 'Search failed',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    }, { status: 500 });
+      error: isMeilisearchDown ? 'Search service unavailable' : 'Search failed',
+      message: isMeilisearchDown 
+        ? 'Meilisearch service is not available. Please contact the administrator to enable search functionality.'
+        : errorMessage,
+      searchDisabled: isMeilisearchDown,
+    }, { status: isMeilisearchDown ? 503 : 500 });
   }
 }

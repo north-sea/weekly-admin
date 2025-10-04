@@ -177,8 +177,8 @@ export const syncContentToSearch = async (content: any): Promise<void> => {
     const task = await index.addDocuments([searchDocument]);
     console.log(`Content ${content.id} synced to search index, task ID: ${task.taskUid}`);
   } catch (error) {
-    console.error(`Failed to sync content ${content.id} to search:`, error);
-    throw error;
+    // Don't throw error if Meilisearch is unavailable - just log it
+    console.warn(`Failed to sync content ${content.id} to search (Meilisearch may be unavailable):`, error instanceof Error ? error.message : error);
   }
 };
 
@@ -191,8 +191,8 @@ export const removeContentFromSearch = async (contentId: number): Promise<void> 
     await index.deleteDocument(contentId);
     console.log(`Content ${contentId} removed from search index`);
   } catch (error) {
-    console.error(`Failed to remove content ${contentId} from search:`, error);
-    throw error;
+    // Don't throw error if Meilisearch is unavailable - just log it
+    console.warn(`Failed to remove content ${contentId} from search (Meilisearch may be unavailable):`, error instanceof Error ? error.message : error);
   }
 };
 
@@ -230,8 +230,9 @@ export const bulkSyncContentsToSearch = async (contents: any[]): Promise<any> =>
     console.log(`${contents.length} contents synced to search index, task ID: ${task.taskUid}`);
     return task;
   } catch (error) {
-    console.error('Failed to bulk sync contents to search:', error);
-    throw error;
+    // Don't throw error if Meilisearch is unavailable - just log it
+    console.warn('Failed to bulk sync contents to search (Meilisearch may be unavailable):', error instanceof Error ? error.message : error);
+    return null;
   }
 };
 
