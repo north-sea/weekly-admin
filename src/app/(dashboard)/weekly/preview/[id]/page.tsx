@@ -127,17 +127,17 @@ const WeeklyPreviewPage: React.FC = () => {
             </Title>
             <Space style={{ marginTop: '4px' }} wrap>
               {content.featured && (
-                <Tag color="red" size="small">
+                <Tag color="red">
                   精选
                 </Tag>
               )}
               {content.source && (
-                <Tag color="blue" size="small">
+                <Tag color="blue">
                   {content.source}
                 </Tag>
               )}
               {content.tags.slice(0, 3).map(tag => (
-                <Tag key={tag.id} size="small" color="default">
+                <Tag key={tag.id} color="default">
                   {tag.name}
                 </Tag>
               ))}

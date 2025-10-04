@@ -86,7 +86,7 @@ export async function GET(
 
     // 时间分布统计（按创建日期）
     const timeStats = contents.reduce((stats: Record<string, number>, content) => {
-      const date = new Date(content.created_at).toISOString().split('T')[0];
+      const date = new Date(content.created_at || new Date()).toISOString().split('T')[0];
       stats[date] = (stats[date] || 0) + 1;
       return stats;
     }, {});

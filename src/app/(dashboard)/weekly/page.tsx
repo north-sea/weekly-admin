@@ -69,7 +69,7 @@ const WeeklyManagePage: React.FC = () => {
       title: '发布时间',
       dataIndex: 'published_at',
       width: 150,
-      render: (text) => text ? new Date(text).toLocaleString() : '-',
+      render: (text: any) => text ? new Date(text as string).toLocaleString() : '-',
     },
     {
       title: '操作',

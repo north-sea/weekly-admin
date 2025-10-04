@@ -47,6 +47,20 @@ export default function StartupProvider({ children }: StartupProviderProps) {
         throw new Error(data.error || data.message || 'Startup validation failed');
       }
 
+      // Initialize client-side monitoring if in production
+      if (process.env.NODE_ENV === 'production') {
+        // Set up error tracking for client-side errors
+        window.addEventListener('error', (event) => {
+          console.error('Client-side error:', event.error);
+          // In a real implementation, you might send this to a logging service
+        });
+
+        window.addEventListener('unhandledrejection', (event) => {
+          console.error('Unhandled promise rejection:', event.reason);
+          // In a real implementation, you might send this to a logging service
+        });
+      }
+
       setInitialized(true);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown startup error';

@@ -12,8 +12,8 @@ const CreateWeeklyIssueSchema = z.object({
 });
 
 const GetWeeklyIssuesSchema = z.object({
-  page: z.string().transform(Number).pipe(z.number().int().positive()).default('1'),
-  pageSize: z.string().transform(Number).pipe(z.number().int().positive().max(100)).default('10'),
+  page: z.string().transform(Number).pipe(z.number().int().positive()).default(1),
+  pageSize: z.string().transform(Number).pipe(z.number().int().positive().max(100)).default(10),
   status: z.enum(['draft', 'published', 'archived']).optional(),
   search: z.string().optional(),
 });

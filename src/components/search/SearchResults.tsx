@@ -182,7 +182,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
               <Space size={[4, 4]} wrap>
                 <TagOutlined style={{ color: '#999' }} />
                 {tags.slice(0, 5).map((tag, index) => (
-                  <Tag key={index} size="small">
+                  <Tag key={index}>
                     {tag}
                   </Tag>
                 ))}

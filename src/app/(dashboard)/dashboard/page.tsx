@@ -146,7 +146,7 @@ export default function DashboardPage() {
             showIcon
             style={{ marginBottom: '24px' }}
             action={
-              <Button size="small" onClick={refetch}>
+              <Button size="small" onClick={() => refetch()}>
                 重试
               </Button>
             }

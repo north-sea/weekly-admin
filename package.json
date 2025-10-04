@@ -3,15 +3,22 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "dev:turbo": "next dev --turbopack",
+    "dev": "next dev --turbopack",
     "build": "next build",
+    "build:analyze": "ANALYZE=true next build",
+    "build:production": "NODE_ENV=production next build",
     "start": "next start",
+    "start:production": "NODE_ENV=production next start -p ${PORT:-3000}",
     "lint": "next lint",
+    "lint:fix": "next lint --fix",
+    "type-check": "tsc --noEmit",
     "db:generate": "pnpm prisma generate",
     "db:pull": "pnpm prisma db pull",
     "db:migrate": "pnpm tsx scripts/migrate-db.ts",
-    "validate-startup": "tsx scripts/validate-startup.ts"
+    "validate-startup": "node scripts/validate-startup.js",
+    "docker:build": "docker build -t weekly-content-management .",
+    "docker:run": "docker run -p 3000:3000 --env-file .env weekly-content-management",
+    "health-check": "curl -f http://localhost:3000/api/health || exit 1"
   },
   "dependencies": {
     "@ant-design/charts": "^2.6.1",

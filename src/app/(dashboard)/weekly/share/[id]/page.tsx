@@ -133,17 +133,17 @@ const WeeklySharePage: React.FC = () => {
             </Title>
             <div style={{ marginTop: '4px' }}>
               {content.featured && (
-                <Tag color="red" size="small" style={{ marginRight: '4px' }}>
+                <Tag color="red" style={{ marginRight: '4px' }}>
                   精选
                 </Tag>
               )}
               {content.source && (
-                <Tag color="blue" size="small" style={{ marginRight: '4px' }}>
+                <Tag color="blue" style={{ marginRight: '4px' }}>
                   {content.source}
                 </Tag>
               )}
               {content.tags.slice(0, 3).map(tag => (
-                <Tag key={tag.id} size="small" color="default" style={{ marginRight: '4px' }}>
+                <Tag key={tag.id} color="default" style={{ marginRight: '4px' }}>
                   {tag.name}
                 </Tag>
               ))}

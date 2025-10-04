@@ -407,7 +407,7 @@ export default function ImageManager({
                       description={
                         <Space direction="vertical" size={4} style={{ width: '100%' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Tag color={getTypeTagColor(image.type)} size="small">
+                            <Tag color={getTypeTagColor(image.type)}>
                               {getTypeDisplayName(image.type)}
                             </Tag>
                             <Text type="secondary" style={{ fontSize: '11px' }}>

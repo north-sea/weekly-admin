@@ -145,17 +145,17 @@ const AvailableContentsList: React.FC<AvailableContentsListProps> = ({
               
               <Space wrap style={{ marginTop: '4px' }}>
                 {content.category && (
-                  <Tag color="green" size="small">
+                  <Tag color="green">
                     {content.category.name}
                   </Tag>
                 )}
                 {content.tags.slice(0, 3).map(tag => (
-                  <Tag key={tag.id} size="small">
+                  <Tag key={tag.id}>
                     {tag.name}
                   </Tag>
                 ))}
                 {content.tags.length > 3 && (
-                  <Tag size="small">+{content.tags.length - 3}</Tag>
+                  <Tag>+{content.tags.length - 3}</Tag>
                 )}
               </Space>
               

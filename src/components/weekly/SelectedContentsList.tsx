@@ -112,7 +112,7 @@ const SortableItem: React.FC<{
         ]}
       >
         <div style={{ position: 'absolute', left: '8px', top: '8px' }}>
-          <Tag color="blue" size="small">
+                          <Tag color="blue">
             {index + 1}
           </Tag>
         </div>
@@ -135,7 +135,7 @@ const SortableItem: React.FC<{
                 </Tag>
               )}
               {content.featured && (
-                <Tag color="red" size="small" style={{ marginLeft: '4px' }}>
+                <Tag color="red" style={{ marginLeft: '4px' }}>
                   精选
                 </Tag>
               )}
@@ -154,22 +154,22 @@ const SortableItem: React.FC<{
               
               <Space wrap style={{ marginTop: '4px' }}>
                 {content.section && (
-                  <Tag color="purple" size="small">
+                  <Tag color="purple">
                     {content.section}
                   </Tag>
                 )}
                 {content.category && (
-                  <Tag color="green" size="small">
+                  <Tag color="green">
                     {content.category.name}
                   </Tag>
                 )}
                 {content.tags.slice(0, 2).map(tag => (
-                  <Tag key={tag.id} size="small">
+                  <Tag key={tag.id}>
                     {tag.name}
                   </Tag>
                 ))}
                 {content.tags.length > 2 && (
-                  <Tag size="small">+{content.tags.length - 2}</Tag>
+                  <Tag>+{content.tags.length - 2}</Tag>
                 )}
               </Space>
             </div>

@@ -408,7 +408,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
               <Text strong>{savedFilter.name}</Text>
               <div style={{ marginTop: 4 }}>
                 {Object.keys(savedFilter.filters).map(key => (
-                  <Tag key={key} size="small" style={{ marginBottom: 2 }}>
+                  <Tag key={key} style={{ marginBottom: 2 }}>
                     {key}
                   </Tag>
                 ))}
@@ -625,7 +625,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                 </Text>
                 <div style={{ marginTop: 8 }}>
                   {Object.keys(savedFilter.filters).map(key => (
-                    <Tag key={key} size="small">
+                    <Tag key={key}>
                       {key}
                     </Tag>
                   ))}

@@ -283,11 +283,11 @@ export default function AdvancedAnalyticsPage() {
           <Text strong>{title}</Text>
           <br />
           <Space size="small">
-            <Tag color={record.contentType === 'Blog' ? 'blue' : 'green'} size="small">
+            <Tag color={record.contentType === 'Blog' ? 'blue' : 'green'}>
               {record.contentType}
             </Tag>
             {record.categoryName && (
-              <Tag size="small">{record.categoryName}</Tag>
+              <Tag>{record.categoryName}</Tag>
             )}
           </Space>
         </div>
@@ -436,7 +436,7 @@ export default function AdvancedAnalyticsPage() {
           showIcon
           style={{ marginBottom: '24px' }}
           action={
-            <Button size="small" onClick={refetch}>
+            <Button size="small" onClick={() => refetch()}>
               重试
             </Button>
           }

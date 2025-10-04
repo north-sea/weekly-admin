@@ -33,11 +33,8 @@ vim .env
 # 生成Prisma客户端
 pnpm db:generate
 
-# 启动开发服务器
+# 启动开发服务器（使用Turbopack）
 pnpm dev
-
-# 或使用Turbopack（更快的热重载）
-pnpm dev:turbo
 ```
 
 访问 [http://localhost:3000](http://localhost:3000) 开始开发。

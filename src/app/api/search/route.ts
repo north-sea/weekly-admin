@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
           success: false,
           error: 'Invalid request parameters',
-          details: validation.error.errors,
+          details: validation.error.issues,
         }, { status: 400 });
       }
       
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: false,
         error: 'Invalid request parameters',
-        details: validation.error.errors,
+        details: validation.error.issues,
       }, { status: 400 });
     }
     
@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
         status,
         categoryIds,
         tagIds,
-        dateRange,
+        dateRange: dateRange as [string, string] | undefined,
         sources,
         userId,
       },
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: false,
         error: 'Invalid request body',
-        details: validation.error.errors,
+        details: validation.error.issues,
       }, { status: 400 });
     }
     
@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
         status,
         categoryIds,
         tagIds,
-        dateRange,
+        dateRange: dateRange as [string, string] | undefined,
         sources,
         userId,
       },

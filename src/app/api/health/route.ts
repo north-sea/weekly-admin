@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import client from '@/lib/search';
 import { initializeApplication, isApplicationInitialized } from '@/lib/startup';
+import { resourceMonitor } from '@/lib/monitoring/resource-monitor';
+import { performanceMonitor } from '@/lib/monitoring/performance';
+import { errorTracker } from '@/lib/monitoring/error-tracker';
+import { logger } from '@/lib/logger';
 
 interface HealthStatus {
   status: 'healthy' | 'unhealthy';
@@ -18,9 +22,29 @@ interface HealthCheckResponse {
     application: HealthStatus;
     startup: HealthStatus;
   };
+  resources?: {
+    memory: {
+      used: number; // MB
+      percentage: number;
+    };
+    cpu: {
+      usage: number;
+    };
+    uptime: number;
+  };
+  performance: {
+    totalOperations: number;
+    averageDuration: number;
+    successRate: number;
+  };
+  errors: {
+    recentErrors: number;
+    totalErrors: number;
+  };
   timestamp: Date;
   uptime: number;
   initialized: boolean;
+  version: string;
 }
 
 export async function GET() {
@@ -53,9 +77,19 @@ export async function GET() {
         timestamp,
       },
     },
+    performance: {
+      totalOperations: 0,
+      averageDuration: 0,
+      successRate: 0,
+    },
+    errors: {
+      recentErrors: 0,
+      totalErrors: 0,
+    },
     timestamp,
     uptime: process.uptime(),
     initialized: false,
+    version: process.env.npm_package_version || '1.0.0',
   };
 
   // Check startup validation first
@@ -130,6 +164,48 @@ export async function GET() {
 
   // Update application response time
   healthCheck.services.application.responseTime = Date.now() - startTime;
+
+  // Get current resource metrics
+  const resourceMetrics = resourceMonitor.getCurrentMetrics();
+  if (resourceMetrics) {
+    healthCheck.resources = {
+      memory: {
+        used: Math.round(resourceMetrics.memory.used / 1024 / 1024), // MB
+        percentage: Math.round(resourceMetrics.memory.percentage),
+      },
+      cpu: {
+        usage: Math.round(resourceMetrics.cpu.usage),
+      },
+      uptime: Math.round(resourceMetrics.process.uptime),
+    };
+  }
+
+  // Get performance stats
+  const performanceStats = performanceMonitor.getStats();
+  healthCheck.performance = {
+    totalOperations: performanceStats.count,
+    averageDuration: Math.round(performanceStats.avgDuration),
+    successRate: Math.round(performanceStats.successRate * 100),
+  };
+
+  // Get error stats
+  const errorStats = errorTracker.getStats();
+  healthCheck.errors = {
+    recentErrors: errorStats.recentErrors,
+    totalErrors: errorStats.totalErrors,
+  };
+
+  // Add version info
+  healthCheck.version = process.env.APP_VERSION || 'unknown';
+
+  // Log health check
+  logger.info('Health check completed', {
+    status: healthCheck.overall,
+    duration: healthCheck.services.application.responseTime,
+    memoryUsage: healthCheck.resources?.memory.percentage,
+    cpuUsage: healthCheck.resources?.cpu.usage,
+    type: 'health_check',
+  });
 
   // Return appropriate status code
   const statusCode = healthCheck.overall === 'healthy' ? 200 : 503;

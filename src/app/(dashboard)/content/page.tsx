@@ -51,7 +51,7 @@ export default function ContentPage() {
 
   // 提交创建表单 - 使用react-query mutation
   const handleCreateSubmit = async (values: Record<string, unknown>) => {
-    createContentMutation.mutate(values, {
+    createContentMutation.mutate(values as any, {
       onSuccess: () => {
         message.success('创建成功');
         setCreateModalVisible(false);
@@ -69,9 +69,9 @@ export default function ContentPage() {
     if (!currentContent) return;
 
     updateContentMutation.mutate({ 
-      id: currentContent.id, 
+      id: Number(currentContent.id), 
       ...values 
-    }, {
+    } as any, {
       onSuccess: () => {
         message.success('更新成功');
         setEditModalVisible(false);
