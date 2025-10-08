@@ -127,6 +127,7 @@ model contents {
   categories           categories?            @relation(fields: [category_id], references: [id])
   content_tags         content_tags[]
   weekly_content_items weekly_content_items[]
+  drafts               drafts[]
 }
 
 model operation_logs {
@@ -278,4 +279,67 @@ enum contents_screenshot_api {
   ScreenshotLayer
   HCTI
   manual
+}
+
+enum drafts_status {
+  pending
+  adopted
+  rejected
+}
+
+/// 草稿表 - 存储从 Karakeep 同步的书签数据
+model drafts {
+  id BigInt @id @default(autoincrement())
+
+  // Karakeep 原始数据
+  karakeep_id String  @unique @db.VarChar(100)
+  title       String  @db.VarChar(500)
+  url         String  @db.VarChar(1000)
+  description String? @db.Text
+  summary     String? @db.Text // Karakeep AI 总结
+  note        String? @db.Text
+  favicon_url String? @db.VarChar(500)
+  image_url   String? @db.VarChar(500)
+
+  // Karakeep 元数据
+  karakeep_created_at   DateTime? @db.Timestamp(0)
+  karakeep_updated_at   DateTime? @db.Timestamp(0)
+  tagging_status        String?   @db.VarChar(50) // Karakeep 标注状态
+  summarization_status  String?   @db.VarChar(50) // Karakeep 总结状态
+  
+  // 类似 content 表的字段 - 便于转换
+  slug                  String?   @db.VarChar(500)
+  content               String?   @db.LongText // 格式化后的内容（周刊格式）
+  source                String?   @db.VarChar(200) // 来源网站名
+  word_count            Int?      @default(0)
+
+  // 扩展字段 - 用于草稿管理
+  status              drafts_status? @default(pending)
+  priority            Int?           @default(0)
+  category_suggestion String?        @db.VarChar(100)
+  tags_suggestion     String?        @db.Text // JSON 格式的 Karakeep 标签
+
+  // 去重和关联
+  duplicate_of_draft_id BigInt?
+  content_id            BigInt?
+
+  // 同步信息
+  synced_at DateTime? @db.Timestamp(0)
+
+  // 系统字段
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @default(now()) @db.Timestamp(0)
+
+  // Relations
+  linked_content contents? @relation(fields: [content_id], references: [id], onDelete: SetNull)
+  duplicate_of   drafts?   @relation("DraftDuplicate", fields: [duplicate_of_draft_id], references: [id], onDelete: SetNull)
+  duplicates     drafts[]  @relation("DraftDuplicate")
+
+  // 索引
+  @@index([status], map: "idx_status")
+  @@index([karakeep_id], map: "idx_karakeep_id")
+  @@index([synced_at], map: "idx_synced_at")
+  @@index([priority], map: "idx_priority")
+  @@index([content_id], map: "idx_content_id")
+  @@index([duplicate_of_draft_id], map: "idx_duplicate_of_draft_id")
 }

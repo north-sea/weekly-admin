@@ -27,6 +27,10 @@ export const menuConfig: MenuDataItem[] = [
         path: '/content',
         name: '内容列表',
       },
+      {
+        path: '/content/drafts',
+        name: '草稿管理',
+      },
     ],
   },
   {

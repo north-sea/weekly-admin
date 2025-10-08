@@ -6,6 +6,7 @@ export * from './useCategoryQueries';
 export * from './useTagQueries';
 export * from './useAnalyticsQueries';
 export * from './useWeeklyQueries';
+export * from './useDraftQueries';
 
 // 导出缓存配置和管理工具
 export * from '@/lib/cache-config';
