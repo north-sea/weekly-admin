@@ -33,24 +33,20 @@ const ProLayoutWrapper: React.FC<ProLayoutWrapperProps> = ({ children }) => {
       logo={false} // 暂时不使用logo，可以后续添加
       layout="mix"
       navTheme="light"
-      headerTheme="light"
-      primaryColor="#1890ff"
       fixedHeader
       fixSiderbar
       splitMenus={false}
       contentWidth="Fluid"
-      selectedKeys={[pathname]}
-      openKeys={[pathname.split('/').slice(0, -1).join('/')]}
       menu={{
-        type: 'group',
+        type: 'sub',
         request: async () => menuConfig,
       }}
       location={{
         pathname,
       }}
-      breadcrumbRender={(route, params, routes) => {
-        // 检查 routes 是否为有效数组
-        if (!routes || !Array.isArray(routes) || routes.length === 0) {
+      breadcrumbRender={(routers?: any[]) => {
+        // 检查 routers 是否为有效数组
+        if (!routers || !Array.isArray(routers) || routers.length === 0) {
           // 降级处理：基于当前路径生成简单面包屑
           const pathSegments = pathname.split('/').filter(Boolean);
           if (pathSegments.length === 0) {
@@ -68,25 +64,25 @@ const ProLayoutWrapper: React.FC<ProLayoutWrapperProps> = ({ children }) => {
           
           return fallbackBreadcrumbs;
         }
-        
-        // 原有逻辑：routes 存在时的处理
-        const breadcrumbs = routes.map((item) => ({
-          title: item.breadcrumbName || item.name,
-          href: item.path,
-        }));
-        return breadcrumbs;
+        // routers 存在时直接返回，由 ProLayout 处理
+        return routers;
       }}
-      menuItemRender={(item, dom) => (
-        <div
-          onClick={() => {
-            if (item.path) {
-              router.push(item.path);
-            }
-          }}
-        >
-          {dom}
-        </div>
-      )}
+      menuItemRender={(item, dom) => {
+        // 父级（占位路径）不跳转，仅展开
+        const isPlaceholderParent = item?.path?.startsWith('/_menu/');
+        if (isPlaceholderParent) return dom;
+        return (
+          <div
+            onClick={() => {
+              if (item.path) {
+                router.push(item.path);
+              }
+            }}
+          >
+            {dom}
+          </div>
+        );
+      }}
       actionsRender={() => [
         <HeaderActions key="actions" />,
       ]}

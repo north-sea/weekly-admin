@@ -24,8 +24,10 @@ export const ContentTypeChart: React.FC<ContentTypeChartProps> = ({
     colorField: 'type',
     radius: 0.8,
     label: {
-      type: 'outer' as const,
-      content: '{name}: {percentage}',
+      text: (item: any) => `${item.type}: ${item.count}`,
+      style: {
+        fontSize: 12,
+      },
     },
     interactions: [
       {

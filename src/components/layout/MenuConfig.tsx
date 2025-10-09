@@ -19,7 +19,8 @@ export const menuConfig: MenuDataItem[] = [
     icon: <DashboardOutlined />,
   },
   {
-    path: '/content',
+    // 父级使用占位路径，避免与子项重复
+    path: '/_menu/content',
     name: '内容管理',
     icon: <FileTextOutlined />,
     children: [
@@ -34,7 +35,8 @@ export const menuConfig: MenuDataItem[] = [
     ],
   },
   {
-    path: '/weekly',
+    // 父级使用占位路径，避免与子项重复
+    path: '/_menu/weekly',
     name: '周刊管理',
     icon: <CalendarOutlined />,
     children: [
@@ -54,7 +56,8 @@ export const menuConfig: MenuDataItem[] = [
     icon: <SearchOutlined />,
   },
   {
-    path: '/analytics',
+    // 父级使用占位路径，避免与子项重复
+    path: '/_menu/analytics',
     name: '数据分析',
     icon: <BarChartOutlined />,
     children: [
