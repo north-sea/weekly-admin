@@ -27,6 +27,22 @@ const adminRoutes = [
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // 如果访问登录页且已经有有效 token，则直接重定向到目标页
+  if (pathname.startsWith('/login')) {
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.startsWith('Bearer ')
+      ? authHeader.substring(7)
+      : request.cookies.get('auth-token')?.value;
+
+    if (token) {
+      try {
+        await verifyToken(token);
+        const redirectParam = request.nextUrl.searchParams.get('redirect') || '/dashboard';
+        return NextResponse.redirect(new URL(redirectParam, request.url));
+      } catch {}
+    }
+  }
+
   // Allow public routes
   if (publicRoutes.some(route => pathname.startsWith(route))) {
     return NextResponse.next();

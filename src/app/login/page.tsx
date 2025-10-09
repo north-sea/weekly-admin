@@ -1,6 +1,6 @@
 'use client';
 
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {useRouter, useSearchParams} from 'next/navigation';
 import {Card, Form, Input, Button, Typography, Space, App, Checkbox} from 'antd';
 import {UserOutlined, LockOutlined, LoginOutlined} from '@ant-design/icons';
@@ -17,64 +17,41 @@ interface LoginForm {
 export default function LoginPage() {
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
-    const [isRedirecting, setIsRedirecting] = useState(false);
     const router = useRouter();
     const searchParams = useSearchParams();
     const {login, isAuthenticated, hasHydrated} = useAuthStore();
     const {message} = App.useApp();
+    const redirectedRef = useRef(false);
 
     const redirectUrl = searchParams.get('redirect') || '/dashboard';
 
-    // 添加调试状态监控
+    // 已登录时直接跳转（避免多次触发）
     useEffect(() => {
-        console.log('登录页面状态监控:', {
-            isAuthenticated,
-            hasHydrated,
-            redirectUrl,
-            timestamp: new Date().toISOString()
-        });
-    }, [isAuthenticated, hasHydrated, redirectUrl]);
-
-    // Redirect if already authenticated
-    useEffect(() => {
-        console.log('认证状态检查:', {isAuthenticated, hasHydrated, isRedirecting, redirectUrl});
-
-                 // 防止重复跳转，确保 store 完全水合后再执行跳转逻辑
-         if (isAuthenticated && hasHydrated && !isRedirecting) {
-             console.log('用户已认证且状态已水合，准备跳转到:', redirectUrl);
-             setIsRedirecting(true);
- 
-             // 添加短暂延迟确保 cookie 已设置，middleware 可以读取
-             const timer = setTimeout(() => {
-                 console.log('执行跳转到:', redirectUrl);
- 
-                 try {
-                     console.log('使用 router.replace 跳转');
-                     router.replace(redirectUrl);
-                 } catch (error) {
-                     console.warn('router.replace 失败，使用 window.location:', error);
-                     window.location.href = redirectUrl;
-                 }
-             }, 200);
-             
-             return () => {
-                 console.log('清理跳转定时器');
-                 clearTimeout(timer);
-             };
-         } else if (isAuthenticated && !hasHydrated && !isRedirecting) {
-             console.log('用户已认证但状态未完全水合，等待水合完成...');
-         }
-    }, [isAuthenticated, hasHydrated, isRedirecting, router, redirectUrl]);
+        if (!hasHydrated) return;
+        if (isAuthenticated && !redirectedRef.current) {
+            redirectedRef.current = true;
+            // 短暂延迟，确保 cookie 持久化后中间件可读取
+            const timer = setTimeout(() => {
+                try {
+                    router.replace(redirectUrl);
+                    console.log('router.replace',redirectUrl);
+                } catch {
+                    window.location.href = redirectUrl;
+                }
+            }, 120);
+            return () => {
+                clearTimeout(timer);
+            };
+        }
+    }, [hasHydrated, isAuthenticated, router, redirectUrl]);
 
     const handleSubmit = async (values: LoginForm) => {
         setLoading(true);
-
         try {
             const response = await fetch('/api/auth/login', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: {'Content-Type': 'application/json'},
+                credentials: 'same-origin',
                 body: JSON.stringify({
                     username: values.username,
                     password: values.password,
@@ -83,27 +60,40 @@ export default function LoginPage() {
             });
 
             const data = await response.json();
-
             if (data.success && data.data) {
-                console.log('登录成功，准备更新状态...', {user: data.data.user, token: data.data.token});
                 message.success('登录成功！');
+                // 显式写入 cookie，确保中间件立刻可读
+                try {
+                    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+                    const secureAttr = isHttps ? '; Secure' : '';
+                    const maxAge = Number(data.data.expiresIn) || 8 * 60 * 60;
+                    document.cookie = `auth-token=${data.data.token}; Path=/; Max-Age=${maxAge}; SameSite=Lax${secureAttr}`;
+                } catch {}
+                // 更新本地认证状态
                 login(data.data.user, data.data.token);
-
-                // 移除手动跳转，让 useEffect 处理自动跳转
-                console.log('状态已更新，等待自动跳转到:', redirectUrl);
+                console.log('登录成功，准备跳转...',redirectedRef.current);
+                // 直接跳转，避免依赖额外状态引起的清理问题
+                if (!redirectedRef.current) {
+                    redirectedRef.current = true;
+                    setTimeout(() => {
+                        try {
+                            router.replace(redirectUrl);
+                        } catch {
+                            window.location.href = redirectUrl;
+                        }
+                    }, 120);
+                }
             } else {
                 message.error(data.error || '登录失败');
             }
         } catch (error) {
-            console.error('Login error:', error);
             message.error('网络错误，请稍后重试');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleSubmitFailed = (errorInfo: unknown) => {
-        console.log('Failed:', errorInfo);
+    const handleSubmitFailed = () => {
         message.error('请检查输入信息');
     };
 

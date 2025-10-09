@@ -63,12 +63,16 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
  */
 export function extractTokenFromHeader(request: NextRequest): string | null {
   const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
+  // 优先从 Authorization 获取
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7);
   }
-  
-  return authHeader.substring(7); // Remove 'Bearer ' prefix
+  // 兼容：从 Cookie 读取
+  const cookieToken = request.cookies.get('auth-token')?.value;
+  if (cookieToken) {
+    return cookieToken;
+  }
+  return null;
 }
 
 /**
