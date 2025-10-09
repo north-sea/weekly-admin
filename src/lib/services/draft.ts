@@ -21,6 +21,7 @@ export interface DraftQuery {
   showDuplicates?: 'all' | 'original' | 'duplicate';
   sortBy?: 'created_at' | 'updated_at' | 'priority' | 'title' | 'synced_at';
   sortOrder?: 'asc' | 'desc';
+  stage?: 'inbox' | 'editor';
 }
 
 // 草稿响应类型（包含关联数据）
@@ -288,8 +289,92 @@ export class DraftService {
       showDuplicates = 'all',
       sortBy = 'created_at',
       sortOrder = 'desc',
+      stage,
     } = query;
 
+    // 如果是 editor 阶段：返回 contents 表中 status='draft' 的草稿，映射为 DraftListResponse
+    if (stage === 'editor') {
+      // 关键词条件
+      const whereContents: Prisma.contentsWhereInput = {
+        status: 'draft',
+      };
+      if (keyword) {
+        whereContents.OR = [
+          { title: { contains: keyword } },
+          { description: { contains: keyword } },
+          { source_url: { contains: keyword } },
+        ];
+      }
+
+      // 计算总数
+      const total = await prisma.contents.count({ where: whereContents });
+
+      // 排序映射（contents 不存在 priority/synced_at）
+      const orderByContents: Prisma.contentsOrderByWithRelationInput =
+        sortBy === 'title'
+          ? { title: sortOrder }
+          : sortBy === 'updated_at'
+          ? { updated_at: sortOrder }
+          : { created_at: sortOrder };
+
+      const rows = await prisma.contents.findMany({
+        where: whereContents,
+        orderBy: orderByContents,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          categories: true,
+        },
+      });
+
+      // 映射为 DraftWithRelations 基本字段，以满足前端表格展示
+      const mapped = rows.map((c) => ({
+        id: c.id as unknown as bigint,
+        karakeep_id: '',
+        title: c.title,
+        url: c.source_url || '',
+        description: c.description,
+        note: null,
+        favicon_url: null,
+        image_url: null,
+        karakeep_created_at: null,
+        karakeep_updated_at: null,
+        status: 'adopted', // 在 editor 阶段展示为已采用的草稿来源
+        priority: null,
+        category_suggestion: c.categories?.name || null,
+        tags_suggestion: null,
+        duplicate_of_draft_id: null,
+        content_id: c.id as unknown as bigint,
+        synced_at: c.updated_at,
+        created_at: c.created_at,
+        updated_at: c.updated_at,
+        summary: null,
+        tagging_status: null,
+        summarization_status: null,
+        slug: c.slug,
+        content: c.content,
+        source: c.source,
+        word_count: c.word_count || 0,
+        linked_content: {
+          id: c.id,
+          title: c.title,
+          slug: c.slug,
+          status: c.status,
+        },
+      }));
+
+      return {
+        data: mapped as any,
+        pagination: {
+          page,
+          pageSize,
+          total,
+          totalPages: Math.ceil(total / pageSize),
+        },
+      };
+    }
+
+    // 默认：inbox 阶段（drafts 池）
     // 构建 where 条件
     const where: Prisma.draftsWhereInput = {};
 

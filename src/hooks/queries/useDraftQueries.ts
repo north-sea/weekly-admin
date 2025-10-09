@@ -53,6 +53,7 @@ export interface DraftListParams {
   showDuplicates?: 'all' | 'original' | 'duplicate';
   sortBy?: 'created_at' | 'updated_at' | 'priority' | 'title' | 'synced_at';
   sortOrder?: 'asc' | 'desc';
+  stage?: 'inbox' | 'editor';
 }
 
 export interface DraftListResponse {

@@ -11,7 +11,6 @@ import { PageContainer } from '@ant-design/pro-components';
 import {
   FileTextOutlined,
   CheckCircleOutlined,
-  CloseCircleOutlined,
   ClockCircleOutlined,
 } from '@ant-design/icons';
 import DraftList from '@/components/drafts/DraftList';
@@ -25,14 +24,15 @@ export default function DraftsPage() {
     sortOrder: 'desc',
   });
 
-  // 获取统计数据
-  const { data: allData } = useDraftList({});
-  const { data: pendingData } = useDraftList({ status: 'pending' });
-  const { data: adoptedData } = useDraftList({ status: 'adopted' });
-  const { data: rejectedData } = useDraftList({ status: 'rejected' });
+  // 获取统计数据（与下方筛选互不干扰，固定统计维度）
+  const currentStage = filters.stage || 'inbox';
+  const { data: inboxAll } = useDraftList({ stage: 'inbox' });
+  const { data: inboxPending } = useDraftList({ stage: 'inbox', status: 'pending' });
+  const { data: inboxAdopted } = useDraftList({ stage: 'inbox', status: 'adopted' });
+  const { data: editorAll } = useDraftList({ stage: 'editor' });
 
   // 获取最后同步时间
-  const lastSyncTime = allData?.data?.[0]?.synced_at;
+  const lastSyncTime = inboxAll?.data?.[0]?.synced_at;
 
   return (
     <PageContainer
@@ -45,17 +45,26 @@ export default function DraftsPage() {
           { title: '草稿管理' },
         ],
       }}
-      extra={[
+      extra={currentStage === 'inbox' ? [
         <SyncButton key="sync" lastSyncTime={lastSyncTime} />,
-      ]}
+      ] : []}
     >
       {/* 统计卡片 */}
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={12} md={6}>
           <Card>
             <Statistic
-              title="全部草稿"
-              value={allData?.pagination.total || 0}
+              title="编辑草稿总数"
+              value={editorAll?.pagination.total || 0}
+              prefix={<FileTextOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={6}>
+          <Card>
+            <Statistic
+              title="草稿池（drafts）"
+              value={inboxAll?.pagination.total || 0}
               prefix={<FileTextOutlined />}
             />
           </Card>
@@ -64,7 +73,7 @@ export default function DraftsPage() {
           <Card>
             <Statistic
               title="待处理"
-              value={pendingData?.pagination.total || 0}
+              value={inboxPending?.pagination.total || 0}
               prefix={<ClockCircleOutlined />}
               valueStyle={{ color: '#faad14' }}
             />
@@ -74,19 +83,9 @@ export default function DraftsPage() {
           <Card>
             <Statistic
               title="已采用"
-              value={adoptedData?.pagination.total || 0}
+              value={inboxAdopted?.pagination.total || 0}
               prefix={<CheckCircleOutlined />}
               valueStyle={{ color: '#52c41a' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="已拒绝"
-              value={rejectedData?.pagination.total || 0}
-              prefix={<CloseCircleOutlined />}
-              valueStyle={{ color: '#ff4d4f' }}
             />
           </Card>
         </Col>

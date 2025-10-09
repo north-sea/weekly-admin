@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Table, Tag, Space, Button, Typography, Popconfirm, Modal, Tooltip } from 'antd';
 import { 
   EyeOutlined, 
@@ -112,6 +112,13 @@ export const DraftList: React.FC<DraftListProps> = ({
     sortOrder: 'desc',
   });
   const [previewDraft, setPreviewDraft] = useState<any>(null);
+
+  // 同步外部筛选条件到内部状态，确保父组件变更时触发查询
+  useEffect(() => {
+    if (externalFilters) {
+      setFilters((prev: any) => ({ ...prev, ...externalFilters }));
+    }
+  }, [externalFilters]);
 
   // 查询
   const { data, isLoading } = useDraftList(filters);

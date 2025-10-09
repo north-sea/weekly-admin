@@ -29,7 +29,16 @@ export const StatCard: React.FC<StatCardProps> = ({
   extra,
 }) => {
   return (
-    <Card loading={loading} size="small">
+    <Card 
+      loading={loading} 
+      size="small"
+      bodyStyle={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        justifyContent: 'space-between', 
+        minHeight: 110 
+      }}
+    >
       <Statistic
         title={title}
         value={value}
@@ -39,8 +48,8 @@ export const StatCard: React.FC<StatCardProps> = ({
           color: trend?.isPositive ? '#3f8600' : trend?.isPositive === false ? '#cf1322' : undefined 
         }}
       />
-      {trend && (
-        <div style={{ marginTop: 8 }}>
+      <div style={{ marginTop: 8, minHeight: 20 }}>
+        {trend && (
           <Text type="secondary" style={{ fontSize: '12px' }}>
             {trend.isPositive ? (
               <ArrowUpOutlined style={{ color: '#3f8600', marginRight: 4 }} />
@@ -49,13 +58,11 @@ export const StatCard: React.FC<StatCardProps> = ({
             )}
             {Math.abs(trend.value)}%
           </Text>
-        </div>
-      )}
-      {extra && (
-        <div style={{ marginTop: 8 }}>
-          {extra}
-        </div>
-      )}
+        )}
+      </div>
+      <div style={{ marginTop: 8, minHeight: 16 }}>
+        {extra}
+      </div>
     </Card>
   );
 };

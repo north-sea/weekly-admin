@@ -36,6 +36,20 @@ export default function DraftFilters({ value = {}, onChange }: DraftFiltersProps
     <div style={{ marginBottom: 16 }}>
       <Form layout="vertical">
         <Row gutter={16}>
+          {/* 阶段筛选 */}
+          <Col xs={12} sm={12} md={6} lg={4}>
+            <Form.Item label="阶段">
+              <Select
+                placeholder="全部"
+                value={filters.stage}
+                onChange={(val) => handleChange('stage', val)}
+                allowClear
+              >
+                <Option value="inbox">采集草稿池</Option>
+                <Option value="editor">编辑草稿(contents)</Option>
+              </Select>
+            </Form.Item>
+          </Col>
           {/* 搜索框 */}
           <Col xs={24} sm={24} md={8} lg={6}>
             <Form.Item label="搜索">

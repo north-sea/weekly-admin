@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
       showDuplicates: (searchParams.get('showDuplicates') || 'all') as any,
       sortBy: (searchParams.get('sortBy') || 'created_at') as any,
       sortOrder: (searchParams.get('sortOrder') || 'desc') as any,
+      stage: (searchParams.get('stage') || undefined) as any,
     };
 
     const result = await getDraftList(query);

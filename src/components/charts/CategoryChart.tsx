@@ -18,8 +18,14 @@ export const CategoryChart: React.FC<CategoryChartProps> = ({
   loading = false,
   title = '分类使用统计',
 }) => {
+  const safeData = Array.isArray(data)
+    ? data
+        .filter((d) => d && typeof d.name === 'string')
+        .map((d) => ({ name: d.name, count: Number(d.count || 0) }))
+    : [];
+
   const config = {
-    data,
+    data: safeData,
     xField: 'name',
     yField: 'count',
     columnStyle: {
@@ -36,9 +42,10 @@ export const CategoryChart: React.FC<CategoryChartProps> = ({
     },
     tooltip: {
       formatter: (datum: any) => {
+        const value = Number(datum?.count ?? 0);
         return {
           name: '使用次数',
-          value: `${datum.count} 次`,
+          value: `${isNaN(value) ? 0 : value} 次`,
         };
       },
     },
@@ -46,7 +53,7 @@ export const CategoryChart: React.FC<CategoryChartProps> = ({
 
   return (
     <Card loading={loading} title={title} size="small">
-      {data.length > 0 ? (
+      {safeData.length > 0 ? (
         <Column {...config} height={200} />
       ) : (
         <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

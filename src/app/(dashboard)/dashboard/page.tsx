@@ -27,7 +27,6 @@ import {
   BookOutlined,
   EditOutlined,
   EyeOutlined,
-  ClockCircleOutlined,
   TrophyOutlined,
   BarChartOutlined,
   PlusOutlined,
@@ -199,31 +198,30 @@ export default function DashboardPage() {
           </Col>
         </Row>
 
-        {/* Quality Statistics */}
+        {/* Key Stats */}
         <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
           <Col xs={24} sm={12} md={6}>
             <StatCard
-              title="平均字数"
-              value={analytics?.quality.avgWordCount || 0}
-              suffix="字"
-              prefix={<FileTextOutlined />}
+              title="发布率"
+              value={analytics?.overview.publishRate || 0}
+              suffix="%"
+              prefix={<BarChartOutlined />}
               loading={analyticsLoading}
             />
           </Col>
           <Col xs={24} sm={12} md={6}>
             <StatCard
-              title="平均阅读时间"
-              value={analytics?.quality.avgReadingTime || 0}
-              suffix="分钟"
-              prefix={<ClockCircleOutlined />}
-              loading={analyticsLoading}
-            />
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-            <StatCard
-              title="总浏览量"
-              value={analytics?.quality.totalViews || 0}
+              title="已发布内容"
+              value={analytics?.overview.publishedContents || 0}
               prefix={<EyeOutlined />}
+              loading={analyticsLoading}
+            />
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <StatCard
+              title="草稿内容"
+              value={analytics?.overview.draftContents || 0}
+              prefix={<EditOutlined />}
               loading={analyticsLoading}
             />
           </Col>
@@ -339,7 +337,7 @@ export default function DashboardPage() {
                   type="primary" 
                   icon={<PlusOutlined />} 
                   block
-                  onClick={() => router.push('/content')}
+                  onClick={() => router.push('/content/list')}
                 >
                   创建新内容
                 </Button>

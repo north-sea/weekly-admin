@@ -4,7 +4,7 @@ import { verifyToken } from './lib/auth-middleware';
 // Define protected routes
 const protectedRoutes = [
   '/dashboard',
-  '/content',
+  '/content/list',
   '/contents',
   '/weekly',
   '/analytics',

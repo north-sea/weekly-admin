@@ -25,7 +25,7 @@ export const menuConfig: MenuDataItem[] = [
     icon: <FileTextOutlined />,
     children: [
       {
-        path: '/content',
+        path: '/content/list',
         name: '内容列表',
       },
       {
