@@ -22,6 +22,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
 
     // 解析查询参数
+    const rawStage = searchParams.get('stage');
+    const stage = rawStage === null || rawStage === '' || rawStage === 'all' ? undefined : (rawStage as any);
+
     const query: DraftQuery = {
       page: parseInt(searchParams.get('page') || '1'),
       pageSize: parseInt(searchParams.get('pageSize') || '20'),
@@ -31,7 +34,7 @@ export async function GET(request: NextRequest) {
       showDuplicates: (searchParams.get('showDuplicates') || 'all') as any,
       sortBy: (searchParams.get('sortBy') || 'created_at') as any,
       sortOrder: (searchParams.get('sortOrder') || 'desc') as any,
-      stage: (searchParams.get('stage') || undefined) as any,
+      stage,
     };
 
     const result = await getDraftList(query);
@@ -39,16 +42,16 @@ export async function GET(request: NextRequest) {
     // 转换 BigInt 为字符串
     const serializedData = result.data.map(draft => ({
       ...draft,
-      id: draft.id.toString(),
-      duplicate_of_draft_id: draft.duplicate_of_draft_id?.toString() || null,
-      content_id: draft.content_id?.toString() || null,
-      linked_content: draft.linked_content ? {
-        ...draft.linked_content,
-        id: draft.linked_content.id.toString(),
+      id: (draft as any).id?.toString?.() || draft.id,
+      duplicate_of_draft_id: (draft as any).duplicate_of_draft_id?.toString?.() || draft.duplicate_of_draft_id || null,
+      content_id: (draft as any).content_id?.toString?.() || draft.content_id || null,
+      linked_content: (draft as any).linked_content ? {
+        ...(draft as any).linked_content,
+        id: (draft as any).linked_content.id?.toString?.() || (draft as any).linked_content.id,
       } : null,
-      duplicate_of: draft.duplicate_of ? {
-        ...draft.duplicate_of,
-        id: draft.duplicate_of.id.toString(),
+      duplicate_of: (draft as any).duplicate_of ? {
+        ...(draft as any).duplicate_of,
+        id: (draft as any).duplicate_of.id?.toString?.() || (draft as any).duplicate_of.id,
       } : null,
     }));
 

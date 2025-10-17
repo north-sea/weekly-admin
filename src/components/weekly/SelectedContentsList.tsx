@@ -102,7 +102,7 @@ const SortableItem: React.FC<{
                                 {content.title}
                             </Text>
                             {content.source && (
-                                <Tag color='orange' size='small' style={{marginLeft: '8px'}} icon={<LinkOutlined />}>
+                                <Tag color='orange' style={{marginLeft: '8px'}} icon={<LinkOutlined />}>
                                     {content.source}
                                 </Tag>
                             )}

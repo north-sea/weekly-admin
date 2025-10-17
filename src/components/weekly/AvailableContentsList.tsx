@@ -123,7 +123,6 @@ const AvailableContentsList: React.FC<AvailableContentsListProps> = ({
               {content.source && (
                 <Tag
                   color="blue"
-                  size="small"
                   style={{ marginLeft: '8px' }}
                   icon={<LinkOutlined />}
                 >

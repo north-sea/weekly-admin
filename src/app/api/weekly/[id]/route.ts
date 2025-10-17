@@ -71,16 +71,19 @@ export async function GET(
       );
     }
 
-    // 格式化返回数据
+    // 格式化返回数据，确保包含新增的结构化字段
     const formattedIssue = {
       ...issue,
       contents: issue.weekly_content_items.map((item) => ({
         ...item.content,
+        // 周刊项目的额外字段
         sort_order: item.sort_order,
         section: item.section,
         featured: item.featured,
+        // 关联数据
         tags: item.content.content_tags.map((ct) => ct.tag),
         category: item.content.categories,
+        // 确保包含结构化预览字段（image_url, summary 已在 content 中）
       })),
     };
 

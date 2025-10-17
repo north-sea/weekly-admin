@@ -97,7 +97,7 @@ const WeeklyPreview: React.FC<WeeklyPreviewProps> = ({ issueId, contents }) => {
               {content.title}
             </Text>
             {content.featured && (
-              <Tag color="red" size="small" style={{ marginLeft: '8px' }}>
+              <Tag color="red" style={{ marginLeft: '8px' }}>
                 精选
               </Tag>
             )}
@@ -121,14 +121,13 @@ const WeeklyPreview: React.FC<WeeklyPreviewProps> = ({ issueId, contents }) => {
               {content.source && (
                 <Tag
                   color="blue"
-                  size="small"
                   icon={<LinkOutlined />}
                 >
                   {content.source}
                 </Tag>
               )}
               {content.tags.slice(0, 3).map(tag => (
-                <Tag key={tag.id} size="small" color="default">
+                <Tag key={tag.id} color="default">
                   {tag.name}
                 </Tag>
               ))}

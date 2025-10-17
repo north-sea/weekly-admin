@@ -17,7 +17,7 @@ import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useRouter } from 'next/navigation';
 import { useDraftList, useUpdateDraft, useDeleteDraft, useConvertDraft } from '@/hooks/queries/useDraftQueries';
-import MarkdownPreview from '@/components/content/MarkdownPreview';
+import StructuredPreview from '@/components/content/StructuredPreview';
 
 const { Text, Link, Paragraph } = Typography;
 
@@ -53,10 +53,13 @@ const DraftPreviewModal: React.FC<{
   // 解析标签
   const tags = draft.tags_suggestion ? JSON.parse(draft.tags_suggestion) : [];
 
-  // 构建用于 MarkdownPreview 的 content 对象
-  const previewContent = {
+  // 构建结构化预览数据
+  const previewData = {
     title: draft.title,
-    content: draft.content || '暂无内容',
+    url: draft.url,
+    image_url: draft.image_url,
+    summary: draft.summary,
+    description: draft.description,
     source: draft.source,
     source_url: draft.url,
     tags: tags.map((tag: any, idx: number) => ({
@@ -64,11 +67,13 @@ const DraftPreviewModal: React.FC<{
       name: tag.name,
     })),
     created_at: draft.karakeep_created_at,
+    // 兼容：如果没有结构化字段，回退到 content 字段
+    content: draft.content,
   };
 
   return (
     <Modal
-      title="草稿预览 - 周刊格式"
+      title="草稿预览"
       open={visible}
       onCancel={onClose}
       footer={null}
@@ -79,8 +84,8 @@ const DraftPreviewModal: React.FC<{
         maxHeight: '75vh',
         overflow: 'auto',
       }}>
-        {/* 使用 MarkdownPreview 组件展示内容 */}
-        <MarkdownPreview content={previewContent} mode="desktop" showMeta={true} />
+        {/* 使用 StructuredPreview 组件展示内容 */}
+        <StructuredPreview data={previewData} mode="desktop" showMeta={true} />
         
         {/* AI 标签提示 */}
         {tags.some((tag: any) => tag.attachedBy === 'ai') && (
@@ -125,6 +130,20 @@ export const DraftList: React.FC<DraftListProps> = ({
   const updateDraft = useUpdateDraft();
   const deleteDraft = useDeleteDraft();
   const convertDraft = useConvertDraft();
+
+  // 安全获取主机名，兼容缺失协议或无效 URL
+  const getHostnameFromUrl = (url?: string): string => {
+    if (!url) return '';
+    try {
+      return new URL(url).hostname;
+    } catch {
+      try {
+        return new URL(`https://${url}`).hostname;
+      } catch {
+        return '';
+      }
+    }
+  };
 
   // 处理筛选变化
   const handleFiltersChange = (newFilters: any) => {
@@ -179,30 +198,41 @@ export const DraftList: React.FC<DraftListProps> = ({
             {record.favicon_url && (
               <img src={record.favicon_url} alt="" style={{ width: 16, height: 16 }} />
             )}
-            <Link 
-              href={record.url} 
-              target="_blank" 
-              style={{ fontSize: '12px' }}
-              ellipsis
-            >
-              {new URL(record.url).hostname}
-            </Link>
+            {record.url ? (
+              <Link 
+                href={record.url} 
+                target="_blank" 
+                style={{ fontSize: '12px' }}
+                ellipsis
+              >
+                {getHostnameFromUrl(record.url) || record.source || '链接'}
+              </Link>
+            ) : (
+              <Text type="secondary" style={{ fontSize: '12px' }}>本地内容</Text>
+            )}
           </Space>
         </Space>
       ),
     },
     {
-      title: '分类/标签',
-      key: 'suggestions',
-      width: 200,
+      title: '分类',
+      dataIndex: 'category_suggestion',
+      key: 'category_suggestion',
+      width: 140,
+      render: (category: string) => (
+        category ? <Tag color="blue" style={{ margin: 0 }}>📁 {category}</Tag> : <Text type="secondary">-</Text>
+      ),
+    },
+    {
+      title: '标签',
+      key: 'tags',
+      width: 220,
       render: (_: any, record: any) => {
         const tags = record.tags_suggestion ? JSON.parse(record.tags_suggestion) : [];
-        return (
-          <Space direction="vertical" size={4}>
-            {record.category_suggestion && (
-              <Tag color="blue" style={{ margin: 0 }}>📁 {record.category_suggestion}</Tag>
-            )}
-            {tags.slice(0, 2).map((tag: any, idx: number) => (
+        if (!tags.length) return <Text type="secondary">-</Text>;
+        const tooltipContent = (
+          <Space wrap size={4}>
+            {tags.map((tag: any, idx: number) => (
               <Tag 
                 key={tag.id || idx}
                 color={tag.attachedBy === 'ai' ? 'purple' : 'default'}
@@ -211,10 +241,25 @@ export const DraftList: React.FC<DraftListProps> = ({
                 {tag.attachedBy === 'ai' ? '🤖' : '🏷️'} {tag.name}
               </Tag>
             ))}
-            {tags.length > 2 && (
-              <Text type="secondary" style={{ fontSize: '12px' }}>+{tags.length - 2} 更多</Text>
-            )}
           </Space>
+        );
+        return (
+          <Tooltip title={tooltipContent} placement="topLeft">
+            <Space wrap size={4}>
+              {tags.slice(0, 3).map((tag: any, idx: number) => (
+                <Tag 
+                  key={tag.id || idx}
+                  color={tag.attachedBy === 'ai' ? 'purple' : 'default'}
+                  style={{ margin: 0 }}
+                >
+                  {tag.attachedBy === 'ai' ? '🤖' : '🏷️'} {tag.name}
+                </Tag>
+              ))}
+              {tags.length > 3 && (
+                <Text type="secondary" style={{ fontSize: '12px' }}>+{tags.length - 3}</Text>
+              )}
+            </Space>
+          </Tooltip>
         );
       },
     },

@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, Space, message, Spin, Typography, Divider, Tag, Row, Col } from 'antd';
 import { ArrowLeftOutlined, ShareAltOutlined, DownloadOutlined, PrinterOutlined } from '@ant-design/icons';
 import { useRouter, useParams } from 'next/navigation';
-import ReactMarkdown from 'react-markdown';
+import StructuredPreview from '@/components/content/StructuredPreview';
+import MarkdownPreview from '@/components/content/MarkdownPreview';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -15,6 +16,8 @@ interface Content {
   content: string;
   source?: string;
   source_url?: string;
+  image_url?: string;
+  summary?: string;
   category?: {
     id: number;
     name: string;
@@ -114,80 +117,57 @@ const WeeklyPreviewPage: React.FC = () => {
     return groups;
   }, {}) || {};
 
-  const renderContentItem = (content: Content, index: number) => (
-    <div key={content.id} style={{ marginBottom: '24px', pageBreakInside: 'avoid' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-        <Text strong style={{ minWidth: '24px', color: '#1890ff', fontSize: '16px' }}>
-          {index + 1}.
-        </Text>
-        <div style={{ flex: 1 }}>
-          <div style={{ marginBottom: '8px' }}>
-            <Title level={4} style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>
-              {content.title}
-            </Title>
-            <Space style={{ marginTop: '4px' }} wrap>
-              {content.featured && (
-                <Tag color="red">
-                  精选
-                </Tag>
-              )}
-              {content.source && (
-                <Tag color="blue">
-                  {content.source}
-                </Tag>
-              )}
-              {content.tags.slice(0, 3).map(tag => (
-                <Tag key={tag.id} color="default">
-                  {tag.name}
-                </Tag>
-              ))}
-            </Space>
+  const renderContentItem = (content: Content, index: number) => {
+    // 判断是否为新版结构化数据（有 image_url 或 summary）
+    const hasStructuredData = content.image_url || content.summary;
+    
+    return (
+      <div key={content.id} style={{ marginBottom: '24px', pageBreakInside: 'avoid' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+          <Text strong style={{ minWidth: '28px', color: '#1890ff', fontSize: '16px' }}>
+            {index + 1}.
+          </Text>
+          <div style={{ flex: 1 }}>
+            {hasStructuredData ? (
+              /* 新版：使用结构化预览 */
+              <StructuredPreview
+                data={{
+                  title: content.title,
+                  url: content.source_url,
+                  image_url: content.image_url,
+                  summary: content.summary,
+                  description: content.description,
+                  source: content.source,
+                  source_url: content.source_url,
+                  tags: content.tags,
+                  created_at: content.created_at,
+                  featured: content.featured,
+                  content: content.content,
+                }}
+                mode="desktop"
+                showMeta={false}
+                showImage={true}
+              />
+            ) : (
+              /* 旧版：使用 Markdown 完整渲染 */
+              <MarkdownPreview
+                content={{
+                  title: content.title,
+                  content: content.content,
+                  source: content.source,
+                  source_url: content.source_url,
+                  tags: content.tags,
+                  created_at: content.created_at,
+                }}
+                mode="desktop"
+                showMeta={false}
+              />
+            )}
           </div>
-          
-          {content.description && (
-            <Paragraph style={{ 
-              margin: '8px 0', 
-              fontSize: '14px', 
-              color: '#666',
-              lineHeight: '1.6'
-            }}>
-              {content.description}
-            </Paragraph>
-          )}
-
-          {/* 内容摘要 */}
-          <div style={{ 
-            backgroundColor: '#f8f9fa', 
-            padding: '12px', 
-            borderRadius: '6px',
-            marginTop: '8px',
-            fontSize: '13px',
-            lineHeight: '1.5'
-          }}>
-            <ReactMarkdown>
-              {content.content.length > 300 
-                ? content.content.substring(0, 300) + '...' 
-                : content.content
-              }
-            </ReactMarkdown>
-          </div>
-
-          {content.source_url && (
-            <div style={{ marginTop: '8px' }}>
-              <a
-                href={content.source_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ fontSize: '12px', color: '#1890ff' }}
-              >
-                🔗 查看原文
-              </a>
-            </div>
-          )}
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>

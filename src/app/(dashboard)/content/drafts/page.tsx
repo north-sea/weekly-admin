@@ -16,7 +16,7 @@ import {
 import DraftList from '@/components/drafts/DraftList';
 import DraftFilters from '@/components/drafts/DraftFilters';
 import SyncButton from '@/components/drafts/SyncButton';
-import { useDraftList, type DraftListParams } from '@/hooks/queries';
+import { useDraftList, useDraftStats, type DraftListParams } from '@/hooks/queries';
 
 export default function DraftsPage() {
   const [filters, setFilters] = useState<DraftListParams>({
@@ -26,13 +26,10 @@ export default function DraftsPage() {
 
   // 获取统计数据（与下方筛选互不干扰，固定统计维度）
   const currentStage = filters.stage || 'inbox';
-  const { data: inboxAll } = useDraftList({ stage: 'inbox' });
-  const { data: inboxPending } = useDraftList({ stage: 'inbox', status: 'pending' });
-  const { data: inboxAdopted } = useDraftList({ stage: 'inbox', status: 'adopted' });
-  const { data: editorAll } = useDraftList({ stage: 'editor' });
+  const { data: stats } = useDraftStats();
 
   // 获取最后同步时间
-  const lastSyncTime = inboxAll?.data?.[0]?.synced_at;
+  const lastSyncTime = undefined; // 统计接口不包含最近同步时间，如需可另行查询
 
   return (
     <PageContainer
@@ -55,7 +52,7 @@ export default function DraftsPage() {
           <Card>
             <Statistic
               title="编辑草稿总数"
-              value={editorAll?.pagination.total || 0}
+              value={stats?.editor.all || 0}
               prefix={<FileTextOutlined />}
             />
           </Card>
@@ -64,7 +61,7 @@ export default function DraftsPage() {
           <Card>
             <Statistic
               title="草稿池（drafts）"
-              value={inboxAll?.pagination.total || 0}
+              value={stats?.inbox.all || 0}
               prefix={<FileTextOutlined />}
             />
           </Card>
@@ -73,7 +70,7 @@ export default function DraftsPage() {
           <Card>
             <Statistic
               title="待处理"
-              value={inboxPending?.pagination.total || 0}
+              value={stats?.inbox.pending || 0}
               prefix={<ClockCircleOutlined />}
               valueStyle={{ color: '#faad14' }}
             />
@@ -83,7 +80,7 @@ export default function DraftsPage() {
           <Card>
             <Statistic
               title="已采用"
-              value={inboxAdopted?.pagination.total || 0}
+              value={stats?.inbox.adopted || 0}
               prefix={<CheckCircleOutlined />}
               valueStyle={{ color: '#52c41a' }}
             />

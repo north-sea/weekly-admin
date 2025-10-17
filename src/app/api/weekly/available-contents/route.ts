@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     });
 
     const where: any = {
-      content_type_id: 4, // Weekly 类型
+      content_type_id: 3, // Weekly 类型
       status: 'published',
     };
 

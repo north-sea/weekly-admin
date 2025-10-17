@@ -40,13 +40,13 @@ export default function DraftFilters({ value = {}, onChange }: DraftFiltersProps
           <Col xs={12} sm={12} md={6} lg={4}>
             <Form.Item label="阶段">
               <Select
-                placeholder="全部"
+                placeholder="全部草稿"
                 value={filters.stage}
                 onChange={(val) => handleChange('stage', val)}
                 allowClear
               >
                 <Option value="inbox">采集草稿池</Option>
-                <Option value="editor">编辑草稿(contents)</Option>
+                <Option value="editor">编辑草稿（内容库）</Option>
               </Select>
             </Form.Item>
           </Col>

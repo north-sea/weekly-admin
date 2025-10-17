@@ -116,6 +116,8 @@ model contents {
   view_count       BigInt?                  @default(0)
   source           String?                  @db.VarChar(200)
   source_url       String?                  @db.VarChar(1000)
+  image_url        String?                  @db.VarChar(500)
+  summary          String?                  @db.Text
   screenshot_api   contents_screenshot_api? @default(manual)
   sort_order       Int?                     @default(0)
   featured         Boolean?                 @default(false)

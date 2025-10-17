@@ -63,6 +63,20 @@ class ApiClient {
                 status: response.status,
                 statusText: response.statusText,
               });
+              // 401 统一登出并跳转登录页
+              if (response.status === 401) {
+                try {
+                  useAuthStore.getState().logout();
+                } catch {}
+                if (typeof window !== 'undefined') {
+                  const isLoginApi = request.url.includes('/api/auth/login');
+                  const onLoginPage = window.location.pathname.startsWith('/login');
+                  if (!isLoginApi && !onLoginPage) {
+                    const redirect = `${window.location.pathname}${window.location.search}`;
+                    window.location.replace(`/login?redirect=${encodeURIComponent(redirect)}`);
+                  }
+                }
+              }
             }
             return response;
           }

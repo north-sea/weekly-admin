@@ -324,6 +324,9 @@ export class DraftService {
         take: pageSize,
         include: {
           categories: true,
+          content_tags: {
+            include: { tag: true },
+          },
         },
       });
 
@@ -342,7 +345,9 @@ export class DraftService {
         status: 'adopted', // 在 editor 阶段展示为已采用的草稿来源
         priority: null,
         category_suggestion: c.categories?.name || null,
-        tags_suggestion: null,
+        tags_suggestion: JSON.stringify(
+          (c as any).content_tags?.map((ct: any) => ({ id: ct.tag_id, name: ct.tag?.name, attachedBy: 'manual' })) || []
+        ),
         duplicate_of_draft_id: null,
         content_id: c.id as unknown as bigint,
         synced_at: c.updated_at,
@@ -374,71 +379,226 @@ export class DraftService {
       };
     }
 
-    // 默认：inbox 阶段（drafts 池）
-    // 构建 where 条件
-    const where: Prisma.draftsWhereInput = {};
+    // 如果是 inbox 阶段：仅返回草稿池
+    if (stage === 'inbox') {
+      // 构建 where 条件
+      const where: Prisma.draftsWhereInput = {};
 
-    // 状态筛选
-    if (status) {
-      where.status = status;
+      // 状态筛选
+      if (status) {
+        where.status = status;
+      }
+
+      // 优先级筛选
+      if (priority !== undefined) {
+        where.priority = priority;
+      }
+
+      // 关键词搜索（标题、描述、URL）
+      if (keyword) {
+        where.OR = [
+          { title: { contains: keyword } },
+          { description: { contains: keyword } },
+          { url: { contains: keyword } },
+        ];
+      }
+
+      // 去重筛选
+      if (showDuplicates === 'original') {
+        where.duplicate_of_draft_id = null;
+      } else if (showDuplicates === 'duplicate') {
+        where.duplicate_of_draft_id = { not: null };
+      }
+
+      // 计算总数
+      const total = await prisma.drafts.count({ where });
+
+      // 排序
+      const orderBy: Prisma.draftsOrderByWithRelationInput = {
+        [sortBy]: sortOrder,
+      };
+
+      // 查询数据
+      const drafts = await prisma.drafts.findMany({
+        where,
+        orderBy,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          linked_content: {
+            select: {
+              id: true,
+              title: true,
+              slug: true,
+              status: true,
+            },
+          },
+          duplicate_of: {
+            select: {
+              id: true,
+              title: true,
+              url: true,
+            },
+          },
+        },
+      });
+
+      return {
+        data: drafts as any,
+        pagination: {
+          page,
+          pageSize,
+          total,
+          totalPages: Math.ceil(total / pageSize),
+        },
+      };
     }
 
-    // 优先级筛选
-    if (priority !== undefined) {
-      where.priority = priority;
-    }
-
-    // 关键词搜索（标题、描述、URL）
+    // 其余情况（stage 未提供或为 all）：合并 inbox（drafts）与 editor（contents）
+    // 1) 构建两个查询条件
+    const inboxWhere: Prisma.draftsWhereInput = {};
+    if (status) inboxWhere.status = status;
+    if (priority !== undefined) inboxWhere.priority = priority;
     if (keyword) {
-      where.OR = [
+      inboxWhere.OR = [
         { title: { contains: keyword } },
         { description: { contains: keyword } },
         { url: { contains: keyword } },
       ];
     }
-
-    // 去重筛选
     if (showDuplicates === 'original') {
-      where.duplicate_of_draft_id = null;
+      inboxWhere.duplicate_of_draft_id = null;
     } else if (showDuplicates === 'duplicate') {
-      where.duplicate_of_draft_id = { not: null };
+      inboxWhere.duplicate_of_draft_id = { not: null };
     }
 
-    // 计算总数
-    const total = await prisma.drafts.count({ where });
+    const contentsWhere: Prisma.contentsWhereInput = { status: 'draft' };
+    if (keyword) {
+      contentsWhere.OR = [
+        { title: { contains: keyword } },
+        { description: { contains: keyword } },
+        { source_url: { contains: keyword } },
+      ];
+    }
 
-    // 排序
-    const orderBy: Prisma.draftsOrderByWithRelationInput = {
-      [sortBy]: sortOrder,
+    // 2) 分别统计总数
+    const [inboxTotal, editorTotal] = await Promise.all([
+      prisma.drafts.count({ where: inboxWhere }),
+      prisma.contents.count({ where: contentsWhere }),
+    ]);
+
+    const total = inboxTotal + editorTotal;
+
+    // 3) 读取足够的数据用于合并排序（到当前页的上限）
+    const fetchLimit = page * pageSize;
+
+    const [inboxRows, editorRows] = await Promise.all([
+      prisma.drafts.findMany({
+        where: inboxWhere,
+        orderBy: { [sortBy]: sortOrder },
+        skip: 0,
+        take: fetchLimit,
+        include: {
+          linked_content: {
+            select: { id: true, title: true, slug: true, status: true },
+          },
+          duplicate_of: {
+            select: { id: true, title: true, url: true },
+          },
+        },
+      }),
+      prisma.contents.findMany({
+        where: contentsWhere,
+        orderBy:
+          sortBy === 'title'
+            ? { title: sortOrder }
+            : sortBy === 'updated_at'
+            ? { updated_at: sortOrder }
+            : { created_at: sortOrder },
+        skip: 0,
+        take: fetchLimit,
+        include: { 
+          categories: true,
+          content_tags: { include: { tag: true } },
+        },
+      }),
+    ]);
+
+    // 4) 将 contents 映射为 DraftWithRelations 结构
+    const mappedEditors = editorRows.map((c) => ({
+      id: c.id as unknown as bigint,
+      karakeep_id: '',
+      title: c.title,
+      url: c.source_url || '',
+      description: c.description,
+      note: null,
+      favicon_url: null,
+      image_url: null,
+      karakeep_created_at: null,
+      karakeep_updated_at: null,
+      status: 'adopted',
+      priority: null,
+      category_suggestion: (c as any).categories?.name || null,
+      tags_suggestion: JSON.stringify(
+        (c as any).content_tags?.map((ct: any) => ({ id: ct.tag_id, name: ct.tag?.name, attachedBy: 'manual' })) || []
+      ),
+      duplicate_of_draft_id: null,
+      content_id: c.id as unknown as bigint,
+      synced_at: c.updated_at,
+      created_at: c.created_at,
+      updated_at: c.updated_at,
+      summary: null,
+      tagging_status: null,
+      summarization_status: null,
+      slug: c.slug,
+      content: c.content,
+      source: c.source,
+      word_count: (c as any).word_count || 0,
+      linked_content: {
+        id: c.id,
+        title: c.title,
+        slug: c.slug,
+        status: c.status,
+      },
+    })) as any[];
+
+    // 5) 合并并根据筛选器二次过滤（对 editor 结果应用 status/priority 约束）
+    let combined = [...(inboxRows as any[]), ...mappedEditors];
+    if (status) combined = combined.filter((item) => item.status === status);
+    if (priority !== undefined) combined = combined.filter((item) => item.priority === priority);
+
+    // 6) 排序（JS 层统一排序，null 值最后）
+    const getKey = (item: any) => {
+      const val = item[sortBy];
+      if (val == null) return null;
+      if (val instanceof Date) return val.getTime();
+      if (typeof val === 'string') {
+        // 日期字符串
+        const date = new Date(val as string);
+        if (!isNaN(date.getTime())) return date.getTime();
+        return val.toLowerCase();
+      }
+      return val;
     };
 
-    // 查询数据
-    const drafts = await prisma.drafts.findMany({
-      where,
-      orderBy,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      include: {
-        linked_content: {
-          select: {
-            id: true,
-            title: true,
-            slug: true,
-            status: true,
-          },
-        },
-        duplicate_of: {
-          select: {
-            id: true,
-            title: true,
-            url: true,
-          },
-        },
-      },
+    combined.sort((a, b) => {
+      const av = getKey(a);
+      const bv = getKey(b);
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1; // null 排在后面
+      if (bv == null) return -1;
+      if (av < bv) return sortOrder === 'asc' ? -1 : 1;
+      if (av > bv) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
     });
 
+    // 7) 分页切片
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    const pageItems = combined.slice(start, end);
+
     return {
-      data: drafts as any,
+      data: pageItems as any,
       pagination: {
         page,
         pageSize,

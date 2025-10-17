@@ -53,7 +53,7 @@ export interface DraftListParams {
   showDuplicates?: 'all' | 'original' | 'duplicate';
   sortBy?: 'created_at' | 'updated_at' | 'priority' | 'title' | 'synced_at';
   sortOrder?: 'asc' | 'desc';
-  stage?: 'inbox' | 'editor';
+  stage?: 'inbox' | 'editor' | 'all';
 }
 
 export interface DraftListResponse {
@@ -74,6 +74,11 @@ export interface SyncStats {
   errors: number;
   duplicatesDetected: number;
   categoriesSuggested: number;
+}
+
+export interface DraftStatsResponse {
+  inbox: { all: number; pending: number; adopted: number };
+  editor: { all: number };
 }
 
 export interface UpdateDraftParams {
@@ -163,6 +168,10 @@ async function syncBatchDrafts(draftIds: string[], addToList?: string): Promise<
   return apiClient.post('/api/drafts/sync-batch', { draftIds, addToList });
 }
 
+async function fetchDraftStats(): Promise<DraftStatsResponse> {
+  return apiClient.get<DraftStatsResponse>('/api/drafts/stats');
+}
+
 // ============================================================================
 // Hooks
 // ============================================================================
@@ -209,6 +218,20 @@ export function useSyncDrafts() {
       // 刷新所有草稿列表
       queryClient.invalidateQueries({ queryKey: draftKeys.lists() });
     },
+  });
+}
+
+/**
+ * 获取草稿统计（合并请求）
+ */
+export function useDraftStats(
+  options?: Omit<UseQueryOptions<DraftStatsResponse>, 'queryKey' | 'queryFn'>
+) {
+  return useQuery({
+    queryKey: [...draftKeys.all, 'stats'],
+    queryFn: fetchDraftStats,
+    staleTime: 30000,
+    ...options,
   });
 }
 

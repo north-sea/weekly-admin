@@ -159,7 +159,7 @@ export const syncContentToSearch = async (content: any): Promise<void> => {
       source: content.source || '',
       source_url: content.source_url || '',
       content_type_id: content.content_type_id,
-      content_type_name: content.content_type_id === 3 ? 'Blog' : 'Weekly',
+      content_type_name: content.content_type_id === 3 ? 'Weekly' : 'Blog',
       status: content.status,
       category_id: content.category_id,
       category_name: content.category?.name || '',
@@ -211,7 +211,7 @@ export const bulkSyncContentsToSearch = async (contents: any[]): Promise<any> =>
       source: content.source || '',
       source_url: content.source_url || '',
       content_type_id: content.content_type_id,
-      content_type_name: content.content_type_id === 3 ? 'Blog' : 'Weekly',
+      content_type_name: content.content_type_id === 3 ? 'Weekly' : 'Blog',
       status: content.status,
       category_id: content.category_id,
       category_name: content.category?.name || '',
@@ -250,7 +250,7 @@ export const searchContents = async (options: SearchOptions): Promise<SearchResu
       const filterParts: string[] = [];
       
       if (filters.contentType) {
-        const typeId = filters.contentType === 'blog' ? 3 : 4;
+        const typeId = filters.contentType === 'weekly' ? 3 : 4;
         filterParts.push(`content_type_id = ${typeId}`);
       }
       
@@ -377,7 +377,7 @@ export const waitForTask = async (taskUid: number): Promise<void> => {
     let task;
     do {
       await new Promise(resolve => setTimeout(resolve, 100)); // Wait 100ms
-      task = await client.getTask(taskUid);
+      task = await (client as any).getTask(taskUid);
     } while (task.status === 'enqueued' || task.status === 'processing');
     
     if (task.status === 'succeeded') {
@@ -397,7 +397,7 @@ export const waitForTask = async (taskUid: number): Promise<void> => {
  */
 export const getTaskStatus = async (taskUid: number) => {
   try {
-    return await client.getTask(taskUid);
+    return await (client as any).getTask(taskUid);
   } catch (error) {
     console.error(`Failed to get task ${taskUid} status:`, error);
     throw error;

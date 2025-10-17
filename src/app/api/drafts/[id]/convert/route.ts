@@ -40,7 +40,7 @@ export async function POST(
 
     // 从请求体获取额外信息
     const {
-      content_type_id = 1, // 默认内容类型
+      content_type_id = 3, // 默认 Weekly 类型
       category_id,
       tags = [],
       content_format = 'markdown',
@@ -105,13 +105,17 @@ export async function POST(
       }
     }
 
-    // 构建内容数据（使用草稿中已生成的 content 或自动生成）
+    // 构建内容数据（直接映射草稿的结构化字段）
     const contentData: any = {
       content_type_id,
       category_id: category_id || null,
       title: draft.title,
       slug: draft.slug || (generateSlug(draft.title) + '-' + Date.now()),
       description: draft.description || draft.summary || draft.note || '',
+      // 结构化字段：直接映射
+      image_url: draft.image_url || null,
+      summary: draft.summary || draft.description || draft.note || null,
+      // 兼容：保留 content 字段（Markdown 格式）
       content: draft.content || `## ${draft.title}
 
 ${draft.summary || draft.description || ''}
@@ -127,9 +131,42 @@ ${draft.note ? `\n**笔记**\n${draft.note}` : ''}
       word_count: draft.word_count || 0,
     };
 
+    // 如果未提供 category_id，尝试根据草稿的 category_suggestion 自动匹配或创建
+    let resolvedCategoryId = category_id || null;
+    if (!resolvedCategoryId && draft.category_suggestion) {
+      try {
+        const suggestedName = draft.category_suggestion.trim();
+        if (suggestedName) {
+          // 先尝试按名称或 slug 匹配
+          const catSlugBase = generateSlug(suggestedName);
+          let category = await prisma.categories.findFirst({
+            where: {
+              OR: [
+                { name: suggestedName },
+                { slug: catSlugBase },
+              ],
+            },
+          });
+          // 不存在则创建
+          if (!category) {
+            const catSlug = generateSlug(suggestedName);
+            category = await prisma.categories.create({
+              data: {
+                name: suggestedName,
+                slug: `${catSlug}-${Date.now()}`,
+              },
+            });
+          }
+          resolvedCategoryId = category.id;
+        }
+      } catch (error) {
+        console.error('自动分类处理失败:', error);
+      }
+    }
+
     // 创建内容
     const content = await prisma.contents.create({
-      data: contentData,
+      data: { ...contentData, category_id: resolvedCategoryId },
     });
 
     // 创建标签关联

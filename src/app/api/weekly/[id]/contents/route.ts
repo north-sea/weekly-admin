@@ -60,7 +60,7 @@ export async function PUT(
     const contents = await prisma.contents.findMany({
       where: {
         id: { in: contentIds },
-        content_type_id: 4, // Weekly 类型
+        content_type_id: 3, // Weekly 类型
         status: 'published',
       },
     });
