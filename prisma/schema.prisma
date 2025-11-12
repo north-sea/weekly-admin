@@ -137,7 +137,7 @@ model operation_logs {
   user_id           Int
   operation_type    operation_logs_operation_type
   resource_type     String                        @db.VarChar(50)
-  resource_id       Int?
+  resource_id       String?                       @db.VarChar(50)
   operation_details String?                       @db.Text
   ip_address        String?                       @db.VarChar(45)
   user_agent        String?                       @db.Text
@@ -149,6 +149,7 @@ model operation_logs {
   @@index([operation_type], map: "idx_operation_type")
   @@index([resource_type], map: "idx_resource_type")
   @@index([user_id], map: "idx_user_id")
+  @@index([resource_id], map: "idx_resource_id")
 }
 
 model tags {

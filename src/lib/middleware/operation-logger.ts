@@ -5,8 +5,8 @@ export interface LoggingContext {
   userId: number;
   operationType: OperationType;
   resourceType: string;
-  resourceId?: number;
-  operationDetails?: Record<string, any>;
+  resourceId?: number | bigint | string;
+  operationDetails?: Record<string, unknown>;
 }
 
 export class OperationLogger {
@@ -37,12 +37,12 @@ export class OperationLogger {
   static async logContentOperation(
     userId: number,
     operationType: OperationType,
-    contentId: number,
+    contentId: number | bigint,
     details: {
       title?: string;
       contentType?: string;
       status?: string;
-      changes?: Record<string, any>;
+      changes?: Record<string, unknown>;
     },
     request?: NextRequest
   ): Promise<void> {
@@ -71,7 +71,7 @@ export class OperationLogger {
       title?: string;
       status?: string;
       contentCount?: number;
-      changes?: Record<string, any>;
+      changes?: Record<string, unknown>;
     },
     request?: NextRequest
   ): Promise<void> {
@@ -125,7 +125,7 @@ export class OperationLogger {
       name?: string;
       action?: string;
       affectedContentCount?: number;
-      changes?: Record<string, any>;
+      changes?: Record<string, unknown>;
     },
     request?: NextRequest
   ): Promise<void> {
@@ -153,7 +153,7 @@ export class OperationLogger {
       operation: string;
       resourceIds: number[];
       affectedCount: number;
-      criteria?: Record<string, any>;
+      criteria?: Record<string, unknown>;
     },
     request?: NextRequest
   ): Promise<void> {
@@ -178,8 +178,8 @@ export class OperationLogger {
     details: {
       action: string;
       target?: string;
-      parameters?: Record<string, any>;
-      result?: Record<string, any>;
+      parameters?: Record<string, unknown>;
+      result?: Record<string, unknown>;
     },
     request?: NextRequest
   ): Promise<void> {
@@ -202,7 +202,7 @@ export class OperationLogger {
     userId: number,
     details: {
       query: string;
-      filters?: Record<string, any>;
+      filters?: Record<string, unknown>;
       resultCount: number;
       responseTime: number;
     },

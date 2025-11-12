@@ -2,6 +2,20 @@
 
 本项目是基于Next.js的周刊内容管理系统，支持内容创建、编辑、搜索和周刊发布等功能。
 
+## 📢 重要通知
+
+**本项目正在进行大规模重构!** 我们正在将 UI 库从 Ant Design 迁移到 shadcn/ui,并简化工作流程。
+
+详细信息请查看: **[重构文档中心 (docs/)](./docs/README.md)**
+
+- 📋 [产品需求文档](./docs/MAIN_PRD.md)
+- 🏗️ [技术架构文档](./docs/TECHNICAL_ARCHITECTURE.md)
+- ✅ [任务清单](./docs/TASKS.md)
+- 🎨 [设计系统](./docs/DESIGN_SYSTEM.md)
+- 📖 [迁移指南](./docs/MIGRATION_GUIDE.md)
+
+---
+
 ## 🚀 快速开始
 
 ### 本地开发环境
