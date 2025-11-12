@@ -8,6 +8,7 @@ import ErrorBoundary from '@/components/providers/ErrorBoundary';
 import NoSSR from '@/components/providers/NoSSR';
 import QueryProvider from '@/components/providers/QueryProvider';
 import StartupProvider from '@/components/providers/StartupProvider';
+import { Toaster } from '@/components/ui/toaster';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -37,7 +38,10 @@ export default function RootLayout({
                                 <QueryProvider>
                                     <NoSSR>
                                         <StartupProvider>
-                                            <ClientProvider>{children}</ClientProvider>
+                                            <ClientProvider>
+                                                {children}
+                                                <Toaster />
+                                            </ClientProvider>
                                         </StartupProvider>
                                     </NoSSR>
                                 </QueryProvider>
