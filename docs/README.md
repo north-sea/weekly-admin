@@ -54,6 +54,16 @@
    - 动效规范
    - 可访问性
 
+7. **[DESIGN_DECISIONS.md](./DESIGN_DECISIONS.md)** - 设计决策记录 🆕
+   - 架构决策记录 (ADR)
+   - 技术选型理由
+   - 权衡和影响分析
+
+8. **[CONTENT_EDITING_GUIDE.md](./CONTENT_EDITING_GUIDE.md)** - 内容编辑指南 🆕
+   - Blog vs Weekly 编辑差异
+   - 编辑最佳实践
+   - 常见问题解答
+
 ---
 
 ## 🚀 快速开始

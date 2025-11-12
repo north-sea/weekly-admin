@@ -379,106 +379,141 @@ export default function SimplifiedEditor({
               </CardContent>
             </Card>
 
-            {/* 内容编辑器 */}
+            {/* 内容编辑器 - Blog 使用 Markdown，Weekly 使用结构化输入 */}
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle>内容编辑</CardTitle>
-                    <CardDescription>支持 Markdown 语法</CardDescription>
+                    <CardDescription>
+                      {contentTypeId === 4 ? '支持 Markdown 语法' : '结构化内容输入'}
+                    </CardDescription>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => insertMarkdown('**', '**', '粗体文本')}
-                      title="粗体"
-                    >
-                      <Bold className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => insertMarkdown('*', '*', '斜体文本')}
-                      title="斜体"
-                    >
-                      <Italic className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => insertMarkdown('`', '`', '代码')}
-                      title="代码"
-                    >
-                      <Code className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => insertMarkdown('\n## ', '', '标题')}
-                      title="标题"
-                    >
-                      <Heading2 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => insertMarkdown('[', '](https://)', '链接文本')}
-                      title="链接"
-                    >
-                      <Link className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => insertMarkdown('![', '](https://)', '图片描述')}
-                      title="图片"
-                    >
-                      <ImageIcon className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => insertMarkdown('\n- ', '', '列表项')}
-                      title="无序列表"
-                    >
-                      <List className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => insertMarkdown('\n1. ', '', '列表项')}
-                      title="有序列表"
-                    >
-                      <ListOrdered className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  {contentTypeId === 4 && (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => insertMarkdown('**', '**', '粗体文本')}
+                        title="粗体"
+                      >
+                        <Bold className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => insertMarkdown('*', '*', '斜体文本')}
+                        title="斜体"
+                      >
+                        <Italic className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => insertMarkdown('`', '`', '代码')}
+                        title="代码"
+                      >
+                        <Code className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => insertMarkdown('\n## ', '', '标题')}
+                        title="标题"
+                      >
+                        <Heading2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => insertMarkdown('[', '](https://)', '链接文本')}
+                        title="链接"
+                      >
+                        <Link className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => insertMarkdown('![', '](https://)', '图片描述')}
+                        title="图片"
+                      >
+                        <ImageIcon className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => insertMarkdown('\n- ', '', '列表项')}
+                        title="无序列表"
+                      >
+                        <List className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => insertMarkdown('\n1. ', '', '列表项')}
+                        title="有序列表"
+                      >
+                        <ListOrdered className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
-                <Controller
-                  name="content"
-                  control={control}
-                  render={({ field }) => (
-                    <MDEditor
-                      value={field.value}
-                      onChange={(val) => field.onChange(val || '')}
-                      preview="edit"
-                      height={500}
-                      data-color-mode="light"
-                      hideToolbar
-                      textareaProps={{
-                        placeholder: '请输入内容正文（支持 Markdown 语法）',
-                        style: { 
-                          fontSize: '14px', 
-                          lineHeight: '1.6',
-                        },
-                      }}
+                {contentTypeId === 4 ? (
+                  // Blog: Markdown 编辑器
+                  <>
+                    <Controller
+                      name="content"
+                      control={control}
+                      render={({ field }) => (
+                        <MDEditor
+                          value={field.value}
+                          onChange={(val) => field.onChange(val || '')}
+                          preview="edit"
+                          height={500}
+                          data-color-mode="light"
+                          hideToolbar
+                          textareaProps={{
+                            placeholder: '请输入内容正文（支持 Markdown 语法）',
+                            style: { 
+                              fontSize: '14px', 
+                              lineHeight: '1.6',
+                            },
+                          }}
+                        />
+                      )}
                     />
-                  )}
-                />
-                {errors.content && (
-                  <p className="text-sm text-destructive mt-2">{errors.content.message}</p>
+                    {errors.content && (
+                      <p className="text-sm text-destructive mt-2">{errors.content.message}</p>
+                    )}
+                  </>
+                ) : (
+                  // Weekly: 结构化输入
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="content">内容摘要 *</Label>
+                      <Controller
+                        name="content"
+                        control={control}
+                        render={({ field }) => (
+                          <Textarea
+                            {...field}
+                            id="content"
+                            placeholder="请输入周刊内容的摘要或关键点（可使用简单 Markdown 格式）"
+                            rows={8}
+                            className="font-mono text-sm"
+                          />
+                        )}
+                      />
+                      {errors.content && (
+                        <p className="text-sm text-destructive">{errors.content.message}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        💡 提示：Weekly 内容使用结构化存储，建议简洁描述核心内容和亮点
+                      </p>
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
