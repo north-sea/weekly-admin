@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { NextRequest } from 'next/server';
 
@@ -8,7 +9,7 @@ export interface OperationLog {
   user_id: number;
   operation_type: OperationType;
   resource_type: string;
-  resource_id?: number;
+  resource_id?: string;
   operation_details?: string;
   ip_address?: string;
   user_agent?: string;
@@ -26,7 +27,7 @@ export interface OperationLogQuery {
   userId?: number;
   operationType?: OperationType;
   resourceType?: string;
-  resourceId?: number;
+  resourceId?: string;
   startDate?: Date;
   endDate?: Date;
   keyword?: string;
@@ -63,20 +64,25 @@ export class OperationLogService {
     userId: number,
     operationType: OperationType,
     resourceType: string,
-    resourceId?: number,
-    operationDetails?: Record<string, any>,
+    resourceId?: number | bigint | string,
+    operationDetails?: Record<string, unknown>,
     request?: NextRequest
   ): Promise<void> {
     try {
       const ipAddress = this.getClientIP(request);
       const userAgent = request?.headers.get('user-agent') || undefined;
       
+      // Convert resourceId to string to support BigInt and other types
+      const normalizedResourceId = resourceId !== undefined && resourceId !== null 
+        ? String(resourceId) 
+        : undefined;
+      
       await prisma.operation_logs.create({
         data: {
           user_id: userId,
           operation_type: operationType,
           resource_type: resourceType,
-          resource_id: resourceId,
+          resource_id: normalizedResourceId,
           operation_details: operationDetails ? JSON.stringify(operationDetails) : undefined,
           ip_address: ipAddress,
           user_agent: userAgent
@@ -103,7 +109,7 @@ export class OperationLogService {
     } = query;
     
     // 构建查询条件
-    const where: Record<string, any> = {};
+    const where: Prisma.operation_logsWhereInput = {};
     
     if (userId) {
       where.user_id = userId;
@@ -122,13 +128,10 @@ export class OperationLogService {
     }
     
     if (startDate || endDate) {
-      where.created_at = {};
-      if (startDate) {
-        where.created_at.gte = startDate;
-      }
-      if (endDate) {
-        where.created_at.lte = endDate;
-      }
+      where.created_at = {
+        ...(startDate ? { gte: startDate } : {}),
+        ...(endDate ? { lte: endDate } : {}),
+      };
     }
     
     if (keyword) {
@@ -173,16 +176,13 @@ export class OperationLogService {
     startDate?: Date,
     endDate?: Date
   ): Promise<OperationStats> {
-    const where: Record<string, any> = {};
+    const where: Prisma.operation_logsWhereInput = {};
     
     if (startDate || endDate) {
-      where.created_at = {};
-      if (startDate) {
-        where.created_at.gte = startDate;
-      }
-      if (endDate) {
-        where.created_at.lte = endDate;
-      }
+      where.created_at = {
+        ...(startDate ? { gte: startDate } : {}),
+        ...(endDate ? { lte: endDate } : {}),
+      };
     }
     
     // 总操作数
@@ -356,7 +356,7 @@ export class OperationLogService {
     user_id: number;
     operation_type: OperationType;
     resource_type: string;
-    resource_id?: number | null;
+    resource_id?: string | null;
     operation_details?: string | null;
     ip_address?: string | null;
     user_agent?: string | null;
