@@ -2,7 +2,7 @@
 
 **报告日期**: 2025年1月  
 **当前阶段**: 阶段 1 - 基础设施和关键页面  
-**总体进度**: 2/33 主任务 (6%)
+**总体进度**: 5/33 主任务 (15%)
 
 ---
 
@@ -149,11 +149,48 @@ interface StructuredContent {
 - 为数据迁移提供了工具
 - 便于扩展新的内容格式
 
-### 4. 更新主 README
+### 4. 安装和配置 shadcn/ui + Claude Theme (T1.1)
+
+**目标**: 为 UI 迁移提供一致的组件库和主题支持。
+
+**完成内容**:
+- 安装 Radix UI 基础组件(`@radix-ui/react-dialog`, `dropdown-menu`, `slot`, `toast`, `tabs`, `select`, `checkbox`, `switch`, `label`)
+- 安装工具库: `class-variance-authority`, `clsx`, `tailwind-merge`, `lucide-react`, `tailwindcss-animate`
+- 更新 `src/app/globals.css`:
+  - 定义 claude theme 的亮暗色变量
+  - 使用 Tailwind v4 `@theme` 设置语义化颜色、字体、圆角
+  - 引入 `@plugin "tailwindcss-animate"`
+  - 设置全局 body 样式与 border 颜色
+- 创建 `src/lib/utils.ts`, 提供 `cn()` 工具函数
+- 新增基础 UI 组件 (位于 `src/components/ui/`): Button, Card, Input, Label, Textarea, Checkbox, Switch
+
+**影响**:
+- 提供 shadcn/ui 风格的基础组件,后续页面可直接使用
+- 项目具备 claude theme 的主题变量与动画支持
+- Tailwind CSS v4 配置已满足后续开发需求
+
+### 5. 更新主 README
 
 - ✅ 添加重构通知
 - ✅ 添加文档链接
 - ✅ 引导开发者查看重构文档
+
+### 6. 登录页 UI 迁移 (T1.3)
+
+**目标**: 作为第一个 UI 迁移案例,验证 shadcn/ui + claude theme 的可行性。
+
+**完成内容**:
+- 完全移除 Ant Design 组件依赖,使用 shadcn/ui Card, Button, Input, Label, Checkbox
+- 表单管理从 Ant Design Form 迁移到 `react-hook-form` + `zod` validator
+- 使用 lucide-react 图标替代 Ant Design Icons
+- 渐变背景 + 毛玻璃卡片效果,体现 claude theme 风格
+- 即时反馈(成功/错误)UI,不依赖全局 message API
+- 保留原有登录逻辑和认证流程
+
+**影响**:
+- 验证了 shadcn/ui 迁移路径可行
+- 提供了表单处理和验证的最佳实践模板
+- 为后续页面迁移积累经验
 
 ---
 
@@ -166,23 +203,6 @@ interface StructuredContent {
 ## 📋 下一步计划
 
 ### 优先级 P0 (最高)
-
-#### T1.1: 安装和配置 shadcn/ui + claude theme
-- 安装依赖
-- 初始化 shadcn/ui
-- 配置 tailwind.config.ts
-- 安装基础组件
-- 测试组件
-
-**预估**: 2-4 小时
-
-#### T1.3: 迁移登录页到 shadcn/ui
-- 作为第一个实战案例
-- 使用 shadcn Card, Input, Button
-- 配置 claude theme
-- 测试登录功能
-
-**预估**: 4-6 小时
 
 #### T1.6: 优化内容编辑页
 - 分屏布局(编辑|预览)

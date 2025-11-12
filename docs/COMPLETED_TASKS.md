@@ -21,6 +21,8 @@
 | 2025-01 | T1.4 | 修复操作日志 schema 和 service | AI Agent | 详见下方 |
 | 2025-01 | T1.5 | 创建内容格式适配器 (ContentFormatAdapter) | AI Agent | 详见下方 |
 | 2025-01 | DOC | 创建完整的 PRD 和任务文档 | AI Agent | 详见下方 |
+| 2025-01 | T1.1 | 安装和配置 shadcn/ui + claude theme | AI Agent | 详见下方 |
+| 2025-01 | T1.3 | 迁移登录页到 shadcn/ui | AI Agent | 详见下方 |
 
 ---
 
@@ -79,9 +81,164 @@
   
   **下一步**: 
   - 需要在开发/测试环境执行数据库迁移 SQL
-  - 需要安装 shadcn/ui 及依赖 (T1.1)
   - 需要开始迁移登录页 (T1.3)
   - 需要创建单元测试验证 ContentFormatAdapter
+
+---
+
+### 2025-01 - shadcn/ui 基础设施配置
+- **任务编号**: T1.1
+- **任务名称**: 安装和配置 shadcn/ui + claude theme
+- **负责人**: AI Agent
+- **完成说明**:
+  
+  #### 📦 依赖安装
+  安装了 shadcn/ui 所需的所有核心依赖:
+  - **Radix UI 组件**: 
+    - `@radix-ui/react-dialog` - 对话框组件
+    - `@radix-ui/react-dropdown-menu` - 下拉菜单
+    - `@radix-ui/react-slot` - 插槽组件
+    - `@radix-ui/react-toast` - 提示消息
+    - `@radix-ui/react-tabs` - 标签页
+    - `@radix-ui/react-select` - 选择器
+    - `@radix-ui/react-checkbox` - 复选框
+    - `@radix-ui/react-switch` - 开关
+    - `@radix-ui/react-label` - 标签
+  - **工具库**:
+    - `class-variance-authority` - 样式变体管理
+    - `clsx` - 类名合并
+    - `tailwind-merge` - Tailwind 类名去重
+    - `lucide-react` - 图标库
+    - `tailwindcss-animate` - 动画插件
+  
+  #### 🎨 Claude Theme 配置
+  更新了 `src/app/globals.css`:
+  - 配置了 claude theme 的完整色彩系统
+  - 支持亮色和暗色两种模式
+  - 定义了所有语义化颜色变量:
+    - `--primary`: 主色 (紫蓝色)
+    - `--secondary`: 次要色 (灰蓝色)
+    - `--accent`: 强调色 (青绿色)
+    - `--destructive`: 错误色 (红色)
+    - `--muted`: 柔和色
+    - `--border`: 边框色
+  - 配置了 Tailwind v4 的 `@theme` 指令
+  - 添加了 tailwindcss-animate 插件
+  
+  #### 🛠️ 工具函数
+  创建了 `src/lib/utils.ts`:
+  - 实现了 `cn()` 工具函数用于类名合并
+  - 使用 `clsx` 和 `tailwind-merge` 组合
+  
+  #### 🧩 基础 UI 组件
+  创建了 7 个核心 shadcn/ui 组件:
+  1. **Button** (`src/components/ui/button.tsx`)
+     - 支持多种变体: default, destructive, outline, secondary, ghost, link
+     - 支持多种尺寸: default, sm, lg, icon
+     - 使用 `class-variance-authority` 实现变体
+  
+  2. **Card** (`src/components/ui/card.tsx`)
+     - 包含 Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter
+     - 用于构建卡片布局
+  
+  3. **Input** (`src/components/ui/input.tsx`)
+     - 文本输入框组件
+     - 支持所有原生 input 属性
+  
+  4. **Label** (`src/components/ui/label.tsx`)
+     - 表单标签组件
+     - 基于 Radix UI Label
+  
+  5. **Textarea** (`src/components/ui/textarea.tsx`)
+     - 多行文本输入框
+  
+  6. **Checkbox** (`src/components/ui/checkbox.tsx`)
+     - 复选框组件
+     - 基于 Radix UI Checkbox
+     - 使用 lucide-react 的 Check 图标
+  
+  7. **Switch** (`src/components/ui/switch.tsx`)
+     - 开关切换组件
+     - 基于 Radix UI Switch
+  
+  **验收状态**: ✅ 已完成
+  - 所有依赖成功安装
+  - Claude theme 配置完整
+  - 基础组件创建完成并遵循 shadcn/ui 规范
+  - Tailwind CSS 配置正确
+  
+  **下一步**: 
+  - 测试基础组件在实际页面中的使用
+  - 开始优化内容编辑页 (T1.6)
+
+---
+
+### 2025-01 - 登录页 UI 迁移
+- **任务编号**: T1.3
+- **任务名称**: 迁移登录页到 shadcn/ui
+- **负责人**: AI Agent
+- **完成说明**:
+  
+  #### 🎨 UI 重构
+  将登录页从 Ant Design 完全迁移到 shadcn/ui:
+  - **移除依赖**: 去除了所有 Ant Design 组件 (`Card`, `Form`, `Input`, `Button`, `Checkbox` 等)
+  - **新组件**: 使用 shadcn/ui 组件:
+    - `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`
+    - `Button`, `Input`, `Label`, `Checkbox`
+    - lucide-react 图标: `UserRound`, `Lock`, `LogIn`, `Loader2`
+  
+  #### 📝 表单管理升级
+  - **替换方案**: Ant Design Form → `react-hook-form` + `zod`
+  - **类型安全**: 使用 zod schema 定义表单验证规则
+  - **验证规则**:
+    - 用户名: 最少 2 字符, 最多 50 字符
+    - 密码: 最少 6 字符, 最多 100 字符
+    - 记住我: boolean 默认 false
+  - **Controller**: 使用 `react-hook-form` 的 Controller 包装表单字段
+  
+  #### 🎭 视觉设计
+  - **渐变背景**: 使用 claude 主题的紫蓝色渐变 (`from-[#667eea]` 到 `to-[#764ba2]`)
+  - **光效层**: 添加径向渐变背景增强视觉深度
+  - **卡片效果**: 
+    - 半透明背景 (`bg-card/90`)
+    - 毛玻璃效果 (`backdrop-blur`)
+    - 去除边框,增强阴影 (`shadow-2xl`)
+  - **主题色**: 标题使用 `text-primary`,副标题使用 `text-muted-foreground`
+  
+  #### ✨ 交互优化
+  - **图标前缀**: 输入框左侧添加图标(用户和锁)
+  - **加载状态**: 按钮禁用时显示旋转的 Loader 图标
+  - **即时反馈**: 
+    - 成功提示: 绿色背景条
+    - 错误提示: 红色背景条 (使用 destructive 主题色)
+  - **错误提示**: 表单验证错误直接显示在输入框下方
+  
+  #### 🔧 技术细节
+  - **响应式**: 使用 Tailwind 响应式类,支持移动端和桌面端
+  - **可访问性**: 
+    - 正确的 `htmlFor` 和 `id` 关联
+    - `autoComplete` 属性正确设置
+    - 表单语义化结构
+  - **代码简化**: 
+    - 移除 Ant Design 的 `App.useApp()` message API
+    - 使用简单的 state 管理反馈信息
+    - 保留原有的登录逻辑和认证流程
+  
+  #### 📦 新增依赖
+  - `react-hook-form`: 表单管理
+  - `@hookform/resolvers`: zod 集成
+  - (zod 已存在于项目中)
+  
+  **验收状态**: ✅ 已完成
+  - 登录页 UI 完全基于 shadcn/ui 和 claude theme
+  - 表单验证功能完整,错误提示清晰
+  - 视觉设计现代化,符合设计规范
+  - 代码 ESLint 检查通过
+  - 保持原有登录逻辑和认证流程不变
+  
+  **下一步**: 
+  - 在开发环境测试登录功能
+  - 开始优化内容编辑页 (T1.6)
 
 ---
 
