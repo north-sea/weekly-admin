@@ -196,7 +196,26 @@ interface StructuredContent {
 
 ## 🚧 进行中的工作
 
-无(当前任务已完成)
+### T1.6: 优化内容编辑页（准备中）
+
+**当前状态**: 已完成前期准备，待开始实施
+
+**已完成的准备工作**:
+- ✅ 创建了基础 shadcn/ui 组件
+- ✅ 创建了 ContentFormatAdapter
+- ✅ 创建了 Select 组件（用于表单）
+- ✅ 分析了现有编辑页面结构
+
+**待完成的主要工作**:
+1. 创建必需的 shadcn/ui 组件（Badge, Tabs, Dialog, Toast 等）
+2. 创建简化的 Markdown 编辑器组件
+3. 使用 react-hook-form + zod 重构表单
+4. 集成 ContentFormatAdapter 支持新老格式
+5. 优化编辑体验（分屏、自动保存、快捷键）
+
+**技术方案**: 采用渐进式迁移，创建新路由 `/content/[id]`，保留旧路由作为备份
+
+**预估工时**: 13-18 小时
 
 ---
 
@@ -204,7 +223,7 @@ interface StructuredContent {
 
 ### 优先级 P0 (最高)
 
-#### T1.6: 优化内容编辑页
+#### T1.6: 优化内容编辑页（进行中）
 - 分屏布局(编辑|预览)
 - 集成 ContentFormatAdapter
 - 支持新老格式
