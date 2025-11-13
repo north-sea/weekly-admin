@@ -30,13 +30,10 @@ export interface Draft {
   synced_at: string | null;
   created_at: string | null;
   updated_at: string | null;
-  // 关联数据
-  content?: {
-    id: string;
-    title: string;
-    slug: string;
-    status: string;
-  } | null;
+  summary?: string | null;
+  content?: string | null;
+  source?: string | null;
+  domain?: string | null;
   duplicate_of?: {
     id: string;
     title: string;
@@ -146,8 +143,8 @@ async function deleteDraft(id: string): Promise<void> {
   return apiClient.delete<void>(`/api/drafts/${id}`);
 }
 
-async function convertDraft(id: string, data: ConvertDraftParams): Promise<any> {
-  return apiClient.post<any>(`/api/drafts/${id}/convert`, data);
+async function convertDraft(id: string, data: ConvertDraftParams): Promise<{ id: string }> {
+  return apiClient.post<{ id: string }>(`/api/drafts/${id}/convert`, data);
 }
 
 async function batchUpdateDrafts(data: BatchUpdateParams): Promise<{ count: number }> {

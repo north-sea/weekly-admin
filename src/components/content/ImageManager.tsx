@@ -68,6 +68,14 @@ export default function ImageManager({
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
+
+  const handleDateRangeChange = (dates: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null) => {
+    if (!dates || dates[0] === null || dates[1] === null) {
+      setDateRange(null);
+      return;
+    }
+    setDateRange([dates[0], dates[1]]);
+  };
   const [showUpload, setShowUpload] = useState(false);
 
   // 模拟图片数据（实际项目中应该从API获取）
@@ -102,10 +110,12 @@ export default function ImageManager({
     if (visible) {
       loadImages();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   useEffect(() => {
     filterImages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [images, searchKeyword, selectedType, dateRange]);
 
   // 加载图片列表
@@ -263,7 +273,7 @@ export default function ImageManager({
             <Col>
               <RangePicker
                 value={dateRange}
-                onChange={setDateRange}
+                onChange={handleDateRangeChange}
                 placeholder={['开始日期', '结束日期']}
                 style={{ width: 240 }}
               />

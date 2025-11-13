@@ -1,0 +1,48 @@
+
+> admin@0.1.0 build /home/engine/project
+> next build
+
+   ▲ Next.js 15.4.4
+   - Experiments (use with caution):
+     · optimizePackageImports
+
+   Creating an optimized production build ...
+ ⚠ Compiled with warnings in 28.0s
+
+./src/components/search/SearchInput.tsx
+Attempted import error: 'useSearchSuggestions' is not exported from '@/hooks/useSearch' (imported as 'useSearchSuggestions').
+
+Import trace for requested module:
+./src/components/search/SearchInput.tsx
+./src/app/(dashboard)/search/page.tsx
+
+ ⚠ Compiled with warnings in 18.0s
+
+./src/components/search/SearchInput.tsx
+Attempted import error: 'useSearchSuggestions' is not exported from '@/hooks/useSearch' (imported as 'useSearchSuggestions').
+
+Import trace for requested module:
+./src/components/search/SearchInput.tsx
+./src/app/(dashboard)/search/page.tsx
+
+ ✓ Compiled successfully in 46s
+   Skipping linting
+   Checking validity of types ...
+Failed to compile.
+
+./src/app/login/page.tsx:43:5
+Type error: Type 'Resolver<{ username: string; password: string; remember?: boolean | undefined; }, any, { username: string; password: string; remember: boolean; }>' is not assignable to type 'Resolver<{ username: string; password: string; remember: boolean; }, any, { username: string; password: string; remember: boolean; }>'.
+  Types of parameters 'options' and 'options' are incompatible.
+    Type 'ResolverOptions<{ username: string; password: string; remember: boolean; }>' is not assignable to type 'ResolverOptions<{ username: string; password: string; remember?: boolean | undefined; }>'.
+      Type 'boolean | undefined' is not assignable to type 'boolean'.
+        Type 'undefined' is not assignable to type 'boolean'.
+
+[0m [90m 41 |[39m     formState[33m:[39m { errors }[33m,[39m
+ [90m 42 |[39m   } [33m=[39m useForm[33m<[39m[33mz[39m[33m.[39minfer[33m<[39m[36mtypeof[39m loginSchema[33m>>[39m({
+[31m[1m>[22m[39m[90m 43 |[39m     resolver[33m:[39m zodResolver(loginSchema)[33m,[39m
+ [90m    |[39m     [31m[1m^[22m[39m
+ [90m 44 |[39m     defaultValues[33m:[39m {
+ [90m 45 |[39m       username[33m:[39m [32m''[39m[33m,[39m
+ [90m 46 |[39m       password[33m:[39m [32m''[39m[33m,[39m[0m
+Next.js build worker exited with code: 1 and signal: null
+ ELIFECYCLE  Command failed with exit code 1.

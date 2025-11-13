@@ -1,0 +1,47 @@
+
+> admin@0.1.0 build /home/engine/project
+> next build
+
+   ▲ Next.js 15.4.4
+   - Experiments (use with caution):
+     · optimizePackageImports
+
+   Creating an optimized production build ...
+ ⚠ Compiled with warnings in 37.0s
+
+./src/components/search/SearchInput.tsx
+Attempted import error: 'useSearchSuggestions' is not exported from '@/hooks/useSearch' (imported as 'useSearchSuggestions').
+
+Import trace for requested module:
+./src/components/search/SearchInput.tsx
+./src/app/(dashboard)/search/page.tsx
+
+ ⚠ Compiled with warnings in 21.0s
+
+./src/components/search/SearchInput.tsx
+Attempted import error: 'useSearchSuggestions' is not exported from '@/hooks/useSearch' (imported as 'useSearchSuggestions').
+
+Import trace for requested module:
+./src/components/search/SearchInput.tsx
+./src/app/(dashboard)/search/page.tsx
+
+ ✓ Compiled successfully in 58s
+   Skipping linting
+   Checking validity of types ...
+Failed to compile.
+
+./src/components/content/MarkdownEditor.tsx:391:15
+Type error: Type '{ content: string; title?: string; content_type?: { id: number; name?: string; }; category?: { id: number; name: string; }; tags?: Array<{ id: number; name: string; }>; created_at?: string; user?: { display_name?: string; username: string; }; }' is not assignable to type '{ id?: number | undefined; title: string; content: string; description?: string | undefined; source?: string | undefined; source_url?: string | undefined; recommendation_reason?: string | undefined; ... 6 more ...; user?: { ...; } | undefined; }'.
+  Types of property 'title' are incompatible.
+    Type 'string | undefined' is not assignable to type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+
+[0m [90m 389 |[39m           {contentData [33m?[39m (
+ [90m 390 |[39m             [33m<[39m[33mMarkdownPreview[39m 
+[31m[1m>[22m[39m[90m 391 |[39m               content[33m=[39m{{
+ [90m     |[39m               [31m[1m^[22m[39m
+ [90m 392 |[39m                 [33m...[39mcontentData[33m,[39m
+ [90m 393 |[39m                 content[33m:[39m content
+ [90m 394 |[39m               }}[0m
+Next.js build worker exited with code: 1 and signal: null
+ ELIFECYCLE  Command failed with exit code 1.

@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
           user_id: authResult.user.id,
           operation_type: 'LOGOUT',
           resource_type: 'USER',
-          resource_id: authResult.user.id,
+          resource_id: String(authResult.user.id),
           operation_details: JSON.stringify({
             userAgent: request.headers.get('user-agent'),
           }),

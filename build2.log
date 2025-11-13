@@ -1,0 +1,52 @@
+
+> admin@0.1.0 build /home/engine/project
+> next build
+
+   ▲ Next.js 15.4.4
+   - Experiments (use with caution):
+     · optimizePackageImports
+
+   Creating an optimized production build ...
+ ⚠ Compiled with warnings in 30.0s
+
+./src/components/search/SearchInput.tsx
+Attempted import error: 'useSearchSuggestions' is not exported from '@/hooks/useSearch' (imported as 'useSearchSuggestions').
+
+Import trace for requested module:
+./src/components/search/SearchInput.tsx
+./src/app/(dashboard)/search/page.tsx
+
+ ⚠ Compiled with warnings in 20.0s
+
+./src/components/search/SearchInput.tsx
+Attempted import error: 'useSearchSuggestions' is not exported from '@/hooks/useSearch' (imported as 'useSearchSuggestions').
+
+Import trace for requested module:
+./src/components/search/SearchInput.tsx
+./src/app/(dashboard)/search/page.tsx
+
+ ✓ Compiled successfully in 50s
+   Skipping linting
+   Checking validity of types ...
+Failed to compile.
+
+./src/components/content/ImageManager.tsx:266:17
+Type error: Type 'Dispatch<SetStateAction<[Dayjs, Dayjs] | null>>' is not assignable to type '(dates: NoUndefinedRangeValueType<Dayjs> | null, dateStrings: [string, string]) => void'.
+  Types of parameters 'value' and 'dates' are incompatible.
+    Type 'NoUndefinedRangeValueType<Dayjs> | null' is not assignable to type 'SetStateAction<[Dayjs, Dayjs] | null>'.
+      Type 'NoUndefinedRangeValueType<Dayjs>' is not assignable to type 'SetStateAction<[Dayjs, Dayjs] | null>'.
+        Type '[start: Dayjs | null, end: Dayjs | null]' is not assignable to type '[Dayjs, Dayjs] | ((prevState: [Dayjs, Dayjs] | null) => [Dayjs, Dayjs] | null)'.
+          Type '[start: Dayjs | null, end: Dayjs | null]' is not assignable to type '[Dayjs, Dayjs]'.
+            Type at position 0 in source is not compatible with type at position 0 in target.
+              Type 'Dayjs | null' is not assignable to type 'Dayjs'.
+                Type 'null' is not assignable to type 'Dayjs'.
+
+[0m [90m 264 |[39m               [33m<[39m[33mRangePicker[39m
+ [90m 265 |[39m                 value[33m=[39m{dateRange}
+[31m[1m>[22m[39m[90m 266 |[39m                 onChange[33m=[39m{setDateRange}
+ [90m     |[39m                 [31m[1m^[22m[39m
+ [90m 267 |[39m                 placeholder[33m=[39m{[[32m'开始日期'[39m[33m,[39m [32m'结束日期'[39m]}
+ [90m 268 |[39m                 style[33m=[39m{{ width[33m:[39m [35m240[39m }}
+ [90m 269 |[39m               [33m/[39m[33m>[39m[0m
+Next.js build worker exited with code: 1 and signal: null
+ ELIFECYCLE  Command failed with exit code 1.
