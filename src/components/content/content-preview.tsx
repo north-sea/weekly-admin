@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useMemo } from 'react';
+import type { Components } from 'react-markdown';
+import type { CodeComponent } from 'react-markdown/lib/ast-to-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -238,12 +240,13 @@ export default function ContentPreview({
                 <ExternalLink className="h-3 w-3" />
               </a>
             ),
-            code: ({ inline, className, children, ...props }) => {
+            code: ((props) => {
+              const { inline, className, children, ...rest } = props;
               if (inline) {
                 return (
                   <code
                     className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono"
-                    {...props}
+                    {...rest}
                   >
                     {children}
                   </code>
@@ -251,12 +254,12 @@ export default function ContentPreview({
               }
               return (
                 <pre className="bg-muted rounded-lg p-4 overflow-x-auto">
-                  <code className={className} {...props}>
+                  <code className={className} {...rest}>
                     {children}
                   </code>
                 </pre>
               );
-            },
+            }) as CodeComponent,
           }}
         >
           {content.content}
@@ -456,23 +459,24 @@ export default function ContentPreview({
                   <ExternalLink className="h-3 w-3" />
                 </a>
               ),
-              code: ({ inline, className, children, ...props }) => {
+              code: ((props) => {
+                const { inline, className, children, ...rest } = props;
                 if (inline) {
                   return (
                     <code
                       className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono"
-                      {...props}
+                      {...rest}
                     >
                       {children}
                     </code>
                   );
                 }
                 return (
-                  <code className={className} {...props}>
+                  <code className={className} {...rest}>
                     {children}
                   </code>
                 );
-              },
+              }) as CodeComponent,
             }}
           >
             {content.content}

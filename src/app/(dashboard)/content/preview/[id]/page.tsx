@@ -167,7 +167,6 @@ export default function ContentPreviewPage() {
               content={content}
               mode={previewMode}
               showMeta={true}
-              showToolbar={false}
             />
           </Card>
         </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import type { CodeComponent } from 'react-markdown/lib/ast-to-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -116,7 +117,8 @@ export default function MarkdownPreview({
                 {children}
               </div>
             ),
-            code: ({ inline, className, children, ...props }) => {
+            code: ((props) => {
+              const { inline, className, children, ...rest } = props;
               if (inline) {
                 return (
                   <code 
@@ -126,7 +128,7 @@ export default function MarkdownPreview({
                       borderRadius: '3px',
                       fontSize: '0.9em'
                     }}
-                    {...props}
+                    {...rest}
                   >
                     {children}
                   </code>
@@ -139,12 +141,12 @@ export default function MarkdownPreview({
                   borderRadius: '6px',
                   overflow: 'auto'
                 }}>
-                  <code className={className} {...props}>
+                  <code className={className} {...rest}>
                     {children}
                   </code>
                 </pre>
               );
-            },
+            }) as CodeComponent,
             table: ({ children }) => (
               <div style={{ overflowX: 'auto', margin: '16px 0' }}>
                 <table style={{ 
@@ -277,7 +279,8 @@ export default function MarkdownPreview({
                 {children}
               </div>
             ),
-            code: ({ inline, className, children, ...props }) => {
+            code: ((props) => {
+              const { inline, className, children, ...rest } = props;
               if (inline) {
                 return (
                   <code 
@@ -287,7 +290,7 @@ export default function MarkdownPreview({
                       borderRadius: '3px',
                       fontSize: '0.9em'
                     }}
-                    {...props}
+                    {...rest}
                   >
                     {children}
                   </code>
@@ -300,12 +303,12 @@ export default function MarkdownPreview({
                   borderRadius: '6px',
                   overflow: 'auto'
                 }}>
-                  <code className={className} {...props}>
+                  <code className={className} {...rest}>
                     {children}
                   </code>
                 </pre>
               );
-            },
+            }) as CodeComponent,
             img: ({ src, alt, ...props }) => (
               <img
                 src={src}
