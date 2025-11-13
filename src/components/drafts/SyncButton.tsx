@@ -47,7 +47,7 @@ export default function SyncButton({ lastSyncTime, showLastSyncTime = true }: Sy
       } else {
         msg.success(message);
       }
-    } catch (error) {
+    } catch {
       msg.error('同步失败，请检查 Karakeep 配置');
     }
   };

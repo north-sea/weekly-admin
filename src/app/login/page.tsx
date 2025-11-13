@@ -17,7 +17,7 @@ import { useAuthStore } from '@/stores/auth';
 const loginSchema = z.object({
   username: z.string().min(2, { message: '用户名至少 2 个字符' }).max(50),
   password: z.string().min(6, { message: '密码至少 6 个字符' }).max(100),
-  remember: z.boolean().default(false),
+  remember: z.boolean(),
 });
 
 interface LoginFeedback {
