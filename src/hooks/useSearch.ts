@@ -1,51 +1,36 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { debounce } from 'lodash-es';
+import { useSearchQuery, useSearchSuggestions } from '@/hooks/queries/useSearchQueries';
 
-// Search filters interface
-export interface SearchFilters {
-  contentType?: 'blog' | 'weekly';
-  status?: string[];
-  categoryIds?: number[];
-  tagIds?: number[];
-  dateRange?: [string, string];
-  sources?: string[];
-  userId?: number;
-}
+// Re-export types from the centralized location
+export type { SearchFilters, SearchOptions, SearchResult, SearchHistoryItem } from '@/lib/types/search';
+import type { SearchFilters, SearchOptions, SearchHistoryItem } from '@/lib/types/search';
 
-// Search options interface
-export interface SearchOptions {
-  query?: string;
-  filters?: SearchFilters;
-  sort?: string[];
-  page?: number;
-  limit?: number;
-  highlight?: boolean;
-}
-
-// Search result interface
-export interface SearchResult {
-  hits: any[];
-  total: number;
-  page: number;
-  limit: number;
-  processingTimeMs: number;
-  query: string;
-}
-
-// Search history item interface
-export interface SearchHistoryItem {
-  id: string;
-  query: string;
-  filters?: SearchFilters;
-  timestamp: number;
-}
-
-// Custom hook for search functionality
+// Custom hook for search functionality with React Query
 export function useSearch(initialOptions: SearchOptions = {}) {
   const [searchOptions, setSearchOptions] = useState<SearchOptions>(initialOptions);
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [shouldSearch, setShouldSearch] = useState(false);
+  const [suggestionQuery, setSuggestionQuery] = useState(initialOptions.query ?? '');
+  
+  // Use React Query for search
+  const {
+    data: searchResult,
+    isLoading: isSearching,
+    error: searchError,
+    refetch: refetchSearch,
+  } = useSearchQuery(searchOptions, shouldSearch);
+  
+  // Use React Query for suggestions
+  const {
+    data: suggestionsData,
+  } = useSearchSuggestions(
+    suggestionQuery,
+    5,
+    Boolean(suggestionQuery.trim())
+  );
+  
+  const suggestions = suggestionsData?.suggestions || [];
   
   // Load search history from localStorage on mount
   useEffect(() => {
@@ -104,86 +89,6 @@ export function useSearch(initialOptions: SearchOptions = {}) {
     });
   }, [saveSearchHistory]);
   
-  // Build query parameters for API call
-  const buildQueryParams = useCallback((options: SearchOptions) => {
-    const params = new URLSearchParams();
-    
-    if (options.query) params.set('q', options.query);
-    if (options.page) params.set('page', options.page.toString());
-    if (options.limit) params.set('limit', options.limit.toString());
-    if (options.highlight !== undefined) params.set('highlight', options.highlight.toString());
-    
-    if (options.filters) {
-      const { contentType, status, categoryIds, tagIds, dateRange, sources, userId } = options.filters;
-      
-      if (contentType) params.set('contentType', contentType);
-      if (status && status.length > 0) params.set('status', status.join(','));
-      if (categoryIds && categoryIds.length > 0) params.set('categoryIds', categoryIds.join(','));
-      if (tagIds && tagIds.length > 0) params.set('tagIds', tagIds.join(','));
-      if (sources && sources.length > 0) params.set('sources', sources.join(','));
-      if (userId) params.set('userId', userId.toString());
-      if (dateRange && dateRange.length === 2) params.set('dateRange', dateRange.join(','));
-    }
-    
-    if (options.sort && options.sort.length > 0) {
-      params.set('sort', options.sort.join(','));
-    }
-    
-    return params.toString();
-  }, []);
-  
-  // Main search query
-  const {
-    data: searchResult,
-    isLoading: isSearching,
-    error: searchError,
-    refetch: refetchSearch,
-  } = useQuery({
-    queryKey: ['search', searchOptions],
-    queryFn: async (): Promise<SearchResult> => {
-      const queryString = buildQueryParams(searchOptions);
-      const response = await fetch(`/api/search?${queryString}`);
-      
-      if (!response.ok) {
-        throw new Error('Search failed');
-      }
-      
-      const result = await response.json();
-      if (!result.success) {
-        throw new Error(result.error || 'Search failed');
-      }
-      
-      return result.data;
-    },
-    enabled: false, // Don't auto-fetch, only when explicitly called
-  });
-  
-  // Search suggestions query
-  const fetchSuggestions = useCallback(async (query: string) => {
-    if (!query.trim()) {
-      setSuggestions([]);
-      return;
-    }
-    
-    try {
-      const response = await fetch(`/api/search?action=suggestions&q=${encodeURIComponent(query)}&limit=5`);
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          setSuggestions(result.data.suggestions);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch suggestions:', error);
-    }
-  }, []);
-  
-  // Debounced suggestions fetcher
-  const debouncedFetchSuggestions = useMemo(
-    () => debounce(fetchSuggestions, 300),
-    [fetchSuggestions]
-  );
-  
   // Update search options
   const updateSearchOptions = useCallback((newOptions: Partial<SearchOptions>) => {
     setSearchOptions(prev => ({ ...prev, ...newOptions }));
@@ -202,43 +107,48 @@ export function useSearch(initialOptions: SearchOptions = {}) {
       addToHistory(finalOptions.query, finalOptions.filters);
     }
     
+    setShouldSearch(true);
     refetchSearch();
   }, [searchOptions, updateSearchOptions, addToHistory, refetchSearch]);
   
   // Instant search (for search-as-you-type)
   const instantSearch = useCallback((query: string) => {
     updateSearchOptions({ query, page: 1 });
-    debouncedFetchSuggestions(query);
     
     // Debounced search execution
     const debouncedSearch = debounce(() => {
+      setShouldSearch(true);
       refetchSearch();
     }, 500);
     
     debouncedSearch();
-  }, [updateSearchOptions, debouncedFetchSuggestions, refetchSearch]);
+  }, [updateSearchOptions, refetchSearch]);
   
   // Apply filters
   const applyFilters = useCallback((filters: SearchFilters) => {
     updateSearchOptions({ filters, page: 1 });
+    setShouldSearch(true);
     refetchSearch();
   }, [updateSearchOptions, refetchSearch]);
   
   // Clear filters
   const clearFilters = useCallback(() => {
     updateSearchOptions({ filters: {}, page: 1 });
+    setShouldSearch(true);
     refetchSearch();
   }, [updateSearchOptions, refetchSearch]);
   
   // Change page
   const changePage = useCallback((page: number) => {
     updateSearchOptions({ page });
+    setShouldSearch(true);
     refetchSearch();
   }, [updateSearchOptions, refetchSearch]);
   
   // Change sort
   const changeSort = useCallback((sort: string[]) => {
     updateSearchOptions({ sort, page: 1 });
+    setShouldSearch(true);
     refetchSearch();
   }, [updateSearchOptions, refetchSearch]);
   
@@ -251,8 +161,25 @@ export function useSearch(initialOptions: SearchOptions = {}) {
     };
     
     setSearchOptions(prev => ({ ...prev, ...options }));
+    setShouldSearch(true);
     refetchSearch();
   }, [refetchSearch]);
+  
+  // Fetch suggestions - now using React Query hook
+  const fetchSuggestions = useCallback((query: string) => {
+    setSuggestionQuery(query);
+  }, []);
+  
+  const debouncedFetchSuggestions = useMemo(
+    () => debounce(fetchSuggestions, 300),
+    [fetchSuggestions]
+  );
+  
+  useEffect(() => {
+    if (searchOptions.query !== undefined) {
+      setSuggestionQuery(searchOptions.query);
+    }
+  }, [searchOptions.query]);
   
   return {
     // Search state
@@ -288,30 +215,20 @@ export function useSearch(initialOptions: SearchOptions = {}) {
 }
 
 // Hook for search suggestions only
-export function useSearchSuggestions() {
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+export function useSearchSuggestionsOnly() {
+  const [query, setQuery] = useState('');
+  const [suggestionLimit, setSuggestionLimit] = useState(5);
   
-  const fetchSuggestions = useCallback(async (query: string, limit: number = 5) => {
-    if (!query.trim()) {
-      setSuggestions([]);
-      return;
-    }
-    
-    setIsLoading(true);
-    try {
-      const response = await fetch(`/api/search?action=suggestions&q=${encodeURIComponent(query)}&limit=${limit}`);
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          setSuggestions(result.data.suggestions);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch suggestions:', error);
-    } finally {
-      setIsLoading(false);
-    }
+  const {
+    data: suggestionsData,
+    isLoading,
+  } = useSearchSuggestions(query, suggestionLimit, !!query.trim());
+  
+  const suggestions = suggestionsData?.suggestions || [];
+  
+  const fetchSuggestions = useCallback((newQuery: string, limit: number = 5) => {
+    setSuggestionLimit(limit);
+    setQuery(newQuery);
   }, []);
   
   const debouncedFetchSuggestions = useMemo(
@@ -323,6 +240,6 @@ export function useSearchSuggestions() {
     suggestions,
     isLoading,
     fetchSuggestions: debouncedFetchSuggestions,
-    clearSuggestions: () => setSuggestions([]),
+    clearSuggestions: () => setQuery(''),
   };
 }

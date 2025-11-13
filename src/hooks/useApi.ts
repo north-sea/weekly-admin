@@ -6,12 +6,9 @@ import {
   useInfiniteQuery,
   useQueryClient, 
   UseQueryOptions, 
-  UseMutationOptions,
-  UseInfiniteQueryOptions,
-  InfiniteData
+  UseMutationOptions
 } from '@tanstack/react-query';
 import { apiClient, ApiOptions } from '@/lib/api-client';
-import type { ApiResponse, PaginatedData, QueryParams } from '@/types';
 
 // 通用类型定义
 export interface PaginationParams {
@@ -34,7 +31,7 @@ export interface PaginatedResponse<T> {
 export interface BatchOperationParams {
   action: 'create' | 'update' | 'delete';
   ids?: (string | number)[];
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
 }
 
 // 增强的查询键生成器
@@ -43,8 +40,8 @@ export const queryKeys = {
   content: {
     all: ['content'] as const,
     lists: () => [...queryKeys.content.all, 'list'] as const,
-    list: (params?: Record<string, any>) => [...queryKeys.content.lists(), params] as const,
-    infinite: (params?: Record<string, any>) => [...queryKeys.content.all, 'infinite', params] as const,
+    list: (params?: Record<string, unknown>) => [...queryKeys.content.lists(), params] as const,
+    infinite: (params?: Record<string, unknown>) => [...queryKeys.content.all, 'infinite', params] as const,
     details: () => [...queryKeys.content.all, 'detail'] as const,
     detail: (id: string | number) => [...queryKeys.content.details(), id] as const,
     versions: (id: string | number) => [...queryKeys.content.detail(id), 'versions'] as const,
@@ -54,7 +51,7 @@ export const queryKeys = {
   categories: {
     all: ['categories'] as const,
     lists: () => [...queryKeys.categories.all, 'list'] as const,
-    list: (params?: Record<string, any>) => [...queryKeys.categories.lists(), params] as const,
+    list: (params?: Record<string, unknown>) => [...queryKeys.categories.lists(), params] as const,
     details: () => [...queryKeys.categories.all, 'detail'] as const,
     detail: (id: string | number) => [...queryKeys.categories.details(), id] as const,
     stats: () => [...queryKeys.categories.all, 'stats'] as const,
@@ -63,7 +60,7 @@ export const queryKeys = {
   tags: {
     all: ['tags'] as const,
     lists: () => [...queryKeys.tags.all, 'list'] as const,
-    list: (params?: Record<string, any>) => [...queryKeys.tags.lists(), params] as const,
+    list: (params?: Record<string, unknown>) => [...queryKeys.tags.lists(), params] as const,
     details: () => [...queryKeys.tags.all, 'detail'] as const,
     detail: (id: string | number) => [...queryKeys.tags.details(), id] as const,
     popular: (limit?: number) => [...queryKeys.tags.all, 'popular', limit] as const,
@@ -81,7 +78,7 @@ export const queryKeys = {
   weekly: {
     all: ['weekly'] as const,
     lists: () => [...queryKeys.weekly.all, 'list'] as const,
-    list: (params?: Record<string, any>) => [...queryKeys.weekly.lists(), params] as const,
+    list: (params?: Record<string, unknown>) => [...queryKeys.weekly.lists(), params] as const,
     details: () => [...queryKeys.weekly.all, 'detail'] as const,
     detail: (id: string | number) => [...queryKeys.weekly.details(), id] as const,
     contents: (id: string | number) => [...queryKeys.weekly.detail(id), 'contents'] as const,
@@ -92,14 +89,16 @@ export const queryKeys = {
   operationLogs: {
     all: ['operation-logs'] as const,
     lists: () => [...queryKeys.operationLogs.all, 'list'] as const,
-    list: (params?: Record<string, any>) => [...queryKeys.operationLogs.lists(), params] as const,
-    stats: () => [...queryKeys.operationLogs.all, 'stats'] as const,
-    export: () => [...queryKeys.operationLogs.all, 'export'] as const,
+    list: (params?: Record<string, unknown>) => [...queryKeys.operationLogs.lists(), params] as const,
+    stats: (params?: Record<string, unknown>) => [...queryKeys.operationLogs.all, 'stats', params] as const,
+    export: (params?: Record<string, unknown>) => [...queryKeys.operationLogs.all, 'export', params] as const,
   },
   // 搜索相关
   search: {
     all: ['search'] as const,
-    results: (query: string, filters?: Record<string, any>) => [...queryKeys.search.all, 'results', query, filters] as const,
+    results: (query: string, filters?: Record<string, unknown>) => [...queryKeys.search.all, 'results', query, filters] as const,
+    query: (options: Record<string, unknown>) => [...queryKeys.search.all, 'query', options] as const,
+    suggestions: (query: string, limit?: number) => [...queryKeys.search.all, 'suggestions', query, limit] as const,
   },
   // 用户相关
   user: {
@@ -203,7 +202,7 @@ export function useApiMutation<TData = unknown, TVariables = unknown, TError = E
 // 分页查询钩子
 export function usePaginatedQuery<TData = unknown, TError = Error>(
   url: string,
-  params?: PaginationParams & Record<string, any>,
+  params?: PaginationParams & Record<string, unknown>,
   options?: Omit<UseQueryOptions<PaginatedResponse<TData>, TError>, 'queryFn'> & {
     apiOptions?: ApiOptions;
   }
@@ -232,7 +231,7 @@ export function usePaginatedQuery<TData = unknown, TError = Error>(
 // 无限滚动查询钩子
 export function useInfiniteScrollQuery<TData = unknown, TError = Error>(
   url: string,
-  params?: Omit<PaginationParams, 'page'> & Record<string, any>,
+  params?: Omit<PaginationParams, 'page'> & Record<string, unknown>,
   options?: {
     apiOptions?: ApiOptions;
     queryKey?: readonly unknown[];
@@ -297,36 +296,48 @@ export function useBatchMutation<TData = unknown, TError = Error>(
 export function useOptimisticUpdate() {
   const queryClient = useQueryClient();
   
+  const hasId = (value: unknown): value is { id: string | number } => {
+    if (typeof value !== 'object' || value === null) {
+      return false;
+    }
+    const record = value as { id?: unknown };
+    return (
+      ('id' in record) &&
+      (typeof record.id === 'string' || typeof record.id === 'number')
+    );
+  };
+  
+  const isPaginatedResponseWithIds = <T extends { id: string | number }>(value: unknown): value is PaginatedResponse<T> => {
+    if (typeof value !== 'object' || value === null) {
+      return false;
+    }
+    const record = value as { data?: unknown; pagination?: unknown };
+    return Array.isArray(record.data) && typeof record.pagination === 'object' && record.pagination !== null;
+  };
+  
   return {
     // 乐观更新单个项目
-    updateItem: <T>(
+    updateItem: <T extends { id: string | number }>(
       queryKey: readonly unknown[],
       id: string | number,
       updater: (oldData: T) => T
     ) => {
-      queryClient.setQueryData(queryKey, (oldData: any) => {
+      queryClient.setQueryData(queryKey, (oldData) => {
         if (!oldData) return oldData;
         
-        // 处理分页数据结构
-        if (oldData.data && Array.isArray(oldData.data)) {
+        if (isPaginatedResponseWithIds<T>(oldData)) {
           return {
             ...oldData,
-            data: oldData.data.map((item: any) => 
-              item.id === id ? updater(item) : item
-            ),
+            data: oldData.data.map((item) => (item.id === id ? updater(item) : item)),
           };
         }
         
-        // 处理普通数组
         if (Array.isArray(oldData)) {
-          return oldData.map((item: any) => 
-            item.id === id ? updater(item) : item
-          );
+          return oldData.map((item) => (hasId(item) && item.id === id ? updater(item as T) : item)) as typeof oldData;
         }
         
-        // 处理单个对象
-        if (oldData.id === id) {
-          return updater(oldData);
+        if (hasId(oldData) && oldData.id === id) {
+          return updater(oldData as T);
         }
         
         return oldData;
@@ -334,17 +345,16 @@ export function useOptimisticUpdate() {
     },
     
     // 乐观添加项目
-    addItem: <T>(
+    addItem: <T extends { id: string | number }>(
       queryKey: readonly unknown[],
       newItem: T,
       position: 'start' | 'end' = 'start'
     ) => {
-      queryClient.setQueryData(queryKey, (oldData: any) => {
+      queryClient.setQueryData(queryKey, (oldData) => {
         if (!oldData) return oldData;
         
-        // 处理分页数据结构
-        if (oldData.data && Array.isArray(oldData.data)) {
-          const newData = position === 'start' 
+        if (isPaginatedResponseWithIds<T>(oldData)) {
+          const newData = position === 'start'
             ? [newItem, ...oldData.data]
             : [...oldData.data, newItem];
           
@@ -358,11 +368,11 @@ export function useOptimisticUpdate() {
           };
         }
         
-        // 处理普通数组
         if (Array.isArray(oldData)) {
-          return position === 'start' 
+          const updated = position === 'start'
             ? [newItem, ...oldData]
             : [...oldData, newItem];
+          return updated as typeof oldData;
         }
         
         return oldData;
@@ -370,16 +380,15 @@ export function useOptimisticUpdate() {
     },
     
     // 乐观删除项目
-    removeItem: <T>(
+    removeItem: <T extends { id: string | number }>(
       queryKey: readonly unknown[],
       id: string | number
     ) => {
-      queryClient.setQueryData(queryKey, (oldData: any) => {
+      queryClient.setQueryData(queryKey, (oldData) => {
         if (!oldData) return oldData;
         
-        // 处理分页数据结构
-        if (oldData.data && Array.isArray(oldData.data)) {
-          const filteredData = oldData.data.filter((item: any) => item.id !== id);
+        if (isPaginatedResponseWithIds<T>(oldData)) {
+          const filteredData = oldData.data.filter((item) => item.id !== id);
           
           return {
             ...oldData,
@@ -391,9 +400,9 @@ export function useOptimisticUpdate() {
           };
         }
         
-        // 处理普通数组
         if (Array.isArray(oldData)) {
-          return oldData.filter((item: any) => item.id !== id);
+          const filtered = oldData.filter((item) => !hasId(item) || item.id !== id);
+          return filtered as typeof oldData;
         }
         
         return oldData;

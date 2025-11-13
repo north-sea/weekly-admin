@@ -177,9 +177,11 @@ Implementation Checklist:
 18. 添加单元测试验证重构后的功能正确性 ⏳
 19. 更新项目文档，说明新的数据获取模式 ⏳
 20. 进行全面功能测试，确保重构不影响现有功能 ⏳
+21. 重构搜索功能，替换直接 fetch 调用为 React Query 搜索服务 ✅
+22. 重构操作日志模块，使用 React Query 查询和服务替换手动状态管理 ✅
 
 # Current Execution Step (Updated by EXECUTE mode when starting a step)
-> 当前执行完成：React Query重构全面完成，所有核心功能已迁移到新架构
+> 当前执行完成：React Query重构继续推进，搜索和操作日志模块已完成迁移
 
 # Task Progress (Appended by EXECUTE mode after each step completion)
 *   2024-01-11 14:30:00
@@ -289,6 +291,18 @@ Implementation Checklist:
     *   Blockers: 无
     *   Status: 成功完成
 
+*   2024-02-15 10:00:00
+    *   Step: 21-22. 搜索与操作日志模块迁移
+    *   Modifications:
+        - 新建 search 类型定义和服务层，构建 React Query 搜索查询与建议 hooks
+        - 重构 useSearch 钩子，接入新的查询服务并保留历史记录能力
+        - 新建操作日志服务与查询 hooks，覆盖列表、统计、导出与异常检测能力
+        - 重构操作日志页面，替换所有 fetch 调用为 React Query 数据流并统一分页与筛选状态
+    *   Change Summary: 搜索与操作日志模块已迁移到 React Query 架构，消除直接 fetch 调用，提升状态管理一致性
+    *   Reason: 执行计划步骤21-22
+    *   Blockers: 无
+    *   Status: 成功完成
+
 # Final Review (Populated by REVIEW mode)
 
 ## 重构完成度评估
@@ -333,10 +347,10 @@ Implementation Checklist:
 - **错误处理**：统一的错误处理和用户反馈机制
 
 ### 📊 重构统计
-- **重构文件数量**：15个核心文件
-- **新增文件**：7个新架构文件
-- **移除代码行数**：约500行手动状态管理代码
-- **新增代码行数**：约800行高质量react-query代码
+- **重构文件数量**：20个核心文件（新增：搜索、操作日志模块）
+- **新增文件**：10个新架构文件（新增：search-api.ts, operation-logs-api.ts, useSearchQueries.ts, useOperationLogsQueries.ts, types/search.ts）
+- **移除代码行数**：约600行手动状态管理和直接fetch调用代码
+- **新增代码行数**：约1000行高质量react-query代码
 - **零破坏性变更**：所有现有接口保持兼容
 
 ### 🚀 架构升级对比
