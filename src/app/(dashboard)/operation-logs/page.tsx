@@ -14,7 +14,6 @@ import {
   Col,
   Statistic,
   Alert,
-  Tooltip,
   Popover,
   Modal,
   message
@@ -30,197 +29,86 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
+import { 
+  useOperationLogs, 
+  useOperationLogsStats, 
+  useDetectAnomalousOperations,
+  useExportOperationLogs,
+  useRefreshOperationLogs
+} from '@/hooks/queries/useOperationLogsQueries';
+import type { OperationLog, OperationLogsQuery } from '@/lib/services/operation-logs-api';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
 
-interface OperationLog {
-  id: number;
-  user_id: number;
-  operation_type: 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT';
-  resource_type: string;
-  resource_id?: number;
-  operation_details?: string;
-  ip_address?: string;
-  user_agent?: string;
-  created_at?: string;
-  user?: {
-    id: number;
-    username: string;
-    display_name?: string;
-  };
-}
-
-interface OperationStats {
-  totalOperations: number;
-  operationsByType: Record<string, number>;
-  operationsByUser: Array<{
-    userId: number;
-    username: string;
-    count: number;
-  }>;
-  operationsByResource: Array<{
-    resourceType: string;
-    count: number;
-  }>;
-  recentOperations: OperationLog[];
-}
-
 const OperationLogsPage: React.FC = () => {
-  const [logs, setLogs] = useState<OperationLog[]>([]);
-  const [stats, setStats] = useState<OperationStats | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [statsLoading, setStatsLoading] = useState(false);
-  const [pagination, setPagination] = useState({
-    current: 1,
-    pageSize: 20,
-    total: 0
-  });
-  
   // 筛选条件
-  const [filters, setFilters] = useState({
-    operationType: undefined as string | undefined,
-    resourceType: undefined as string | undefined,
-    userId: undefined as number | undefined,
-    dateRange: undefined as [dayjs.Dayjs, dayjs.Dayjs] | undefined,
-    keyword: undefined as string | undefined
+  const [filters, setFilters] = useState<OperationLogsQuery>({
+    page: 1,
+    pageSize: 20,
   });
   
   // 异常操作检测
-  const [anomalousOperations, setAnomalousOperations] = useState<any[]>([]);
   const [showAnomalousAlert, setShowAnomalousAlert] = useState(false);
-
-  // 获取操作日志
-  const fetchLogs = async (page = 1, pageSize = 20) => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        pageSize: pageSize.toString()
-      });
-      
-      if (filters.operationType) params.append('operationType', filters.operationType);
-      if (filters.resourceType) params.append('resourceType', filters.resourceType);
-      if (filters.userId) params.append('userId', filters.userId.toString());
-      if (filters.keyword) params.append('keyword', filters.keyword);
-      if (filters.dateRange) {
-        params.append('startDate', filters.dateRange[0].toISOString());
-        params.append('endDate', filters.dateRange[1].toISOString());
-      }
-      
-      const response = await fetch(`/api/operation-logs?${params}`);
-      const result = await response.json();
-      
-      if (result.success) {
-        setLogs(result.data.data);
-        setPagination({
-          current: result.data.pagination.page,
-          pageSize: result.data.pagination.pageSize,
-          total: result.data.pagination.total
-        });
-      } else {
-        message.error('获取操作日志失败');
-      }
-    } catch (error) {
-      console.error('获取操作日志失败:', error);
-      message.error('获取操作日志失败');
-    } finally {
-      setLoading(false);
-    }
+  
+  // React Query hooks
+  const { data: logsData, isLoading: loading } = useOperationLogs(filters);
+  const { data: stats, isLoading: statsLoading } = useOperationLogsStats(
+    filters.startDate && filters.endDate 
+      ? { startDate: filters.startDate, endDate: filters.endDate }
+      : undefined
+  );
+  const { data: anomalousOperations = [], refetch: detectAnomalous } = useDetectAnomalousOperations();
+  const exportMutation = useExportOperationLogs();
+  const refreshLogs = useRefreshOperationLogs();
+  
+  const logs = logsData?.data || [];
+  const pagination = logsData?.pagination || {
+    page: 1,
+    pageSize: 20,
+    total: 0,
+    totalPages: 0,
   };
-
-  // 获取统计信息
-  const fetchStats = async () => {
-    setStatsLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (filters.dateRange) {
-        params.append('startDate', filters.dateRange[0].toISOString());
-        params.append('endDate', filters.dateRange[1].toISOString());
-      }
-      
-      const response = await fetch(`/api/operation-logs/stats?${params}`);
-      const result = await response.json();
-      
-      if (result.success) {
-        setStats(result.data);
-      }
-    } catch (error) {
-      console.error('获取统计信息失败:', error);
-    } finally {
-      setStatsLoading(false);
-    }
-  };
-
-  // 导出日志
-  const handleExport = async (format: 'json' | 'csv') => {
-    try {
-      const params = new URLSearchParams({ format });
-      
-      if (filters.operationType) params.append('operationType', filters.operationType);
-      if (filters.resourceType) params.append('resourceType', filters.resourceType);
-      if (filters.userId) params.append('userId', filters.userId.toString());
-      if (filters.keyword) params.append('keyword', filters.keyword);
-      if (filters.dateRange) {
-        params.append('startDate', filters.dateRange[0].toISOString());
-        params.append('endDate', filters.dateRange[1].toISOString());
-      }
-      
-      const response = await fetch(`/api/operation-logs/export?${params}`);
-      
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `operation-logs-${dayjs().format('YYYY-MM-DD')}.${format}`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        message.success('导出成功');
-      } else {
-        message.error('导出失败');
-      }
-    } catch (error) {
-      console.error('导出失败:', error);
-      message.error('导出失败');
-    }
-  };
-
-  // 检测异常操作
-  const detectAnomalousOperations = async () => {
-    try {
-      // 这里应该调用异常检测API，暂时模拟数据
-      const mockAnomalous = [
-        {
-          userId: 1,
-          username: 'admin',
-          operationCount: 120,
-          timeWindow: '60 minutes'
-        }
-      ];
-      
-      if (mockAnomalous.length > 0) {
-        setAnomalousOperations(mockAnomalous);
+  
+  // 初始检测异常操作
+  useEffect(() => {
+    detectAnomalous().then(({ data }) => {
+      if (data && data.length > 0) {
         setShowAnomalousAlert(true);
       }
-    } catch (error) {
-      console.error('异常检测失败:', error);
-    }
+    });
+  }, [detectAnomalous]);
+  
+  // 导出日志
+  const handleExport = (format: 'json' | 'csv') => {
+    const exportQuery = { ...filters };
+    delete exportQuery.page;
+    delete exportQuery.pageSize;
+    
+    exportMutation.mutate(
+      { format, query: exportQuery },
+      {
+        onSuccess: () => {
+          message.success('导出成功');
+        },
+        onError: (error) => {
+          console.error('导出失败:', error);
+          message.error('导出失败');
+        },
+      }
+    );
   };
-
-  useEffect(() => {
-    fetchLogs();
-    fetchStats();
-    detectAnomalousOperations();
-  }, []);
-
-  useEffect(() => {
-    fetchLogs(1);
-    fetchStats();
-  }, [filters]);
-
+  
+  // 处理表格变化
+  const handleTableChange = (page: number, pageSize: number) => {
+    setFilters(prev => ({ ...prev, page, pageSize }));
+  };
+  
+  // 处理筛选条件变化
+  const handleFilterChange = <K extends keyof OperationLogsQuery>(key: K, value: OperationLogsQuery[K]) => {
+    setFilters(prev => ({ ...prev, [key]: value, page: 1 }));
+  };
+  
   // 表格列定义
   const columns: ColumnsType<OperationLog> = [
     {
@@ -277,7 +165,6 @@ const OperationLogsPage: React.FC = () => {
       render: (details) => {
         if (!details) return '-';
         
-        // 格式化显示内容
         let formattedContent;
         try {
           const parsed = JSON.parse(details);
@@ -286,7 +173,6 @@ const OperationLogsPage: React.FC = () => {
           formattedContent = details;
         }
         
-        // Popover 内容组件
         const popoverContent = (
           <div style={{ maxWidth: 400, maxHeight: 300, overflow: 'auto' }}>
             <pre 
@@ -391,7 +277,7 @@ const OperationLogsPage: React.FC = () => {
             <Card>
               <Statistic
                 title="创建操作"
-                value={stats.operationsByType.CREATE || 0}
+                value={stats.operationsByType?.CREATE || 0}
                 valueStyle={{ color: '#52c41a' }}
                 loading={statsLoading}
               />
@@ -401,7 +287,7 @@ const OperationLogsPage: React.FC = () => {
             <Card>
               <Statistic
                 title="更新操作"
-                value={stats.operationsByType.UPDATE || 0}
+                value={stats.operationsByType?.UPDATE || 0}
                 valueStyle={{ color: '#1890ff' }}
                 loading={statsLoading}
               />
@@ -411,7 +297,7 @@ const OperationLogsPage: React.FC = () => {
             <Card>
               <Statistic
                 title="删除操作"
-                value={stats.operationsByType.DELETE || 0}
+                value={stats.operationsByType?.DELETE || 0}
                 valueStyle={{ color: '#f5222d' }}
                 loading={statsLoading}
               />
@@ -429,7 +315,7 @@ const OperationLogsPage: React.FC = () => {
               allowClear
               style={{ width: '100%' }}
               value={filters.operationType}
-              onChange={(value) => setFilters({ ...filters, operationType: value })}
+              onChange={(value) => handleFilterChange('operationType', value)}
             >
               <Option value="CREATE">创建</Option>
               <Option value="UPDATE">更新</Option>
@@ -444,7 +330,7 @@ const OperationLogsPage: React.FC = () => {
               allowClear
               style={{ width: '100%' }}
               value={filters.resourceType}
-              onChange={(value) => setFilters({ ...filters, resourceType: value })}
+              onChange={(value) => handleFilterChange('resourceType', value)}
             >
               <Option value="content">内容</Option>
               <Option value="weekly_issue">周刊</Option>
@@ -456,8 +342,19 @@ const OperationLogsPage: React.FC = () => {
           <Col span={6}>
             <RangePicker
               style={{ width: '100%' }}
-              value={filters.dateRange}
-              onChange={(dates) => setFilters({ ...filters, dateRange: dates as [dayjs.Dayjs, dayjs.Dayjs] })}
+              onChange={(dates) => {
+                if (dates) {
+                  handleFilterChange('startDate', dates[0]?.toISOString());
+                  handleFilterChange('endDate', dates[1]?.toISOString());
+                } else {
+                  setFilters(prev => {
+                    const newFilters = { ...prev };
+                    delete newFilters.startDate;
+                    delete newFilters.endDate;
+                    return newFilters;
+                  });
+                }
+              }}
             />
           </Col>
           <Col span={6}>
@@ -466,14 +363,14 @@ const OperationLogsPage: React.FC = () => {
               prefix={<SearchOutlined />}
               allowClear
               value={filters.keyword}
-              onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+              onChange={(e) => handleFilterChange('keyword', e.target.value)}
             />
           </Col>
           <Col span={4}>
             <Space>
               <Button
                 icon={<ReloadOutlined />}
-                onClick={() => fetchLogs(pagination.current, pagination.pageSize)}
+                onClick={refreshLogs}
                 loading={loading}
               >
                 刷新
@@ -490,6 +387,7 @@ const OperationLogsPage: React.FC = () => {
                     onCancel: () => handleExport('csv')
                   });
                 }}
+                loading={exportMutation.isPending}
               >
                 导出
               </Button>
@@ -506,13 +404,13 @@ const OperationLogsPage: React.FC = () => {
           rowKey="id"
           loading={loading}
           pagination={{
-            ...pagination,
+            current: pagination.page,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
             showSizeChanger: true,
             showQuickJumper: true,
             showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`,
-            onChange: (page, pageSize) => {
-              fetchLogs(page, pageSize);
-            }
+            onChange: handleTableChange,
           }}
           scroll={{ x: 1200 }}
         />
