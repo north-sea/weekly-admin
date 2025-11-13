@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Card, Typography, Divider, Tag, Space, Empty, Button } from 'antd';
-import { LinkOutlined, EyeOutlined } from '@ant-design/icons';
-import ReactMarkdown from 'react-markdown';
-
-const { Title, Text, Paragraph } = Typography;
+import React, { useEffect, useState } from 'react';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { Link2, Star, Loader2 } from 'lucide-react';
 
 interface Content {
   id: number;
@@ -44,38 +44,70 @@ interface WeeklyPreviewProps {
 
 const WeeklyPreview: React.FC<WeeklyPreviewProps> = ({ issueId, contents }) => {
   const [issue, setIssue] = useState<WeeklyIssue | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchIssueInfo();
+    let isMounted = true;
+
+    const loadIssue = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(`/api/weekly/${issueId}`);
+        const result = await response.json();
+
+        if (isMounted) {
+          if (result.success) {
+            setIssue(result.data);
+          } else {
+            setIssue(null);
+          }
+        }
+      } catch (error) {
+        if (isMounted) {
+          console.error('获取周刊信息失败:', error);
+          setIssue(null);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadIssue();
+
+    return () => {
+      isMounted = false;
+    };
   }, [issueId]);
 
-  const fetchIssueInfo = async () => {
-    try {
-      const response = await fetch(`/api/weekly/${issueId}`);
-      const result = await response.json();
-
-      if (result.success) {
-        setIssue(result.data);
-      }
-    } catch (error) {
-      console.error('获取周刊信息失败:', error);
-    }
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full py-12">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-primary" />
+          <p className="text-sm text-muted-foreground">加载中...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!issue) {
-    return <Empty description="加载中..." />;
+    return (
+      <div className="flex items-center justify-center h-full py-12 text-sm text-muted-foreground">
+        无法加载周刊信息
+      </div>
+    );
   }
 
   if (contents.length === 0) {
     return (
-      <Empty
-        description="暂无内容"
-        style={{ marginTop: '20px' }}
-      />
+      <div className="flex items-center justify-center h-full py-12 text-sm text-muted-foreground">
+        暂无内容
+      </div>
     );
   }
 
-  // 按分类分组内容
   const groupedContents = contents.reduce((groups: Record<string, Content[]>, content) => {
     const section = content.section || content.category?.name || '未分类';
     if (!groups[section]) {
@@ -86,61 +118,53 @@ const WeeklyPreview: React.FC<WeeklyPreviewProps> = ({ issueId, contents }) => {
   }, {});
 
   const renderContentItem = (content: Content, index: number) => (
-    <div key={content.id} style={{ marginBottom: '16px' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-        <Text strong style={{ minWidth: '20px', color: '#1890ff' }}>
-          {index + 1}.
-        </Text>
-        <div style={{ flex: 1 }}>
-          <div style={{ marginBottom: '4px' }}>
-            <Text strong style={{ fontSize: '14px' }}>
-              {content.title}
-            </Text>
+    <Card key={content.id} className="p-4 hover:shadow-sm transition-all">
+      <div className="flex items-start gap-2">
+        <Badge variant="outline" className="text-xs mt-0.5">
+          {index + 1}
+        </Badge>
+        <div className="flex-1 space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h4 className="text-sm font-medium leading-tight">{content.title}</h4>
             {content.featured && (
-              <Tag color="red" style={{ marginLeft: '8px' }}>
-                精选
-              </Tag>
+              <Badge variant="destructive" className="flex items-center gap-1 text-xs">
+                <Star className="h-3 w-3" />精选
+              </Badge>
             )}
           </div>
-          
+
           {content.description && (
-            <Paragraph
-              style={{ 
-                margin: '4px 0', 
-                fontSize: '12px', 
-                color: '#666',
-                lineHeight: '1.4'
-              }}
-            >
+            <p className="text-xs text-muted-foreground leading-relaxed">
               {content.description}
-            </Paragraph>
+            </p>
           )}
 
-          <div style={{ marginTop: '8px' }}>
-            <Space size="small" wrap>
-              {content.source && (
-                <Tag
-                  color="blue"
-                  icon={<LinkOutlined />}
-                >
-                  {content.source}
-                </Tag>
-              )}
-              {content.tags.slice(0, 3).map(tag => (
-                <Tag key={tag.id} color="default">
-                  {tag.name}
-                </Tag>
-              ))}
-            </Space>
+          <div className="flex items-center flex-wrap gap-1">
+            {content.source && (
+              <Badge variant="default" className="flex items-center gap-1 text-xs">
+                <Link2 className="h-3 w-3" />
+                {content.source}
+              </Badge>
+            )}
+            {content.tags.slice(0, 3).map((tag) => (
+              <Badge key={tag.id} variant="secondary" className="text-xs">
+                {tag.name}
+              </Badge>
+            ))}
+            {content.tags.length > 3 && (
+              <Badge variant="secondary" className="text-xs">
+                +{content.tags.length - 3}
+              </Badge>
+            )}
           </div>
 
           {content.source_url && (
-            <div style={{ marginTop: '4px' }}>
+            <div>
               <a
                 href={content.source_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ fontSize: '11px', color: '#1890ff' }}
+                className="text-xs text-primary hover:underline"
               >
                 查看原文 →
               </a>
@@ -148,66 +172,55 @@ const WeeklyPreview: React.FC<WeeklyPreviewProps> = ({ issueId, contents }) => {
           )}
         </div>
       </div>
-    </div>
+    </Card>
   );
 
   return (
-    <div style={{ padding: '16px', backgroundColor: '#fff' }}>
-      {/* 周刊头部 */}
-      <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-        <Title level={3} style={{ margin: '0 0 8px 0' }}>
-          {issue.title}
-        </Title>
-        <Text type="secondary" style={{ fontSize: '12px' }}>
-          第 {issue.issue_number} 期 • {issue.start_date} 至 {issue.end_date}
-        </Text>
-        {issue.description && (
-          <Paragraph style={{ marginTop: '8px', fontSize: '13px', color: '#666' }}>
-            {issue.description}
-          </Paragraph>
-        )}
-      </div>
-
-      <Divider />
-
-      {/* 内容统计 */}
-      <div style={{ marginBottom: '16px', textAlign: 'center' }}>
-        <Space size="large">
-          <Text type="secondary" style={{ fontSize: '12px' }}>
-            共 {contents.length} 篇内容
-          </Text>
-          <Text type="secondary" style={{ fontSize: '12px' }}>
-            {Object.keys(groupedContents).length} 个分类
-          </Text>
-        </Space>
-      </div>
-
-      <Divider />
-
-      {/* 分组内容 */}
-      {Object.entries(groupedContents).map(([section, sectionContents]) => (
-        <div key={section} style={{ marginBottom: '24px' }}>
-          <Title level={5} style={{ 
-            margin: '0 0 12px 0', 
-            color: '#1890ff',
-            borderBottom: '1px solid #f0f0f0',
-            paddingBottom: '4px'
-          }}>
-            {section} ({sectionContents.length})
-          </Title>
-          
-          {sectionContents.map((content, index) => renderContentItem(content, index))}
+    <ScrollArea className="h-full">
+      <div className="p-4 space-y-4">
+        <div className="text-center space-y-2">
+          <h3 className="text-xl font-bold">{issue.title}</h3>
+          <p className="text-sm text-muted-foreground">
+            第 {issue.issue_number} 期 • {issue.start_date} 至 {issue.end_date}
+          </p>
+          {issue.description && (
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {issue.description}
+            </p>
+          )}
         </div>
-      ))}
 
-      {/* 底部信息 */}
-      <Divider />
-      <div style={{ textAlign: 'center', marginTop: '16px' }}>
-        <Text type="secondary" style={{ fontSize: '11px' }}>
+        <Separator />
+
+        <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
+          <div>共 {contents.length} 篇内容</div>
+          <div>{Object.keys(groupedContents).length} 个分类</div>
+        </div>
+
+        <Separator />
+
+        <div className="space-y-6">
+          {Object.entries(groupedContents).map(([section, sectionContents]) => (
+            <div key={section} className="space-y-3">
+              <div className="flex items-center gap-2">
+                <h4 className="text-base font-semibold text-primary">{section}</h4>
+                <Badge variant="secondary" className="text-xs">
+                  {sectionContents.length}
+                </Badge>
+              </div>
+              <div className="space-y-2">
+                {sectionContents.map((content, index) => renderContentItem(content, index))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <Separator />
+        <div className="text-center text-xs text-muted-foreground">
           生成时间：{new Date().toLocaleString()}
-        </Text>
+        </div>
       </div>
-    </div>
+    </ScrollArea>
   );
 };
 

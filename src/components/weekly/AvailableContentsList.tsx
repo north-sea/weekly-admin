@@ -1,12 +1,18 @@
 'use client';
 
 import React from 'react';
-import { List, Button, Tag, Typography, Space, Empty, Spin, Collapse, Badge } from 'antd';
-import { PlusOutlined, LinkOutlined, DragOutlined } from '@ant-design/icons';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Card } from '@/components/ui/card';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { Plus, GripVertical, Link2, ChevronDown, ChevronRight } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
-
-const { Text, Paragraph } = Typography;
-const { Panel } = Collapse;
+import { cn } from '@/lib/utils';
 
 interface Content {
   id: number;
@@ -34,6 +40,114 @@ interface AvailableContentsListProps {
   selectedContentIds: number[];
 }
 
+// 可拖拽内容项组件
+const DraggableItem: React.FC<{ content: Content; isSelected: boolean; onAddContent: (content: Content) => void }> = ({ 
+  content, 
+  isSelected,
+  onAddContent 
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    isDragging,
+  } = useDraggable({
+    id: `available-${content.id}`,
+    data: { content },
+    disabled: isSelected,
+  });
+
+  const style = transform ? {
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+  } : {};
+
+  return (
+    <Card
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'mb-2 p-3 transition-all',
+        isDragging && 'opacity-50 cursor-grabbing',
+        isSelected ? 'bg-green-50 border-green-200' : 'hover:shadow-md',
+        !isSelected && 'cursor-default'
+      )}
+    >
+      <div className="flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <h4 className="text-sm font-medium leading-tight line-clamp-2">
+              {content.title}
+            </h4>
+          </div>
+
+          {content.source && (
+            <div className="flex items-center gap-1 mb-2">
+              <Link2 className="h-3 w-3 text-blue-500" />
+              <span className="text-xs text-blue-600">{content.source}</span>
+            </div>
+          )}
+
+          {content.description && (
+            <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+              {content.description}
+            </p>
+          )}
+
+          <div className="flex items-center flex-wrap gap-1 mb-2">
+            {content.category && (
+              <Badge variant="outline" className="text-xs">
+                {content.category.name}
+              </Badge>
+            )}
+            {content.tags.slice(0, 2).map((tag) => (
+              <Badge key={tag.id} variant="secondary" className="text-xs">
+                {tag.name}
+              </Badge>
+            ))}
+            {content.tags.length > 2 && (
+              <Badge variant="secondary" className="text-xs">
+                +{content.tags.length - 2}
+              </Badge>
+            )}
+          </div>
+
+          <div className="text-xs text-muted-foreground">
+            {new Date(content.created_at).toLocaleDateString()}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <Button
+            {...attributes}
+            {...listeners}
+            size="sm"
+            variant="ghost"
+            className={cn(
+              'h-7 w-7 p-0',
+              isSelected ? 'cursor-not-allowed' : 'cursor-grab active:cursor-grabbing'
+            )}
+            disabled={isSelected}
+            title="拖拽添加"
+          >
+            <GripVertical className="h-4 w-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant={isSelected ? 'secondary' : 'default'}
+            className="h-7 w-7 p-0"
+            onClick={() => onAddContent(content)}
+            disabled={isSelected}
+            title={isSelected ? '已添加' : '添加'}
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+};
+
 const AvailableContentsList: React.FC<AvailableContentsListProps> = ({
   contents,
   groupedContents,
@@ -41,172 +155,103 @@ const AvailableContentsList: React.FC<AvailableContentsListProps> = ({
   onAddContent,
   selectedContentIds,
 }) => {
+  const [openSections, setOpenSections] = React.useState<Set<string>>(
+    new Set(Object.keys(groupedContents))
+  );
+
+  const toggleSection = (section: string) => {
+    setOpenSections((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(section)) {
+        newSet.delete(section);
+      } else {
+        newSet.add(section);
+      }
+      return newSet;
+    });
+  };
+
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: '20px' }}>
-        <Spin size="large" />
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+          <p className="text-sm text-muted-foreground">加载中...</p>
+        </div>
       </div>
     );
   }
 
   if (contents.length === 0) {
     return (
-      <Empty
-        description="暂无可用内容"
-        style={{ marginTop: '20px' }}
-      />
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <p className="text-sm text-muted-foreground">暂无可用内容</p>
+        </div>
+      </div>
     );
   }
 
-  // 可拖拽项组件
-  const DraggableItem: React.FC<{ content: Content }> = ({ content }) => {
-    const isSelected = selectedContentIds.includes(content.id);
-    
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      isDragging,
-    } = useDraggable({
-      id: `available-${content.id}`,
-      data: { content },
-      disabled: isSelected,
-    });
-
-    const style = transform ? {
-      transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-      opacity: isDragging ? 0.5 : 1,
-      zIndex: isDragging ? 1000 : 1,
-    } : {};
-
-    return (
-      <div ref={setNodeRef} style={style}>
-        <List.Item
-          style={{
-            padding: '12px',
-            border: '1px solid #f0f0f0',
-            borderRadius: '6px',
-            marginBottom: '8px',
-            backgroundColor: isSelected ? '#f6ffed' : '#fff',
-            cursor: isDragging ? 'grabbing' : 'default',
-          }}
-          actions={[
-            <Space key="actions" size="small">
-              <Button
-                {...attributes}
-                {...listeners}
-                size="small"
-                icon={<DragOutlined />}
-                disabled={isSelected}
-                title="拖拽添加"
-                style={{ cursor: isSelected ? 'not-allowed' : 'grab' }}
-              />
-              <Button
-                type="primary"
-                size="small"
-                icon={<PlusOutlined />}
-                onClick={() => onAddContent(content)}
-                disabled={isSelected}
-              >
-                {isSelected ? '已添加' : '添加'}
-              </Button>
-            </Space>,
-          ]}
-        >
-        <List.Item.Meta
-          title={
-            <div>
-              <Text strong style={{ fontSize: '14px' }}>
-                {content.title}
-              </Text>
-              {content.source && (
-                <Tag
-                  color="blue"
-                  style={{ marginLeft: '8px' }}
-                  icon={<LinkOutlined />}
-                >
-                  {content.source}
-                </Tag>
-              )}
-            </div>
-          }
-          description={
-            <div>
-              {content.description && (
-                <Paragraph
-                  ellipsis={{ rows: 2 }}
-                  style={{ margin: '4px 0', fontSize: '12px', color: '#666' }}
-                >
-                  {content.description}
-                </Paragraph>
-              )}
-              
-              <Space wrap style={{ marginTop: '4px' }}>
-                {content.category && (
-                  <Tag color="green">
-                    {content.category.name}
-                  </Tag>
-                )}
-                {content.tags.slice(0, 3).map(tag => (
-                  <Tag key={tag.id}>
-                    {tag.name}
-                  </Tag>
-                ))}
-                {content.tags.length > 3 && (
-                  <Tag>+{content.tags.length - 3}</Tag>
-                )}
-              </Space>
-              
-              <div style={{ marginTop: '4px', fontSize: '11px', color: '#999' }}>
-                {new Date(content.created_at).toLocaleDateString()}
-              </div>
-            </div>
-          }
-        />
-      </List.Item>
-    </div>
-  );
-};
-
-const renderContentItem = (content: Content) => (
-  <DraggableItem key={content.id} content={content} />
-);
-
   // 按分类分组显示
-  const categoryPanels = Object.entries(groupedContents).map(([categoryName, categoryContents]) => (
-    <Panel
-      key={categoryName}
-      header={
-        <Badge count={categoryContents.length} size="small">
-          <span>{categoryName}</span>
-        </Badge>
-      }
-    >
-      <div>
-        {categoryContents.map(renderContentItem)}
-      </div>
-    </Panel>
-  ));
+  if (Object.keys(groupedContents).length > 0) {
+    return (
+      <ScrollArea className="h-full">
+        <div className="space-y-2">
+          {Object.entries(groupedContents).map(([categoryName, categoryContents]) => {
+            const isOpen = openSections.has(categoryName);
+            return (
+              <Collapsible
+                key={categoryName}
+                open={isOpen}
+                onOpenChange={() => toggleSection(categoryName)}
+              >
+                <CollapsibleTrigger className="flex items-center justify-between w-full p-2 hover:bg-accent rounded-md">
+                  <div className="flex items-center gap-2">
+                    {isOpen ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" />
+                    )}
+                    <span className="text-sm font-medium">{categoryName}</span>
+                  </div>
+                  <Badge variant="secondary" className="text-xs">
+                    {categoryContents.length}
+                  </Badge>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-2">
+                  <div className="space-y-2">
+                    {categoryContents.map((content) => (
+                      <DraggableItem
+                        key={content.id}
+                        content={content}
+                        isSelected={selectedContentIds.includes(content.id)}
+                        onAddContent={onAddContent}
+                      />
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            );
+          })}
+        </div>
+      </ScrollArea>
+    );
+  }
 
+  // 简单列表显示
   return (
-    <div>
-      {Object.keys(groupedContents).length > 0 ? (
-        <Collapse
-          defaultActiveKey={Object.keys(groupedContents)}
-          size="small"
-          ghost
-        >
-          {categoryPanels}
-        </Collapse>
-      ) : (
-        <List
-          dataSource={contents}
-          renderItem={renderContentItem}
-          size="small"
-        />
-      )}
-    </div>
+    <ScrollArea className="h-full">
+      <div className="space-y-2">
+        {contents.map((content) => (
+          <DraggableItem
+            key={content.id}
+            content={content}
+            isSelected={selectedContentIds.includes(content.id)}
+            onAddContent={onAddContent}
+          />
+        ))}
+      </div>
+    </ScrollArea>
   );
 };
 
