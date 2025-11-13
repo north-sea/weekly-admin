@@ -10,7 +10,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
@@ -28,12 +27,16 @@ import {
   Image as ImageIcon,
   List,
   ListOrdered,
-  Heading2
+  Heading2,
+  FileText,
+  Braces,
+  RefreshCw
 } from 'lucide-react';
 import { ContentWithRelations } from '@/lib/services/content-api';
-import { ContentFormatAdapter } from '@/lib/utils/format-adapter';
+import { ContentFormatAdapter, ContentFormat } from '@/lib/utils/format-adapter';
 import MDEditor from '@uiw/react-md-editor';
 import MarkdownPreview from './MarkdownPreview';
+import StructuredPreview from './StructuredPreview';
 import { debounce } from 'lodash-es';
 
 // 表单验证 schema
@@ -58,6 +61,7 @@ const contentSchema = z.object({
 });
 
 type ContentFormData = z.infer<typeof contentSchema>;
+type EditMode = 'markdown' | 'structured';
 
 interface SimplifiedEditorProps {
   initialValues?: Partial<ContentWithRelations>;
@@ -77,10 +81,16 @@ export default function SimplifiedEditor({
   tags = [],
 }: SimplifiedEditorProps) {
   const { toast } = useToast();
-  const [currentView, setCurrentView] = useState<'edit' | 'preview'>('edit');
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
+  
+  // 编辑模式：自动检测初始格式
+  const [editMode, setEditMode] = useState<EditMode>(() => {
+    const initialContent = initialValues?.content || '';
+    const detectedFormat = ContentFormatAdapter.detectFormat(initialContent);
+    return detectedFormat === 'markdown' ? 'markdown' : 'structured';
+  });
   
   const {
     control,
@@ -127,7 +137,6 @@ export default function SimplifiedEditor({
             description: `最后保存时间: ${new Date().toLocaleTimeString()}`,
           });
         } catch (error) {
-          // 静默失败，不打扰用户
           console.error('Auto-save failed:', error);
         } finally {
           setIsAutoSaving(false);
@@ -183,6 +192,32 @@ export default function SimplifiedEditor({
     setHasUnsavedChanges(true);
   };
 
+  // 切换编辑模式
+  const handleToggleEditMode = () => {
+    const newMode: EditMode = editMode === 'markdown' ? 'structured' : 'markdown';
+    
+    toast({
+      title: "切换编辑模式",
+      description: `已切换到${newMode === 'markdown' ? 'Markdown' : '结构化'}模式`,
+    });
+    
+    setEditMode(newMode);
+  };
+
+  // 自动检测并建议切换模式
+  useEffect(() => {
+    if (currentContent) {
+      const detectedFormat = ContentFormatAdapter.detectFormat(currentContent);
+      const suggestedMode: EditMode = detectedFormat === 'markdown' ? 'markdown' : 'structured';
+      
+      // 如果检测到的格式与当前模式不一致，可以提示用户（可选）
+      if (suggestedMode !== editMode && currentContent.length > 50) {
+        // 静默处理，不打扰用户
+        // 用户可以手动切换
+      }
+    }
+  }, [currentContent, editMode]);
+
   return (
     <div className="h-full flex flex-col">
       {/* 顶部工具栏 */}
@@ -198,6 +233,36 @@ export default function SimplifiedEditor({
               返回
             </Button>
             <Separator orientation="vertical" className="h-6" />
+            
+            {/* 编辑模式切换 */}
+            <div className="flex items-center gap-2">
+              <Label className="text-sm text-muted-foreground">编辑模式:</Label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleToggleEditMode}
+                className="gap-2"
+              >
+                {editMode === 'markdown' ? (
+                  <>
+                    <FileText className="h-4 w-4" />
+                    Markdown
+                  </>
+                ) : (
+                  <>
+                    <Braces className="h-4 w-4" />
+                    结构化
+                  </>
+                )}
+                <RefreshCw className="h-3 w-3" />
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {editMode === 'markdown' ? '适合长文和旧内容' : '适合新版周刊'}
+              </span>
+            </div>
+            
+            <Separator orientation="vertical" className="h-6" />
+            
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               {isAutoSaving && (
                 <>
@@ -248,7 +313,7 @@ export default function SimplifiedEditor({
         </div>
       </div>
 
-      {/* 主内容区 */}
+      {/* 主内容区 - 左右分屏 */}
       <div className="flex-1 overflow-hidden">
         <div className="h-full flex gap-6 p-6">
           {/* 左侧编辑区 - 占 60% */}
@@ -379,17 +444,17 @@ export default function SimplifiedEditor({
               </CardContent>
             </Card>
 
-            {/* 内容编辑器 - Blog 使用 Markdown，Weekly 使用结构化输入 */}
+            {/* 内容编辑器 - 根据编辑模式显示不同界面 */}
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle>内容编辑</CardTitle>
                     <CardDescription>
-                      {contentTypeId === 4 ? '支持 Markdown 语法' : '结构化内容输入'}
+                      {editMode === 'markdown' ? '支持 Markdown 语法' : '结构化内容输入'}
                     </CardDescription>
                   </div>
-                  {contentTypeId === 4 && (
+                  {editMode === 'markdown' && (
                     <div className="flex items-center gap-1">
                       <Button
                         variant="ghost"
@@ -460,8 +525,8 @@ export default function SimplifiedEditor({
                 </div>
               </CardHeader>
               <CardContent>
-                {contentTypeId === 4 ? (
-                  // Blog: Markdown 编辑器
+                {editMode === 'markdown' ? (
+                  // Markdown 编辑器
                   <>
                     <Controller
                       name="content"
@@ -475,7 +540,9 @@ export default function SimplifiedEditor({
                           data-color-mode="light"
                           hideToolbar
                           textareaProps={{
-                            placeholder: '请输入内容正文（支持 Markdown 语法）',
+                            placeholder: contentTypeId === 4 
+                              ? '请输入 Blog 内容（支持 Markdown 语法）' 
+                              : '请输入 Weekly 内容（旧版 Markdown 格式）',
                             style: { 
                               fontSize: '14px', 
                               lineHeight: '1.6',
@@ -489,10 +556,10 @@ export default function SimplifiedEditor({
                     )}
                   </>
                 ) : (
-                  // Weekly: 结构化输入
+                  // 结构化输入
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="content">内容摘要 *</Label>
+                      <Label htmlFor="content">内容 *</Label>
                       <Controller
                         name="content"
                         control={control}
@@ -500,8 +567,12 @@ export default function SimplifiedEditor({
                           <Textarea
                             {...field}
                             id="content"
-                            placeholder="请输入周刊内容的摘要或关键点（可使用简单 Markdown 格式）"
-                            rows={8}
+                            placeholder={
+                              contentTypeId === 3
+                                ? '请输入周刊内容的摘要或关键点（200-500字）\n\n可使用简单格式：\n- 列表项\n**重点**\n[链接](URL)'
+                                : '请输入内容摘要'
+                            }
+                            rows={12}
                             className="font-mono text-sm"
                           />
                         )}
@@ -510,7 +581,7 @@ export default function SimplifiedEditor({
                         <p className="text-sm text-destructive">{errors.content.message}</p>
                       )}
                       <p className="text-xs text-muted-foreground">
-                        💡 提示：Weekly 内容使用结构化存储，建议简洁描述核心内容和亮点
+                        💡 提示：结构化模式适合新版 Weekly，简洁描述核心内容和亮点
                       </p>
                     </div>
                   </div>
@@ -695,19 +766,40 @@ export default function SimplifiedEditor({
               </CardHeader>
               <CardContent className="flex-1 overflow-auto">
                 {currentContent ? (
-                  <MarkdownPreview
-                    content={{
-                      title: currentTitle || '未命名',
-                      content: currentContent,
-                      content_type: { 
-                        id: contentTypeId, 
-                        name: contentTypeId === 4 ? 'Blog' : 'Weekly' 
-                      },
-                      created_at: initialValues?.created_at || new Date().toISOString(),
-                    }}
-                    mode="desktop"
-                    showMeta={false}
-                  />
+                  contentTypeId === 3 ? (
+                    // Weekly 预览 - 使用 StructuredPreview
+                    <StructuredPreview
+                      data={{
+                        title: currentTitle || '未命名',
+                        url: watch('source_url') || '#',
+                        image_url: watch('cover_image'),
+                        summary: currentContent,
+                        description: watch('recommendation_reason'),
+                        source: watch('source') || '未知来源',
+                        source_url: watch('source_url') || '#',
+                        tags: [],
+                        created_at: initialValues?.created_at || new Date().toISOString(),
+                        content: currentContent,
+                      }}
+                      mode="desktop"
+                      showMeta={true}
+                    />
+                  ) : (
+                    // Blog 预览 - 使用 MarkdownPreview
+                    <MarkdownPreview
+                      content={{
+                        title: currentTitle || '未命名',
+                        content: currentContent,
+                        content_type: { 
+                          id: contentTypeId, 
+                          name: 'Blog' 
+                        },
+                        created_at: initialValues?.created_at || new Date().toISOString(),
+                      }}
+                      mode="desktop"
+                      showMeta={false}
+                    />
+                  )
                 ) : (
                   <div className="flex items-center justify-center h-full text-muted-foreground">
                     <p>开始编辑以查看预览</p>
