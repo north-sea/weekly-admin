@@ -1,322 +1,364 @@
 # 设计决策记录 (Architecture Decision Records)
 
-本文档记录 Weekly 系统重构过程中的重要技术和产品决策。
+**版本**: v1.0  
+**最后更新**: 2025年1月  
 
 ---
 
-## ADR-001: 内容编辑器支持格式自动检测与手动切换
+## 概述
 
-**日期**: 2025-01  
-**状态**: ✅ 已实施（已更新）  
-**决策者**: AI Agent  
-
-### 背景
-
-系统支持两种内容类型：
-1. **Blog** - 长文博客，使用 Markdown 格式
-2. **Weekly** - 周刊推荐，经历了格式演进：
-   - 早期：Markdown 文件
-   - 中期：数据库存储，content 字段为 Markdown 字符串（旧版 Weekly）
-   - 现在：完全结构化数据（新版 Weekly）
-
-### 问题发现
-
-初始实现过于简化，未考虑到：
-1. **历史数据兼容性**：旧版 Weekly 和 Blog 都在数据库中以 Markdown 字符串存储
-2. **格式混合**：同一内容类型可能包含新旧两种格式
-3. **编辑灵活性**：用户需要能够手动切换编辑模式来适配不同格式
-4. **预览统一性**：无论新旧格式，Weekly 的预览样式应该保持一致的卡片风格
-
-### 决策
-
-**根据内容类型显示不同的编辑界面：**
-
-#### Blog (content_type_id = 4)
-- ✅ 使用 **Markdown 编辑器** (`@uiw/react-md-editor`)
-- ✅ 提供完整的 Markdown 工具栏（加粗、斜体、代码、链接、图片、列表等）
-- ✅ 支持实时预览
-- ✅ 适合长文自由创作
-
-#### Weekly (content_type_id = 3)
-- ✅ 使用 **结构化表单输入**（Textarea）
-- ✅ 简洁的文本输入框，专注于核心内容描述
-- ✅ 内容字段用于存储摘要或关键点（可使用简单 Markdown）
-- ✅ 配合 Weekly 专用字段（来源、来源链接、推荐理由）形成完整的推荐卡片
-
-### 实现
-
-```typescript
-// simplified-editor.tsx
-{contentTypeId === 4 ? (
-  // Blog: Markdown 编辑器
-  <MDEditor
-    value={field.value}
-    onChange={(val) => field.onChange(val || '')}
-    preview="edit"
-    height={500}
-  />
-) : (
-  // Weekly: 结构化输入
-  <Textarea
-    placeholder="请输入周刊内容的摘要或关键点"
-    rows={8}
-  />
-)}
-```
-
-### 优势
-
-1. **更符合数据模型**
-   - Blog 存储自由格式的 Markdown
-   - Weekly 存储结构化字段
-
-2. **更好的用户体验**
-   - Blog 编辑者获得强大的 Markdown 编辑能力
-   - Weekly 编辑者获得简洁直观的表单界面
-
-3. **数据一致性**
-   - 避免 Weekly 内容格式混乱
-   - 便于后续渲染和展示
-
-4. **可扩展性**
-   - 未来可以为 Weekly 添加更多结构化字段
-   - 可以轻松支持其他内容类型
-
-### 权衡
-
-- **增加了代码复杂度**：需要根据类型渲染不同组件
-- **解决方案**：使用条件渲染，保持代码清晰
-
-### 相关代码
-
-- `src/components/content/simplified-editor.tsx` - 编辑器实现
-- `src/lib/utils/format-adapter.ts` - 格式适配器（兼容老数据）
-
-### 未来考虑
-
-1. 如果 Weekly 需要更丰富的格式，可以考虑：
-   - 富文本编辑器（如 Tiptap）
-   - 块编辑器（如 Editor.js）
-   - 保持简洁的 Markdown 子集
-
-2. 可以为 Weekly 添加更多结构化字段：
-   - 标签（自动提取或手动添加）
-   - 重要程度评分
-   - 目标受众
-   - 等等
+本文档记录了 Weekly 系统重构过程中的关键设计决策，包括决策背景、考虑的方案、最终选择以及理由。
 
 ---
 
-## ADR-002: 操作日志 resource_id 使用 String 类型
+## ADR-001: 内容编辑器的格式检测与手动切换
 
 **日期**: 2025-01  
 **状态**: ✅ 已实施  
-**决策者**: AI Agent  
+**决策者**: 开发团队  
 
 ### 背景
 
-原有的 `operation_logs.resource_id` 字段使用 `Int?` 类型，导致无法记录 BigInt 类型的 content_id。
+Weekly 内容格式经历了三个演化阶段：
+1. **早期**: 周刊内容存储为 Markdown 文件
+2. **中期**: 博客和周刊都存储在数据库中，`content` 字段为 Markdown 字符串
+3. **当前**: 新版周刊使用结构化数据（JSON），但旧内容仍为 Markdown
 
-### 决策
+这导致编辑器需要同时支持两种格式，如何提供良好的编辑体验成为关键问题。
 
-将 `resource_id` 改为 `String? @db.VarChar(50)`，支持：
-- 数字 ID
-- BigInt ID
-- UUID
-- 其他自定义 ID 格式
+### 考虑的方案
 
-### 优势
+#### 方案 A: 强制迁移所有旧内容到新格式
+**优点**:
+- 统一数据格式
+- 简化代码逻辑
+- 避免格式检测开销
 
-- 灵活性高，支持各种 ID 类型
-- 向后兼容（数字可转为字符串）
-- 便于未来扩展
+**缺点**:
+- 需要批量数据迁移，风险高
+- Markdown 转 JSON 可能丢失信息
+- 无法回退到旧格式
+- 迁移失败影响线上服务
 
-### 实现
+#### 方案 B: 自动检测格式，无法手动切换
+**优点**:
+- 对用户透明
+- 自动化程度高
 
-```prisma
-model operation_logs {
-  resource_id String? @db.VarChar(50)
-  @@index([resource_id])
-}
-```
+**缺点**:
+- 用户无法选择偏好的编辑模式
+- 格式检测可能出错
+- 缺乏灵活性
 
----
+#### 方案 C: 自动检测 + 手动切换（最终选择）
+**优点**:
+- 兼容新老数据
+- 用户可自主选择编辑模式
+- 支持渐进式迁移
+- 灵活性强
 
-## ADR-003: UI 库从 Ant Design 迁移到 shadcn/ui
+**缺点**:
+- 需要同时维护两套编辑器UI
+- 格式切换逻辑稍复杂
 
-**日期**: 2025-01  
-**状态**: 🔵 进行中（阶段 1: 86% 完成）  
-**决策者**: AI Agent  
+### 最终决策
 
-### 背景
+**选择方案 C**: 自动检测 + 手动切换
 
-原系统使用 Ant Design Pro 作为主要 UI 库，但存在以下问题：
-- 定制性较差
-- 打包体积大
-- 与 claude theme 风格不匹配
+#### 实现细节
 
-### 决策
+1. **初始化时自动检测**:
+   ```typescript
+   const [editMode, setEditMode] = useState<EditMode>(() => {
+     const initialContent = initialValues?.content || '';
+     const detectedFormat = ContentFormatAdapter.detectFormat(initialContent);
+     return detectedFormat === 'markdown' ? 'markdown' : 'structured';
+   });
+   ```
 
-迁移到 shadcn/ui + claude theme
+2. **提供手动切换按钮**:
+   - 工具栏中显示当前模式
+   - 点击可切换 Markdown ⇄ 结构化模式
+   - 提示文案帮助用户理解两种模式的差异
 
-### 优势
+3. **编辑模式差异**:
+   - **Markdown 模式**: 使用 `@uiw/react-md-editor`，适合长文和旧内容
+   - **结构化模式**: 使用简单 Textarea，适合新版周刊的简洁内容
 
-1. **完全可定制**：基于 Radix UI 原语
-2. **按需引入**：只打包使用的组件
-3. **主题统一**：完美支持 claude theme
-4. **可访问性好**：Radix UI 内置 WAI-ARIA
-5. **现代化**：符合最新设计趋势
+4. **预览保持一致**:
+   - Blog: 始终使用 MarkdownPreview（完整渲染）
+   - Weekly: 始终使用 StructuredPreview（卡片式），不论编辑模式
 
-### 迁移策略
+### 好处
 
-**渐进式迁移**，不影响现有功能：
-1. 新页面使用 shadcn/ui
-2. 旧页面逐步迁移
-3. 共存阶段保持两套 UI 库
+1. **向后兼容**: 旧内容可以继续用 Markdown 编辑
+2. **灵活性**: 用户可根据需求选择合适的编辑模式
+3. **渐进式迁移**: 不强制迁移，新内容可以使用新格式
+4. **降低风险**: 避免批量数据迁移的风险
+5. **用户体验**: 编辑器自动识别格式，减少用户困惑
 
-### 已完成迁移
+### 相关文件
 
-- ✅ 登录页
-- ✅ 内容编辑页
-
-### 待迁移
-
-- [ ] 内容预览页
-- [ ] 草稿管理页
-- [ ] 周刊编辑页
-- [ ] 仪表板
-- [ ] 分析页面
-- [ ] 设置页面
-
----
-
-## ADR-004: 表单管理使用 react-hook-form + zod
-
-**日期**: 2025-01  
-**状态**: ✅ 已实施  
-**决策者**: AI Agent  
-
-### 背景
-
-原系统使用 Ant Design Form 管理表单，与 UI 库强绑定。
-
-### 决策
-
-使用 `react-hook-form` + `zod` 进行表单管理和验证
-
-### 优势
-
-1. **类型安全**：zod 提供运行时类型验证
-2. **性能好**：减少不必要的重新渲染
-3. **框架无关**：不依赖特定 UI 库
-4. **开发体验好**：自动类型推导
-
-### 示例
-
-```typescript
-const schema = z.object({
-  title: z.string().min(1, '标题不能为空'),
-  content: z.string().min(1, '内容不能为空'),
-});
-
-const { control, handleSubmit } = useForm({
-  resolver: zodResolver(schema),
-});
-```
+- `src/components/content/simplified-editor.tsx`
+- `src/lib/utils/format-adapter.ts`
+- `src/app/(dashboard)/content/[id]/page.tsx`
 
 ---
 
-## ADR-005: ContentFormatAdapter 处理新老数据格式
+## ADR-002: 内容预览组件的统一渲染逻辑
 
 **日期**: 2025-01  
 **状态**: ✅ 已实施  
-**决策者**: AI Agent  
+**决策者**: 开发团队  
 
 ### 背景
 
-系统数据格式演进：
-- 老格式：Markdown 字符串
-- 新格式：JSON 结构化数据
+系统中存在多个预览组件：
+- `MarkdownPreview.tsx` - 使用 Ant Design 组件，渲染 Markdown
+- `StructuredPreview.tsx` - 使用 Ant Design 组件，渲染结构化数据
+- 预览逻辑分散在不同页面中，难以维护
 
-需要同时支持两种格式。
+在 shadcn/ui 迁移过程中，需要重新设计预览组件。
 
-### 决策
+### 考虑的方案
 
-创建 `ContentFormatAdapter` 适配器类，提供统一的检测、转换和渲染接口。
+#### 方案 A: 保留两个独立组件
+**优点**:
+- 保持现有逻辑
+- 改动最小
 
-### 优势
+**缺点**:
+- 组件重复
+- 维护成本高
+- 使用时需要判断用哪个组件
 
-1. **向后兼容**：老数据无需迁移即可使用
-2. **渐进式**：可以逐步转换为新格式
-3. **降低风险**：不需要一次性数据迁移
-4. **易于回退**：出问题可以快速恢复
+#### 方案 B: 创建统一的 ContentPreview 组件（最终选择）
+**优点**:
+- 单一入口，易于维护
+- 自动检测格式并选择渲染方式
+- 统一样式和交互
+- 符合 DRY 原则
 
-### 核心方法
+**缺点**:
+- 组件内部逻辑稍复杂
+
+### 最终决策
+
+**选择方案 B**: 创建统一的 `ContentPreview` 组件
+
+#### 实现特点
+
+1. **自动格式检测**:
+   ```typescript
+   const detectedFormat = useMemo(() => {
+     return ContentFormatAdapter.detectFormat(content.content);
+   }, [content.content]);
+   ```
+
+2. **根据内容类型和格式选择渲染器**:
+   - Blog (content_type.id === 4): 使用 `renderBlogPreview()`
+   - Weekly + JSON 格式: 使用 `renderWeeklyStructuredPreview()`
+   - Weekly + Markdown 格式: 使用 `renderWeeklyMarkdownPreview()`
+
+3. **使用 shadcn/ui 组件**:
+   - 移除 Ant Design 依赖
+   - 使用 Badge, Card, Separator 等 shadcn 组件
+   - 使用 Lucide React 图标
+
+4. **支持多种预览模式**:
+   - `mode: 'desktop' | 'mobile'` - 响应式预览
+   - `showMeta: boolean` - 控制是否显示元信息
+   - 通过 CSS 调整移动端样式
+
+5. **优化排版**:
+   - 自定义 ReactMarkdown 渲染组件
+   - 优化标题、段落、列表、代码块样式
+   - 支持语法高亮（rehype-highlight）
+   - 图片自适应和懒加载
+
+### 好处
+
+1. **统一接口**: 一个组件适配所有场景
+2. **自动化**: 无需手动判断格式
+3. **可维护性**: 样式和逻辑集中管理
+4. **现代化**: 使用 shadcn/ui，符合新设计系统
+5. **性能优化**: 使用 useMemo 缓存计算结果
+
+### 使用示例
 
 ```typescript
-class ContentFormatAdapter {
-  static detectFormat(content: string): ContentFormat;
-  static toStructured(content: string): StructuredContent;
-  static toMarkdown(structured: StructuredContent): string;
-  static extractMetadata(content: string): ContentMetadata;
-}
+<ContentPreview
+  content={content}
+  mode="desktop"
+  showMeta={true}
+/>
 ```
 
-### 使用场景
+### 相关文件
 
-- 编辑器：根据格式选择不同的编辑方式
-- 预览：统一渲染新老格式
-- 导出：转换为所需格式
+- `src/components/content/content-preview.tsx`
+- `src/app/(dashboard)/content/preview/[id]/page.tsx`
+- `src/lib/utils/format-adapter.ts`
 
 ---
 
-## 模板
+## ADR-003: 内容预览页面的工具栏设计
 
-复制以下模板记录新的决策：
-
-```markdown
-## ADR-XXX: 决策标题
-
-**日期**: YYYY-MM  
-**状态**: ⚪️ 提议 / 🔵 进行中 / ✅ 已实施 / ❌ 已废弃  
-**决策者**: 姓名  
+**日期**: 2025-01  
+**状态**: ✅ 已实施  
+**决策者**: 开发团队  
 
 ### 背景
 
-描述问题的背景和上下文。
+内容预览页面需要提供多种功能：
+- 返回编辑页
+- 分享链接
+- 打印
+- 导出 PDF
+- 切换预览模式（桌面/移动端）
 
-### 问题
+如何设计工具栏以提供良好的用户体验是关键。
 
-具体说明遇到的问题。
+### 设计决策
 
-### 决策
+#### 1. Sticky 工具栏
+- 固定在顶部 (`position: sticky`)
+- 始终可见，方便用户操作
+- 毛玻璃效果 (`backdrop-blur`)，现代感强
 
-描述做出的决策。
+#### 2. 响应式布局
+- 桌面端: 显示完整按钮文字
+- 移动端: 仅显示图标 (`hidden sm:inline`)
 
-### 优势
+#### 3. 预览模式切换
+- 使用圆角按钮组 (`rounded-lg` + `p-1`)
+- 视觉上突出当前选中模式
+- 图标: Monitor（桌面） / Smartphone（移动）
 
-列出这个决策的好处。
+#### 4. 打印优化
+- 工具栏添加 `print:hidden` 类
+- 打印时隐藏工具栏和装饰元素
+- 确保内容适合打印页面
+- 添加打印专用 CSS
 
-### 权衡
+### 实现细节
 
-列出这个决策的代价或限制。
+```tsx
+<div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b print:hidden">
+  <div className="container mx-auto px-4 py-3">
+    <div className="flex items-center justify-between">
+      {/* 左侧：返回按钮 */}
+      <Button variant="ghost" onClick={() => router.back()}>
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        返回
+      </Button>
 
-### 实现
+      {/* 右侧：功能按钮组 */}
+      <div className="flex items-center gap-2">
+        {/* 预览模式切换 */}
+        <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+          <Button variant={mode === 'desktop' ? 'default' : 'ghost'}>
+            <Monitor className="h-4 w-4" />
+          </Button>
+          <Button variant={mode === 'mobile' ? 'default' : 'ghost'}>
+            <Smartphone className="h-4 w-4" />
+          </Button>
+        </div>
 
-关键代码示例或实现细节。
-
-### 相关代码
-
-列出相关的文件和代码位置。
-
-### 未来考虑
-
-可能的改进方向或替代方案。
+        {/* 分享、打印、导出 */}
+        <Button onClick={handleShare}>分享</Button>
+        <Button onClick={handlePrint}>打印</Button>
+        <Button onClick={handleExportPDF}>导出 PDF</Button>
+      </div>
+    </div>
+  </div>
+</div>
 ```
+
+### 好处
+
+1. **易用性**: 功能触手可及
+2. **现代化**: 毛玻璃效果提升视觉体验
+3. **响应式**: 适配不同屏幕尺寸
+4. **打印友好**: 打印时自动隐藏工具栏
+
+### 相关文件
+
+- `src/app/(dashboard)/content/preview/[id]/page.tsx`
 
 ---
 
-> **维护说明**：
-> - 所有重要的技术决策都应记录在此文档
-> - 保持决策的可追溯性和透明性
-> - 便于新成员了解系统设计的演进过程
+## ADR-004: 使用 React Query Hooks 替代 Service 类
+
+**日期**: 2025-01  
+**状态**: ✅ 已实施  
+**决策者**: 开发团队  
+
+### 背景
+
+旧代码使用 Service 类（如 `ContentService`）直接调用 API，存在以下问题：
+- 缺乏缓存管理
+- 无法自动重新请求
+- 加载状态需要手动维护
+- 难以实现乐观更新
+
+### 最终决策
+
+**使用 React Query Hooks**: `useContentDetail`, `useUpdateContent` 等
+
+#### 优势
+
+1. **自动缓存**: 减少重复请求
+2. **状态管理**: 自动处理 loading, error, data
+3. **乐观更新**: 立即更新 UI，提升体验
+4. **失败重试**: 自动重试失败的请求
+5. **缓存失效**: 自动刷新过期数据
+
+#### 使用示例
+
+```typescript
+// 旧方式
+const [content, setContent] = useState(null);
+const [loading, setLoading] = useState(true);
+
+useEffect(() => {
+  ContentService.getContentById(id).then(setContent).finally(() => setLoading(false));
+}, [id]);
+
+// 新方式
+const { data: content, isLoading } = useContentDetail(id);
+```
+
+### 好处
+
+1. **代码量减少**: 无需手动管理状态
+2. **性能优化**: 智能缓存策略
+3. **用户体验**: 加载状态更流畅
+4. **可维护性**: 集中管理 API 调用
+
+### 相关文件
+
+- `src/hooks/queries/useContentQueries.ts`
+- `src/app/(dashboard)/content/preview/[id]/page.tsx`
+
+---
+
+## 附录
+
+### 文档更新流程
+
+1. 每次重大技术决策前，评估多个方案
+2. 记录决策背景、考虑的方案、最终选择和理由
+3. 在本文档中添加新的 ADR 条目
+4. 更新相关的技术文档和代码注释
+
+### 参考资料
+
+- [ADR (Architecture Decision Records) 最佳实践](https://adr.github.io/)
+- [React Query 最佳实践](https://tanstack.com/query/latest)
+- [shadcn/ui 设计系统](https://ui.shadcn.com/)
+
+---
+
+> **维护人**: 开发团队  
+> **最后更新**: 2025年1月
