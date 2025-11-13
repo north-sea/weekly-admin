@@ -10,7 +10,7 @@ const OperationLogQuerySchema = z.object({
   userId: z.coerce.number().int().positive().optional(),
   operationType: z.enum(['CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT']).optional(),
   resourceType: z.string().optional(),
-  resourceId: z.coerce.number().int().positive().optional(),
+  resourceId: z.string().optional(),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
   keyword: z.string().optional()

@@ -18,6 +18,7 @@
 
 | 完成日期 | 任务编号 | 任务名称 | 负责人 | 说明 |
 |-----------|----------|----------|--------|------|
+| 2025-01 | T1.7 | 优化内容预览页 (统一渲染逻辑) | AI Agent | 详见下方 |
 | 2025-01 | T1.4 | 修复操作日志 schema 和 service | AI Agent | 详见下方 |
 | 2025-01 | T1.5 | 创建内容格式适配器 (ContentFormatAdapter) | AI Agent | 详见下方 |
 | 2025-01 | DOC | 创建完整的 PRD 和任务文档 | AI Agent | 详见下方 |
@@ -25,6 +26,84 @@
 | 2025-01 | T1.3 | 迁移登录页到 shadcn/ui | AI Agent | 详见下方 |
 | 2025-01 | T1.6 | 优化内容编辑页 (shadcn/ui) | AI Agent | 详见下方 |
 | 2025-01 | T1.2 | 创建设计系统文档 | AI Agent | 已完成 |
+
+---
+
+### 2025-01 - 优化内容预览页 (T1.7)
+- **任务编号**: T1.7
+- **任务名称**: 优化内容预览页(统一渲染逻辑)
+- **负责人**: AI Agent
+- **完成说明**:
+  
+  #### 🎨 ContentPreview 组件
+  创建了统一的内容预览组件:
+  - **文件位置**: `src/components/content/content-preview.tsx` (517 行)
+  - **核心特性**:
+    - 使用 `ContentFormatAdapter` 自动检测内容格式(Markdown vs JSON)
+    - 支持 Blog 和 Weekly 两种内容类型的差异化渲染
+    - Blog 预览: 完整文章布局,包含标题、描述、作者信息、封面图、分类标签
+    - Weekly 预览: 结构化内容渲染或 Markdown 渲染,显示来源信息和推荐理由
+    - 响应式设计,支持桌面和移动端模式
+  - **Markdown 渲染**:
+    - 使用 `react-markdown` + `remark-gfm` + `rehype-highlight`
+    - 自定义所有元素样式(标题、段落、列表、表格、代码块、图片、链接等)
+    - 代码块语法高亮
+    - 图片懒加载和自适应
+    - 外部链接自动添加图标
+  - **Weekly 结构化内容**:
+    - sections 数组渲染,支持多种类型(text, code, quote, image)
+    - 左侧边框视觉分隔
+    - 推荐理由卡片高亮显示
+  
+  #### 📄 预览页面路由
+  创建了完整的预览页面:
+  - **文件位置**: `src/app/(dashboard)/content/preview/[id]/page.tsx` (214 行)
+  - **顶部工具栏**:
+    - 返回按钮
+    - 预览模式切换(桌面/移动端)
+    - 分享按钮(复制链接到剪贴板)
+    - 打印按钮
+    - 导出 PDF 按钮(占位功能)
+  - **响应式预览**:
+    - 桌面模式: max-width 4xl (896px)
+    - 移动模式: max-width 375px
+    - 平滑过渡动画
+  - **数据加载**:
+    - 使用 `useContentDetail` React Query hook
+    - 加载状态显示 spinner
+    - 错误状态显示友好提示
+  - **打印优化**:
+    - 隐藏工具栏
+    - 优化打印样式
+    - 避免内容跨页分割
+  
+  #### 🔧 TypeScript 类型修复
+  修复了多个文件的类型错误:
+  - **content-preview.tsx**:
+    - 移除不存在的 `showToolbar` prop
+    - 修复 `inline` 属性类型错误,使用 `CodeComponent` 类型注解
+    - 导入 `CodeComponent` 类型
+  - **MarkdownPreview.tsx**:
+    - 同样修复 `inline` 属性类型问题
+    - 确保类型安全
+  - **操作日志 API**:
+    - 修复 `resourceId` 类型从 `number` 改为 `string`
+    - 更新 `/api/operation-logs/route.ts` schema
+    - 更新 `/api/operation-logs/export/route.ts` schema
+  
+  **验收状态**: ✅ 已完成
+  - 新老格式(Markdown/JSON)都能正确渲染
+  - Blog 和 Weekly 内容差异化展示
+  - 排版美观,符合设计系统规范
+  - 代码高亮正常工作
+  - 多设备预览模式切换流畅
+  - 打印功能可用
+  - TypeScript 编译无错误
+  - 阶段 1 全部任务完成 ✅
+  
+  **下一步**: 
+  - 进入阶段 2: 工作流简化
+  - 开始 T2.1: 重新设计草稿管理页面
 
 ---
 
