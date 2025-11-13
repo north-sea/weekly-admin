@@ -5,7 +5,7 @@ import { DraftCard } from './draft-card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, CheckCircle2, XCircle, Trash2, AlertCircle } from 'lucide-react';
+import { Loader2, XCircle, AlertCircle } from 'lucide-react';
 import type { Draft } from '@/hooks/queries/useDraftQueries';
 import {
   useUpdateDraft,
@@ -62,10 +62,11 @@ export function DraftGrid({ drafts, isLoading, onPreview }: DraftGridProps) {
       setTimeout(() => {
         router.push(`/content/editor/${content.id}`);
       }, 1000);
-    } catch (error: any) {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '转换草稿时发生错误';
       toast({
         title: '采用失败',
-        description: error.message || '转换草稿时发生错误',
+        description: message,
         variant: 'destructive',
       });
     }
@@ -78,10 +79,11 @@ export function DraftGrid({ drafts, isLoading, onPreview }: DraftGridProps) {
         title: '已拒绝',
         description: '草稿已标记为拒绝状态',
       });
-    } catch (error: any) {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '操作失败，请稍后重试';
       toast({
         title: '操作失败',
-        description: error.message,
+        description: message,
         variant: 'destructive',
       });
     }
@@ -94,10 +96,11 @@ export function DraftGrid({ drafts, isLoading, onPreview }: DraftGridProps) {
         title: '删除成功',
         description: '草稿已删除',
       });
-    } catch (error: any) {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '删除失败，请稍后重试';
       toast({
         title: '删除失败',
-        description: error.message,
+        description: message,
         variant: 'destructive',
       });
     }
@@ -117,10 +120,11 @@ export function DraftGrid({ drafts, isLoading, onPreview }: DraftGridProps) {
         description: `已拒绝 ${selectedDrafts.size} 个草稿`,
       });
       setSelectedDrafts(new Set());
-    } catch (error: any) {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '批量操作失败，请稍后重试';
       toast({
         title: '批量操作失败',
-        description: error.message,
+        description: message,
         variant: 'destructive',
       });
     }
@@ -139,7 +143,7 @@ export function DraftGrid({ drafts, isLoading, onPreview }: DraftGridProps) {
       <Alert>
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
-          暂无草稿数据。点击右上角的"同步"按钮从 Karakeep 同步书签。
+          暂无草稿数据。点击右上角的&quot;同步&quot;按钮从 Karakeep 同步书签。
         </AlertDescription>
       </Alert>
     );

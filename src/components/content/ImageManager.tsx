@@ -21,11 +21,9 @@ import {
   Col
 } from 'antd';
 import {
-  SearchOutlined,
   DeleteOutlined,
   CopyOutlined,
   UploadOutlined,
-  FilterOutlined,
   ReloadOutlined,
   PictureOutlined
 } from '@ant-design/icons';
@@ -33,7 +31,7 @@ import { ImageUploadService } from '@/lib/services/image-upload';
 import ImageUpload from './ImageUpload';
 import dayjs from 'dayjs';
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 const { Search } = Input;
 const { RangePicker } = DatePicker;
 

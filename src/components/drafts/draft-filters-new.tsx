@@ -24,7 +24,7 @@ export function DraftFilters({ value = {}, onChange, className }: DraftFiltersPr
   const [filters, setFilters] = useState<DraftListParams>(value);
   const [searchInput, setSearchInput] = useState(value.keyword || '');
 
-  const handleChange = (key: keyof DraftListParams, val: any) => {
+  const handleChange = (key: keyof DraftListParams, val: string | number | undefined) => {
     const newFilters = { ...filters, [key]: val };
     setFilters(newFilters);
     onChange?.(newFilters);

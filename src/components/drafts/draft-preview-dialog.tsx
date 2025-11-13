@@ -89,7 +89,7 @@ export function DraftPreviewDialog({ draft, open, onOpenChange }: DraftPreviewDi
                 {(() => {
                   try {
                     const tags = JSON.parse(draft.tags_suggestion || '[]');
-                    return tags.map((tag: any, idx: number) => (
+                    return tags.map((tag: { id?: number; name: string; attachedBy?: string }, idx: number) => (
                       <Badge
                         key={tag.id || idx}
                         variant="secondary"
@@ -98,7 +98,7 @@ export function DraftPreviewDialog({ draft, open, onOpenChange }: DraftPreviewDi
                         {tag.attachedBy === 'ai' ? '🤖' : '🏷️'} {tag.name}
                       </Badge>
                     ));
-                  } catch (error) {
+                  } catch {
                     return null;
                   }
                 })()}
