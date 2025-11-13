@@ -13,6 +13,7 @@
 - ✅ [任务清单](./docs/TASKS.md)
 - 🎨 [设计系统](./docs/DESIGN_SYSTEM.md)
 - 📖 [迁移指南](./docs/MIGRATION_GUIDE.md)
+- 🔄 [React Query数据获取指南](./docs/REACT_QUERY_GUIDE.md) - **新增**
 
 ---
 

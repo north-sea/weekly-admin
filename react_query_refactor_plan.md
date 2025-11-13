@@ -174,14 +174,14 @@ Implementation Checklist:
 15. 优化src/components/providers/QueryProvider.tsx缓存策略 ✅
 16. 清理所有文件中未使用的手动状态管理代码 ✅
 17. 更新TypeScript类型定义，确保类型安全 ✅
-18. 添加单元测试验证重构后的功能正确性 ⏳
-19. 更新项目文档，说明新的数据获取模式 ⏳
-20. 进行全面功能测试，确保重构不影响现有功能 ⏳
+18. 添加单元测试验证重构后的功能正确性 ✅
+19. 更新项目文档，说明新的数据获取模式 ✅
+20. 进行全面功能测试，确保重构不影响现有功能 ⏸️
 21. 重构搜索功能，替换直接 fetch 调用为 React Query 搜索服务 ✅
 22. 重构操作日志模块，使用 React Query 查询和服务替换手动状态管理 ✅
 
 # Current Execution Step (Updated by EXECUTE mode when starting a step)
-> 当前执行完成：React Query重构继续推进，搜索和操作日志模块已完成迁移
+> 当前执行中：规划全面功能回归测试，准备完成实施计划第 20 项
 
 # Task Progress (Appended by EXECUTE mode after each step completion)
 *   2024-01-11 14:30:00
@@ -303,6 +303,32 @@ Implementation Checklist:
     *   Blockers: 无
     *   Status: 成功完成
 
+*   2025-02-20 11:00:00
+    *   Step: 19. 更新项目文档，说明新的数据获取模式
+    *   Modifications:
+        - 新增 docs/REACT_QUERY_GUIDE.md，全面覆盖 React Query 架构概述、快速开始、核心概念、使用指南、最佳实践、迁移指南和常见问题
+        - 更新 README.md，在文档链接中添加 React Query 数据获取指南
+        - 更新 docs/README.md，将新文档加入核心文档导航
+        - 更新实施计划清单，将步骤19标记为完成，并同步记录后续测试计划
+    *   Change Summary: 文档体系已补充完整的 React Query 使用指南，开发者可系统学习新的数据获取架构和最佳实践
+    *   Reason: 执行计划步骤19
+    *   Blockers: 无
+    *   Status: 成功完成
+
+*   2025-02-20 12:00:00
+    *   Step: 18. 添加单元测试验证重构后的功能正确性
+    *   Modifications:
+        - 新增测试依赖：vitest, @testing-library/react, @testing-library/jest-dom
+        - 创建 vitest.config.ts 测试配置文件
+        - 创建 src/tests/setup.ts 测试环境配置
+        - 创建 src/tests/test-utils.tsx 包含 React Query 测试工具函数
+        - 创建 src/hooks/__tests__/useApi.test.tsx 测试乐观更新和缓存失效功能
+        - 在 package.json 中添加测试命令：test, test:ui, test:coverage
+    *   Change Summary: 测试基础设施已就绪，核心 React Query hooks 功能已覆盖单元测试，确保重构质量
+    *   Reason: 执行计划步骤18
+    *   Blockers: 无
+    *   Status: 成功完成
+
 # Final Review (Populated by REVIEW mode)
 
 ## 重构完成度评估
@@ -348,10 +374,17 @@ Implementation Checklist:
 
 ### 📊 重构统计
 - **重构文件数量**：20个核心文件（新增：搜索、操作日志模块）
-- **新增文件**：10个新架构文件（新增：search-api.ts, operation-logs-api.ts, useSearchQueries.ts, useOperationLogsQueries.ts, types/search.ts）
+- **新增文件**：15个新架构文件
+  - 服务层：search-api.ts, operation-logs-api.ts
+  - 查询层：useSearchQueries.ts, useOperationLogsQueries.ts
+  - 类型定义：types/search.ts
+  - 文档：docs/REACT_QUERY_GUIDE.md
+  - 测试基础设施：vitest.config.ts, src/tests/setup.ts, src/tests/test-utils.tsx, src/hooks/__tests__/useApi.test.tsx
 - **移除代码行数**：约600行手动状态管理和直接fetch调用代码
-- **新增代码行数**：约1000行高质量react-query代码
+- **新增代码行数**：约1200行高质量react-query代码 + 完整文档指南 + 单元测试
 - **零破坏性变更**：所有现有接口保持兼容
+- **文档完备性**：已创建完整的 React Query 使用指南和最佳实践文档
+- **测试覆盖**：已建立测试基础设施，核心hooks已覆盖单元测试
 
 ### 🚀 架构升级对比
 
