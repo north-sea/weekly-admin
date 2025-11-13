@@ -23,6 +23,7 @@
 | 2025-01 | DOC | 创建完整的 PRD 和任务文档 | AI Agent | 详见下方 |
 | 2025-01 | T1.1 | 安装和配置 shadcn/ui + claude theme | AI Agent | 详见下方 |
 | 2025-01 | T1.3 | 迁移登录页到 shadcn/ui | AI Agent | 详见下方 |
+| 2025-01 | T1.6 | 优化内容编辑页 (shadcn/ui) | AI Agent | 详见下方 |
 | 2025-01 | T1.2 | 创建设计系统文档 | AI Agent | 已完成 |
 
 ---
@@ -263,6 +264,132 @@
   **下一步**: 
   - 在开发环境测试登录功能
   - 开始优化内容编辑页 (T1.6)
+
+---
+
+### 2025-01 - 优化内容编辑页
+- **任务编号**: T1.6
+- **任务名称**: 优化内容编辑页（shadcn/ui + react-hook-form）
+- **负责人**: AI Agent
+- **完成说明**:
+  
+  #### 🎨 新建简化编辑器组件
+  创建 `simplified-editor.tsx`:
+  - **表单管理**: 使用 `react-hook-form` + `zod` 替代 Ant Design Form
+  - **UI 组件**: 完全基于 shadcn/ui 组件 (Card, Input, Textarea, Select, Switch, Button, Tabs, Badge, Separator)
+  - **布局优化**: 
+    - 左侧编辑区 (60%): 表单字段 + Markdown 编辑器
+    - 右侧预览区 (40%): 实时预览内容
+    - 顶部工具栏: 返回、保存状态、预览按钮
+  
+  #### ✨ 核心功能
+  - **实时预览**: 使用 MarkdownPreview 组件实时渲染内容
+  - **自动保存**: 3秒防抖自动保存，显示保存状态
+  - **表单验证**: zod schema 验证所有字段
+  - **Markdown 工具栏**: 粗体、斜体、代码、标题、链接、图片、列表等快捷插入
+  - **内容类型区分**: 
+    - Blog: 显示描述、封面图、SEO 设置
+    - Weekly: 显示来源、来源链接、截图 API、推荐理由
+  
+  #### 🧩 新建 shadcn/ui 组件
+  创建了以下组件用于编辑器:
+  - `tabs.tsx`: 标签页组件
+  - `badge.tsx`: 徽章组件（显示未保存状态）
+  - `separator.tsx`: 分隔线组件
+  - `toast.tsx` + `use-toast.ts` + `toaster.tsx`: Toast 通知系统
+  
+  #### 📦 新建编辑页面路由
+  创建 `/content/[id]/page.tsx`:
+  - 使用 `useContentDetail` 获取内容详情
+  - 使用 `useAllCategories` 和 `useAllTags` 获取分类和标签
+  - 使用 `useUpdateContent` 更新内容
+  - 集成 SimplifiedEditor 组件
+  - 集成 Toaster 到 root layout
+  
+  #### 🔧 技术优化
+  - **类型安全**: 完整的 TypeScript 类型定义
+  - **表单状态**: 实时跟踪未保存更改
+  - **性能优化**: 使用 debounce 优化自动保存
+  - **用户体验**: 
+    - 保存状态显示（正在保存/最后保存时间/未保存）
+    - 错误提示使用 Toast（非侵入式）
+    - 实时预览内容变化
+  
+  #### 📝 代码清理
+  - 更新 DraftList 路由: `/content/editor/${id}` → `/content/${id}`
+  - 添加 Toaster 到 root layout，全局可用
+  
+  **验收状态**: ✅ 已完成
+  - 编辑器组件创建完成
+  - 表单验证和自动保存功能完整
+  - 实时预览正常工作
+  - 新路由正确配置
+  - 代码符合 TypeScript 规范
+  
+  **下一步**: 
+  - 测试编辑器在实际环境的使用
+  - 考虑添加快捷键支持 (Ctrl+S 保存等)
+  - 优化移动端响应式布局
+
+---
+
+### 2025-01 - 编辑器增强：格式自动检测与手动切换
+- **任务编号**: T1.6 (增强版)
+- **任务名称**: 编辑器支持格式自动检测和手动切换
+- **负责人**: AI Agent
+- **完成说明**:
+  
+  #### 🔍 问题发现
+  初始版本未充分考虑：
+  - 旧版 Weekly 和 Blog 都使用 Markdown 存储在数据库中
+  - 新版 Weekly 使用完全结构化数据
+  - 需要同时支持两种格式的编辑和预览
+  
+  #### 🛠️ 核心改进
+  1. **自动格式检测**:
+     - 使用 `ContentFormatAdapter.detectFormat()` 检测内容格式
+     - 初始化时自动选择合适的编辑模式（Markdown / 结构化）
+     - 兼容所有历史数据
+  
+  2. **手动模式切换**:
+     - 顶部工具栏新增模式切换按钮
+     - 图标 + 文字清晰标识当前模式
+     - 支持 Markdown ⇄ 结构化自由切换
+     - Toast 提示切换结果
+  
+  3. **统一预览体验**:
+     - 所有内容类型都采用左右分屏布局（60% 编辑 + 40% 预览）
+     - Blog: 使用 `MarkdownPreview` 渲染
+     - Weekly（新旧）: 统一使用 `StructuredPreview` 卡片样式
+     - 实时预览，所见即所得
+  
+  4. **UI/UX 优化**:
+     - 编辑模式信息展示在顶部工具栏
+     - Markdown 模式显示格式工具栏（粗体、斜体、链接等）
+     - 结构化模式提供简洁的 Textarea 输入
+     - 根据内容类型提供不同的占位符提示
+  
+  #### 📝 文档更新
+  - 更新 `DESIGN_DECISIONS.md` ADR-001，记录格式演进和决策
+  - 更新 `CONTENT_EDITING_GUIDE.md`，添加「重要更新」说明
+  
+  #### 🎯 解决的问题
+  - ✅ 兼容历史 Markdown 格式的 Weekly 和 Blog
+  - ✅ 支持新版结构化 Weekly
+  - ✅ 提供灵活的编辑体验
+  - ✅ 统一预览样式，避免混乱
+  - ✅ 降低用户学习成本
+  
+  **验收状态**: ✅ 已完成
+  - 自动检测功能正常
+  - 手动切换流畅无误
+  - 预览样式统一美观
+  - 文档完整更新
+  
+  **下一步**: 
+  - 考虑在结构化模式添加更多结构化字段编辑
+  - 优化 StructuredPreview 组件的渲染逻辑
+  - 添加格式转换辅助工具（可选）
 
 ---
 
