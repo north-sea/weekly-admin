@@ -12,72 +12,22 @@ import {
   PaginationParams
 } from '@/hooks/useApi';
 
-// 周刊数据类型定义
-export interface WeeklyIssue {
-  id: number;
-  title: string;
-  issue_number: number;
-  description?: string;
-  status: 'draft' | 'published' | 'archived';
-  publication_date?: string;
-  created_at: string;
-  updated_at: string;
-  content_count: number;
-  view_count: number;
-  share_count: number;
-}
+import {
+  WeeklyIssue,
+  WeeklyContent,
+  WeeklyStats,
+  WeeklyInput,
+  WeeklyUpdate,
+} from '@/lib/services/weekly-api';
 
-export interface WeeklyContent {
-  id: number;
-  content_id: number;
-  weekly_issue_id: number;
-  position: number;
-  section?: string;
-  notes?: string;
-  content: {
-    id: number;
-    title: string;
-    slug: string;
-    description?: string;
-    content_type: string;
-    category?: string;
-    tags: string[];
-    published_at?: string;
-  };
-}
-
-export interface WeeklyStats {
-  total_views: number;
-  total_shares: number;
-  total_subscribers: number;
-  avg_engagement_rate: number;
-  top_performing_issues: Array<{
-    issue_number: number;
-    title: string;
-    views: number;
-    engagement_rate: number;
-  }>;
-  growth_metrics: {
-    subscriber_growth: number;
-    engagement_growth: number;
-    content_growth: number;
-  };
-}
-
-export interface WeeklyInput {
-  title: string;
-  issue_number?: number;
-  description?: string;
-  publication_date?: string;
-  status?: 'draft' | 'published';
-}
-
-export interface WeeklyUpdate {
-  title?: string;
-  description?: string;
-  publication_date?: string;
-  status?: 'draft' | 'published' | 'archived';
-}
+// 重新导出类型以保持兼容性
+export type {
+  WeeklyIssue,
+  WeeklyContent,
+  WeeklyStats,
+  WeeklyInput,
+  WeeklyUpdate,
+};
 
 // 周刊列表查询
 export function useWeeklyList(params?: PaginationParams & {
@@ -86,11 +36,13 @@ export function useWeeklyList(params?: PaginationParams & {
   year?: number;
   sort_by?: 'issue_number' | 'publication_date' | 'view_count';
 }) {
+  const queryParams = params ? ({ ...params } as PaginationParams & Record<string, unknown>) : undefined;
+  
   return usePaginatedQuery<WeeklyIssue>(
     '/api/weekly',
-    params,
+    queryParams,
     {
-      queryKey: queryKeys.weekly.list(params),
+      queryKey: queryKeys.weekly.list(queryParams),
       staleTime: 3 * 60 * 1000, // 3分钟缓存
     }
   );
@@ -197,7 +149,7 @@ export function useCreateWeekly() {
       
       return { tempId, optimisticWeekly };
     },
-    onSuccess: (data, variables, context) => {
+    onSuccess: (data, variables, context?: { tempId: number; optimisticWeekly: WeeklyIssue }) => {
       // 移除乐观更新的临时数据
       if (context?.tempId) {
         optimistic.removeItem(queryKeys.weekly.lists(), context.tempId);
@@ -206,7 +158,7 @@ export function useCreateWeekly() {
       // 无效化相关查询
       invalidate.invalidateWeekly();
     },
-    onError: (error, variables, context) => {
+    onError: (error, variables, context?: { tempId: number; optimisticWeekly: WeeklyIssue }) => {
       // 回滚乐观更新
       if (context?.tempId) {
         optimistic.removeItem(queryKeys.weekly.lists(), context.tempId);
@@ -259,7 +211,7 @@ export function useUpdateWeekly() {
         // 无效化相关查询
         invalidate.invalidateWeekly(id);
       },
-      onError: (error, variables, context) => {
+      onError: (error, variables, context?: { id: string | number }) => {
         if (context) {
           // 回滚乐观更新
           invalidate.invalidateWeekly(context.id);
@@ -387,7 +339,7 @@ export function useReorderWeeklyContents() {
         data
       );
     },
-    onError: (error, variables, context) => {
+    onError: (error, variables, context?: { weekly_id: number; previousContents: WeeklyContent[] }) => {
       if (context?.previousContents) {
         // 回滚乐观更新
         invalidate.setQueryData(

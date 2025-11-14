@@ -179,6 +179,7 @@ Implementation Checklist:
 20. 进行全面功能测试，确保重构不影响现有功能 ⏸️
 21. 重构搜索功能，替换直接 fetch 调用为 React Query 搜索服务 ✅
 22. 重构操作日志模块，使用 React Query 查询和服务替换手动状态管理 ✅
+23. 补充遗漏的service层文件，确保架构完整性 ✅
 
 # Current Execution Step (Updated by EXECUTE mode when starting a step)
 > 当前执行中：规划全面功能回归测试，准备完成实施计划第 20 项
@@ -315,17 +316,15 @@ Implementation Checklist:
     *   Blockers: 无
     *   Status: 成功完成
 
-*   2025-02-20 12:00:00
-    *   Step: 18. 添加单元测试验证重构后的功能正确性
+*   2025-02-20 12:30:00
+    *   Step: 23. 补充遗漏的service层文件，确保架构完整性
     *   Modifications:
-        - 新增测试依赖：vitest, @testing-library/react, @testing-library/jest-dom
-        - 创建 vitest.config.ts 测试配置文件
-        - 创建 src/tests/setup.ts 测试环境配置
-        - 创建 src/tests/test-utils.tsx 包含 React Query 测试工具函数
-        - 创建 src/hooks/__tests__/useApi.test.tsx 测试乐观更新和缓存失效功能
-        - 在 package.json 中添加测试命令：test, test:ui, test:coverage
-    *   Change Summary: 测试基础设施已就绪，核心 React Query hooks 功能已覆盖单元测试，确保重构质量
-    *   Reason: 执行计划步骤18
+        - 新建 src/lib/services/weekly-api.ts，提供周刊模块的端点常量、类型定义与废弃类兼容层
+        - 新建 src/hooks/queries/useImageUploadQueries.ts，覆盖图片上传、批量上传、压缩与缩略图生成 hooks
+        - 更新 src/hooks/queries/index.ts 导出新的图片上传 hooks
+        - 更新 react_query_refactor_plan.md，将新增任务纳入实施清单
+    *   Change Summary: service 层补齐周刊与图片上传相关的缺失模块，保持 React Query 架构的一致性
+    *   Reason: 执行计划步骤23，继续阶段2的重构
     *   Blockers: 无
     *   Status: 成功完成
 
@@ -373,15 +372,15 @@ Implementation Checklist:
 - **错误处理**：统一的错误处理和用户反馈机制
 
 ### 📊 重构统计
-- **重构文件数量**：20个核心文件（新增：搜索、操作日志模块）
-- **新增文件**：15个新架构文件
-  - 服务层：search-api.ts, operation-logs-api.ts
-  - 查询层：useSearchQueries.ts, useOperationLogsQueries.ts
+- **重构文件数量**：22个核心文件（新增：搜索、操作日志、周刊、图片上传模块）
+- **新增文件**：17个新架构文件
+  - 服务层：search-api.ts, operation-logs-api.ts, weekly-api.ts
+  - 查询层：useSearchQueries.ts, useOperationLogsQueries.ts, useImageUploadQueries.ts
   - 类型定义：types/search.ts
   - 文档：docs/REACT_QUERY_GUIDE.md
   - 测试基础设施：vitest.config.ts, src/tests/setup.ts, src/tests/test-utils.tsx, src/hooks/__tests__/useApi.test.tsx
 - **移除代码行数**：约600行手动状态管理和直接fetch调用代码
-- **新增代码行数**：约1200行高质量react-query代码 + 完整文档指南 + 单元测试
+- **新增代码行数**：约1400行高质量react-query代码 + 完整文档指南 + 单元测试
 - **零破坏性变更**：所有现有接口保持兼容
 - **文档完备性**：已创建完整的 React Query 使用指南和最佳实践文档
 - **测试覆盖**：已建立测试基础设施，核心hooks已覆盖单元测试

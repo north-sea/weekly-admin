@@ -390,7 +390,20 @@ export default function MarkdownEditor({
             <MarkdownPreview 
               content={{
                 ...contentData,
-                content: content
+                title: contentData.title ?? '',
+                content,
+                content_type: contentData.content_type ? {
+                  id: contentData.content_type.id,
+                  name: contentData.content_type.name ?? '',
+                } : undefined,
+                category: contentData.category ? {
+                  id: contentData.category.id,
+                  name: contentData.category.name ?? '',
+                } : contentData.category,
+                tags: contentData.tags?.map(tag => ({
+                  id: tag.id,
+                  name: tag.name ?? '',
+                })),
               }}
               mode={mobilePreview ? 'mobile' : 'desktop'}
               showMeta={true}
@@ -438,7 +451,20 @@ export default function MarkdownEditor({
               <MarkdownPreview 
                 content={{
                   ...contentData,
-                  content: content
+                  title: contentData.title ?? '',
+                  content,
+                  content_type: contentData.content_type ? {
+                    id: contentData.content_type.id,
+                    name: contentData.content_type.name ?? '',
+                  } : undefined,
+                  category: contentData.category ? {
+                    id: contentData.category.id,
+                    name: contentData.category.name ?? '',
+                  } : contentData.category,
+                  tags: contentData.tags?.map(tag => ({
+                    id: tag.id,
+                    name: tag.name ?? '',
+                  })),
                 }}
                 mode={mobilePreview ? 'mobile' : 'desktop'}
                 showMeta={false}

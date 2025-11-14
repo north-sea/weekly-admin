@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Input, AutoComplete, Dropdown, Button, Space, Typography, Empty } from 'antd';
+import { Input, AutoComplete, Dropdown, Button, Typography, Empty } from 'antd';
 import { SearchOutlined, HistoryOutlined, CloseOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useSearchSuggestions, SearchHistoryItem } from '@/hooks/useSearch';
 
@@ -37,13 +37,21 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   const [inputValue, setInputValue] = useState(value);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const inputRef = useRef<any>(null);
+  const [suggestionQuery, setSuggestionQuery] = useState('');
+  const inputRef = useRef<HTMLInputElement | null>(null);
   
-  const { suggestions, isLoading, fetchSuggestions, clearSuggestions } = useSearchSuggestions();
+  const { data: suggestionsData } = useSearchSuggestions(
+    suggestionQuery,
+    5,
+    Boolean(suggestionQuery.trim())
+  );
+  
+  const suggestions = suggestionsData?.suggestions || [];
   
   // Sync with external value changes
   useEffect(() => {
     setInputValue(value);
+    setSuggestionQuery(value);
   }, [value]);
   
   // Handle input change
@@ -51,7 +59,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
     setInputValue(val);
     
     if (val.trim()) {
-      fetchSuggestions(val);
+      setSuggestionQuery(val);
       setShowSuggestions(true);
       setShowHistory(false);
       
@@ -60,7 +68,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
         onInstantSearch(val);
       }
     } else {
-      clearSuggestions();
+      setSuggestionQuery('');
       setShowSuggestions(false);
     }
   };
@@ -135,7 +143,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   };
   
   // Prepare suggestions options
-  const suggestionOptions = suggestions.map(suggestion => ({
+  const suggestionOptions = suggestions.map((suggestion: string) => ({
     value: suggestion,
     label: (
       <div style={{ display: 'flex', alignItems: 'center' }}>
