@@ -1,16 +1,18 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Row, Col, Card, Input, Select, Button, Space, message, Spin, Empty, Divider } from 'antd';
-import { SearchOutlined, FilterOutlined, ReloadOutlined } from '@ant-design/icons';
-import { DndContext, DragEndEvent, DragOverEvent, DragOverlay, DragStartEvent } from '@dnd-kit/core';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/components/ui/use-toast';
+import { Search, RefreshCw } from 'lucide-react';
+import { DndContext, DragEndEvent } from '@dnd-kit/core';
 import { useDroppable } from '@dnd-kit/core';
 import AvailableContentsList from './AvailableContentsList';
 import SelectedContentsList from './SelectedContentsList';
 import WeeklyPreview from './WeeklyPreview';
-
-const { Search } = Input;
-const { Option } = Select;
 
 interface WeeklyEditorProps {
   issueId: number;
@@ -42,20 +44,15 @@ interface Category {
   name: string;
 }
 
-// 可放置区域组件
 const DroppableArea: React.FC<{ id: string; children: React.ReactNode }> = ({ id, children }) => {
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
     <div
       ref={setNodeRef}
-      style={{
-        minHeight: '200px',
-        backgroundColor: isOver ? '#f0f9ff' : 'transparent',
-        border: isOver ? '2px dashed #1890ff' : 'none',
-        borderRadius: '6px',
-        transition: 'all 0.2s ease',
-      }}
+      className={`min-h-[200px] rounded-lg transition-all ${
+        isOver ? 'bg-blue-50 border-2 border-dashed border-blue-300' : ''
+      }`}
     >
       {children}
     </div>
@@ -63,29 +60,19 @@ const DroppableArea: React.FC<{ id: string; children: React.ReactNode }> = ({ id
 };
 
 const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId }) => {
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [selectedContents, setSelectedContents] = useState<Content[]>([]);
   const [availableContents, setAvailableContents] = useState<Content[]>([]);
   const [groupedContents, setGroupedContents] = useState<Record<string, Content[]>>({});
   const [categories, setCategories] = useState<Category[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  
-  // 筛选条件
+  const [searchInput, setSearchInput] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<number | undefined>();
-  const [currentPage, setCurrentPage] = useState(1);
-  const [total, setTotal] = useState(0);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
-  useEffect(() => {
-    fetchSelectedContents();
-    fetchCategories();
-  }, [issueId]);
+  const fetchSelectedContents = useCallback(async () => {
+    if (!issueId) return;
 
-  useEffect(() => {
-    fetchAvailableContents();
-  }, [issueId, searchKeyword, selectedCategory, currentPage]);
-
-  const fetchSelectedContents = async () => {
     try {
       const response = await fetch(`/api/weekly/${issueId}/contents`);
       const result = await response.json();
@@ -95,20 +82,31 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId }) => {
       }
     } catch (error) {
       console.error('获取已选内容失败:', error);
+      toast({
+        title: '加载失败',
+        description: '获取已选内容失败',
+        variant: 'destructive',
+      });
     }
-  };
+  }, [issueId, toast]);
 
-  const fetchAvailableContents = async () => {
+  const fetchAvailableContents = useCallback(async () => {
+    if (!issueId) return;
+
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        page: currentPage.toString(),
+        page: '1',
         pageSize: '20',
         excludeIssueId: issueId.toString(),
       });
 
-      if (searchKeyword) params.append('search', searchKeyword);
-      if (selectedCategory) params.append('categoryId', selectedCategory.toString());
+      if (searchKeyword) {
+        params.append('search', searchKeyword);
+      }
+      if (selectedCategory && selectedCategory !== 'all') {
+        params.append('categoryId', selectedCategory);
+      }
 
       const response = await fetch(`/api/weekly/available-contents?${params.toString()}`);
       const result = await response.json();
@@ -116,59 +114,46 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId }) => {
       if (result.success) {
         setAvailableContents(result.data.contents);
         setGroupedContents(result.data.groupedByCategory);
-        setTotal(result.data.total);
       }
-    } catch (error) {
-      message.error('获取可用内容失败');
+    } catch {
+      toast({
+        title: '加载失败',
+        description: '获取可用内容失败',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
-  };
+  }, [issueId, searchKeyword, selectedCategory, toast]);
 
-  const fetchCategories = async () => {
-    try {
-      const response = await fetch('/api/categories');
-      const result = await response.json();
+  useEffect(() => {
+    void fetchSelectedContents();
+  }, [fetchSelectedContents]);
 
-      if (result.success) {
-        setCategories(result.data);
+  useEffect(() => {
+    void fetchAvailableContents();
+  }, [fetchAvailableContents]);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const response = await fetch('/api/categories');
+        const result = await response.json();
+
+        if (result.success) {
+          setCategories(result.data);
+        }
+      } catch (error) {
+        console.error('获取分类失败:', error);
       }
-    } catch (error) {
-      console.error('获取分类失败:', error);
-    }
-  };
-
-  const handleAddContent = (content: Content) => {
-    const newContent = {
-      ...content,
-      sort_order: selectedContents.length,
-      section: content.category?.name || '未分类',
-      featured: false,
     };
-    
-    setSelectedContents([...selectedContents, newContent]);
-    updateWeeklyContents([...selectedContents, newContent]);
-  };
 
-  const handleRemoveContent = (contentId: number) => {
-    const newContents = selectedContents.filter(c => c.id !== contentId);
-    setSelectedContents(newContents);
-    updateWeeklyContents(newContents);
-  };
-
-  const handleReorderContents = (newContents: Content[]) => {
-    const reorderedContents = newContents.map((content, index) => ({
-      ...content,
-      sort_order: index,
-    }));
-    
-    setSelectedContents(reorderedContents);
-    updateWeeklyContents(reorderedContents);
-  };
+    void loadCategories();
+  }, []);
 
   const updateWeeklyContents = async (contents: Content[]) => {
     try {
-      const data = {
+      const payload = {
         contents: contents.map((content, index) => ({
           content_id: content.id,
           sort_order: index,
@@ -180,7 +165,7 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId }) => {
       const response = await fetch(`/api/weekly/${issueId}/contents`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json();
@@ -189,138 +174,171 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId }) => {
         throw new Error(result.error?.message || '更新失败');
       }
     } catch (error) {
-      message.error(error instanceof Error ? error.message : '更新周刊内容失败');
+      toast({
+        title: '保存失败',
+        description: error instanceof Error ? error.message : '更新周刊内容失败',
+        variant: 'destructive',
+      });
     }
   };
 
-  const handleSearch = (value: string) => {
-    setSearchKeyword(value);
-    setCurrentPage(1);
+  const handleAddContent = (content: Content) => {
+    const newContent = {
+      ...content,
+      sort_order: selectedContents.length,
+      section: content.category?.name || '未分类',
+      featured: false,
+    };
+
+    const nextContents = [...selectedContents, newContent];
+    setSelectedContents(nextContents);
+    void updateWeeklyContents(nextContents);
   };
 
-  const handleCategoryChange = (categoryId: number | undefined) => {
-    setSelectedCategory(categoryId);
-    setCurrentPage(1);
+  const handleRemoveContent = (contentId: number) => {
+    const nextContents = selectedContents.filter((item) => item.id !== contentId);
+    setSelectedContents(nextContents);
+    void updateWeeklyContents(nextContents);
+  };
+
+  const handleReorderContents = (newContents: Content[]) => {
+    const reorderedContents = newContents.map((content, index) => ({
+      ...content,
+      sort_order: index,
+    }));
+
+    setSelectedContents(reorderedContents);
+    void updateWeeklyContents(reorderedContents);
+  };
+
+  const handleSearch = () => {
+    const nextKeyword = searchInput.trim();
+    if (nextKeyword === searchKeyword) {
+      void fetchAvailableContents();
+    } else {
+      setSearchKeyword(nextKeyword);
+    }
+  };
+
+  const handleCategoryChange = (value: string) => {
+    if (value === selectedCategory) {
+      void fetchAvailableContents();
+    } else {
+      setSelectedCategory(value);
+    }
   };
 
   const handleRefresh = () => {
-    fetchAvailableContents();
-    fetchSelectedContents();
-  };
-
-  // 拖拽处理函数
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string);
+    void fetchAvailableContents();
+    void fetchSelectedContents();
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    setActiveId(null);
 
     if (!over) return;
 
-    // 如果是从可用内容拖拽到已选内容区域
     if (active.id.toString().startsWith('available-') && over.id === 'selected-contents') {
-      const contentId = parseInt(active.id.toString().replace('available-', ''));
-      const content = availableContents.find(c => c.id === contentId);
-      
-      if (content && !selectedContents.find(c => c.id === contentId)) {
+      const contentId = parseInt(active.id.toString().replace('available-', ''), 10);
+      const content = availableContents.find((item) => item.id === contentId);
+
+      if (content && !selectedContents.find((item) => item.id === contentId)) {
         handleAddContent(content);
       }
     }
   };
 
   return (
-    <DndContext
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <div style={{ height: '70vh' }}>
-        <Row gutter={16} style={{ height: '100%' }}>
-          {/* 左侧：可选内容列表 */}
-          <Col span={8} style={{ height: '100%' }}>
-            <Card
-              title="可选内容"
-              size="small"
-              style={{ height: '100%' }}
-              extra={
-                <Button
-                  icon={<ReloadOutlined />}
-                  size="small"
-                  onClick={handleRefresh}
-                />
-              }
-            >
-              <div style={{ marginBottom: '16px' }}>
-                <Space direction="vertical" style={{ width: '100%' }}>
-                  <Search
-                    placeholder="搜索内容..."
-                    onSearch={handleSearch}
-                    style={{ width: '100%' }}
-                  />
-                  <Select
-                    placeholder="选择分类"
-                    allowClear
-                    style={{ width: '100%' }}
-                    value={selectedCategory}
-                    onChange={handleCategoryChange}
-                  >
-                    {categories.map(category => (
-                      <Option key={category.id} value={category.id}>
-                        {category.name}
-                      </Option>
-                    ))}
+    <DndContext onDragEnd={handleDragEnd}>
+      <div className="h-[70vh]">
+        <div className="grid grid-cols-12 gap-4 h-full">
+          <div className="col-span-4 h-full">
+            <Card className="h-full flex flex-col">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">可选内容</CardTitle>
+                  <Button variant="ghost" size="icon" onClick={handleRefresh}>
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="flex-1 space-y-3 overflow-hidden pb-4">
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="搜索内容..."
+                      value={searchInput}
+                      onChange={(event) => setSearchInput(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          handleSearch();
+                        }
+                      }}
+                    />
+                    <Button variant="default" size="icon" onClick={handleSearch}>
+                      <Search className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Select value={selectedCategory} onValueChange={handleCategoryChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="选择分类" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">全部分类</SelectItem>
+                      {categories.map((category) => (
+                        <SelectItem key={category.id} value={category.id.toString()}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
                   </Select>
-                </Space>
-              </div>
+                </div>
 
-              <div style={{ height: 'calc(100% - 120px)', overflow: 'auto' }}>
-                <AvailableContentsList
-                  contents={availableContents}
-                  groupedContents={groupedContents}
-                  loading={loading}
-                  onAddContent={handleAddContent}
-                  selectedContentIds={selectedContents.map(c => c.id)}
-                />
-              </div>
+                <div className="flex-1 overflow-hidden">
+                  <AvailableContentsList
+                    contents={availableContents}
+                    groupedContents={groupedContents}
+                    loading={loading}
+                    onAddContent={handleAddContent}
+                    selectedContentIds={selectedContents.map((item) => item.id)}
+                  />
+                </div>
+              </CardContent>
             </Card>
-          </Col>
+          </div>
 
-          {/* 中间：已选内容列表 */}
-          <Col span={8} style={{ height: '100%' }}>
-            <Card
-              title={`已选内容 (${selectedContents.length})`}
-              size="small"
-              style={{ height: '100%' }}
-            >
-              <DroppableArea id="selected-contents">
-                <div style={{ height: 'calc(100% - 60px)', overflow: 'auto' }}>
+          <div className="col-span-4 h-full">
+            <Card className="h-full flex flex-col">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">已选内容</CardTitle>
+                  <Badge variant="secondary">{selectedContents.length}</Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="flex-1 overflow-hidden pb-4">
+                <DroppableArea id="selected-contents">
                   <SelectedContentsList
                     contents={selectedContents}
                     onRemoveContent={handleRemoveContent}
                     onReorderContents={handleReorderContents}
                   />
-                </div>
-              </DroppableArea>
+                </DroppableArea>
+              </CardContent>
             </Card>
-          </Col>
+          </div>
 
-          {/* 右侧：实时预览 */}
-          <Col span={8} style={{ height: '100%' }}>
-            <Card
-              title="实时预览"
-              size="small"
-              style={{ height: '100%' }}
-            >
-              <div style={{ height: 'calc(100% - 60px)', overflow: 'auto' }}>
-                <WeeklyPreview
-                  issueId={issueId}
-                  contents={selectedContents}
-                />
-              </div>
+          <div className="col-span-4 h-full">
+            <Card className="h-full flex flex-col">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">实时预览</CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 overflow-hidden pb-4">
+                <WeeklyPreview issueId={issueId} contents={selectedContents} />
+              </CardContent>
             </Card>
-          </Col>
-        </Row>
+          </div>
+        </div>
       </div>
     </DndContext>
   );
