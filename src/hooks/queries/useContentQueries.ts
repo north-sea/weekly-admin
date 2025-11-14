@@ -12,8 +12,8 @@ import {
   queryKeys,
   PaginationParams
 } from '@/hooks/useApi';
-import { ContentWithRelations, ContentListResponse } from '@/lib/services/content-api';
-import { ContentInput, ContentUpdate, BatchOperation } from '@/lib/validations/content';
+import { ContentWithRelations } from '@/lib/services/content-api';
+import { ContentInput, ContentUpdate } from '@/lib/validations/content';
 
 // 内容列表查询
 export function useContentList(params?: PaginationParams & {
@@ -24,11 +24,13 @@ export function useContentList(params?: PaginationParams & {
   featured?: boolean;
   tag_ids?: number[];
 }) {
+  const queryParams = params ? ({ ...params } as PaginationParams & Record<string, unknown>) : undefined;
+  
   return usePaginatedQuery<ContentWithRelations>(
     '/api/content',
-    params,
+    queryParams,
     {
-      queryKey: queryKeys.content.list(params),
+      queryKey: queryKeys.content.list(queryParams),
       staleTime: 2 * 60 * 1000, // 2分钟缓存
     }
   );
@@ -71,8 +73,8 @@ export function useContentVersionCompare(
   enabled = true
 ) {
   return useGet<{
-    version1: any;
-    version2: any;
+    version1: unknown;
+    version2: unknown;
     diff: string;
   }>(
     `/api/content/${id}/versions/compare?v1=${version1}&v2=${version2}`,
@@ -98,13 +100,13 @@ export function useCreateContent() {
         ...newContent,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      } as ContentWithRelations;
+      } as unknown as ContentWithRelations;
       
       optimistic.addItem(queryKeys.content.lists(), optimisticContent);
       
       return { tempId, optimisticContent };
     },
-    onSuccess: (data, variables, context) => {
+    onSuccess: (data, variables, context?: { tempId: number; optimisticContent: ContentWithRelations }) => {
       // 移除乐观更新的临时数据
       if (context?.tempId) {
         optimistic.removeItem(queryKeys.content.lists(), context.tempId);
@@ -113,7 +115,7 @@ export function useCreateContent() {
       // 无效化相关查询
       invalidate.invalidateContent();
     },
-    onError: (error, variables, context) => {
+    onError: (error, variables, context?: { tempId: number; optimisticContent: ContentWithRelations }) => {
       // 回滚乐观更新
       if (context?.tempId) {
         optimistic.removeItem(queryKeys.content.lists(), context.tempId);

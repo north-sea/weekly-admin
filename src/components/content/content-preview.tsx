@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import type { Components } from 'react-markdown';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -271,26 +270,6 @@ export default function ContentPreview({
                 <ExternalLink className="h-3 w-3" />
               </a>
             ),
-            code: ((props) => {
-              const { inline, className, children, ...rest } = props;
-              if (inline) {
-                return (
-                  <code
-                    className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono"
-                    {...rest}
-                  >
-                    {children}
-                  </code>
-                );
-              }
-              return (
-                <pre className="bg-muted rounded-lg p-4 overflow-x-auto">
-                  <code className={className} {...rest}>
-                    {children}
-                  </code>
-                </pre>
-              );
-            }) as CodeComponent,
           }}
         >
           {content.content}
@@ -490,7 +469,7 @@ export default function ContentPreview({
                   <ExternalLink className="h-3 w-3" />
                 </a>
               ),
-              code: ((props) => {
+              code: ((props: MarkdownCodeProps) => {
                 const { inline, className, children, ...rest } = props;
                 if (inline) {
                   return (
@@ -507,7 +486,7 @@ export default function ContentPreview({
                     {children}
                   </code>
                 );
-              }) as CodeComponent,
+              }),
             }}
           >
             {content.content}

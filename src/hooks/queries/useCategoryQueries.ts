@@ -33,11 +33,13 @@ export function useCategoryList(params?: PaginationParams & {
   search?: string;
   include_stats?: boolean;
 }) {
+  const queryParams = params ? ({ ...params } as PaginationParams & Record<string, unknown>) : undefined;
+  
   return usePaginatedQuery<CategoryWithStats>(
     '/api/categories',
-    params,
+    queryParams,
     {
-      queryKey: queryKeys.categories.list(params),
+      queryKey: queryKeys.categories.list(queryParams),
       staleTime: 5 * 60 * 1000, // 5分钟缓存，分类变化频率较低
     }
   );
@@ -106,7 +108,7 @@ export function useCreateCategory() {
       
       return { tempId, optimisticCategory };
     },
-    onSuccess: (data, variables, context) => {
+    onSuccess: (data, variables, context?: { tempId: number; optimisticCategory: CategoryWithStats }) => {
       // 移除乐观更新的临时数据
       if (context?.tempId) {
         optimistic.removeItem(queryKeys.categories.lists(), context.tempId);
@@ -115,7 +117,7 @@ export function useCreateCategory() {
       // 无效化相关查询
       invalidate.invalidateCategories();
     },
-    onError: (error, variables, context) => {
+    onError: (error, variables, context?: { tempId: number; optimisticCategory: CategoryWithStats }) => {
       // 回滚乐观更新
       if (context?.tempId) {
         optimistic.removeItem(queryKeys.categories.lists(), context.tempId);
@@ -168,7 +170,7 @@ export function useUpdateCategory() {
         // 无效化相关查询
         invalidate.invalidateCategories(id);
       },
-      onError: (error, variables, context) => {
+      onError: (error, variables, context?: { id: string | number }) => {
         if (context) {
           // 回滚乐观更新
           invalidate.invalidateCategories(context.id);
@@ -200,7 +202,7 @@ export function useDeleteCategory() {
         invalidate.invalidateCategories();
         invalidate.invalidateContent(); // 因为内容可能关联了被删除的分类
       },
-      onError: (error, variables, context) => {
+      onError: (error, variables, context?: { id: string | number }) => {
         if (context) {
           // 回滚：重新获取数据
           invalidate.invalidateCategories();
@@ -221,7 +223,7 @@ export function useMoveCategory() {
   }>(
     ({ id }) => `/api/categories/${id}/move`,
     {
-      onSuccess: (data, variables) => {
+      onSuccess: () => {
         // 分类层级变更影响树状结构，需要完全重新获取
         invalidate.invalidateCategories();
       },
