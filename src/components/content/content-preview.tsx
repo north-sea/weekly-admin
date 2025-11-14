@@ -2,7 +2,6 @@
 
 import React, { useMemo } from 'react';
 import type { Components } from 'react-markdown';
-import type { CodeComponent } from 'react-markdown/lib/ast-to-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -13,6 +12,11 @@ import { Separator } from '@/components/ui/separator';
 import { Calendar, User, Eye, ExternalLink, Tag as TagIcon, Clock } from 'lucide-react';
 import { ContentFormatAdapter, StructuredContent } from '@/lib/utils/format-adapter';
 import { cn } from '@/lib/utils';
+
+type MarkdownCodeProps = React.HTMLAttributes<HTMLElement> & {
+  inline?: boolean;
+  children?: React.ReactNode;
+};
 
 interface ContentPreviewProps {
   content: {
@@ -199,6 +203,33 @@ export default function ContentPreview({
                 {children}
               </li>
             ),
+            code: ((props: MarkdownCodeProps) => {
+              const { inline, className, children, ...rest } = props;
+              if (inline) {
+                return (
+                  <code
+                    className={cn(
+                      'rounded-sm bg-muted px-1.5 py-0.5 font-mono text-sm',
+                      className
+                    )}
+                    {...rest}
+                  >
+                    {children}
+                  </code>
+                );
+              }
+              return (
+                <pre
+                  className={cn(
+                    'overflow-auto rounded-lg border border-border bg-muted/50 p-4 font-mono text-sm',
+                    className
+                  )}
+                  {...rest}
+                >
+                  <code>{children}</code>
+                </pre>
+              );
+            }),
             table: ({ children, ...props }) => (
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse border border-border text-sm" {...props}>

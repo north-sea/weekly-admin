@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import type { CodeComponent } from 'react-markdown/lib/ast-to-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -12,6 +11,11 @@ import dayjs from 'dayjs';
 // import 'highlight.js/styles/github.css'; // 已移除highlight.js依赖
 
 const { Title, Text, Paragraph } = Typography;
+
+type MarkdownCodeProps = React.HTMLAttributes<HTMLElement> & {
+  inline?: boolean;
+  children?: React.ReactNode;
+};
 
 interface ContentPreviewProps {
   content: {
@@ -117,7 +121,7 @@ export default function MarkdownPreview({
                 {children}
               </div>
             ),
-            code: ((props) => {
+            code: ((props: MarkdownCodeProps) => {
               const { inline, className, children, ...rest } = props;
               if (inline) {
                 return (
@@ -146,7 +150,7 @@ export default function MarkdownPreview({
                   </code>
                 </pre>
               );
-            }) as CodeComponent,
+            }),
             table: ({ children }) => (
               <div style={{ overflowX: 'auto', margin: '16px 0' }}>
                 <table style={{ 
@@ -279,7 +283,7 @@ export default function MarkdownPreview({
                 {children}
               </div>
             ),
-            code: ((props) => {
+            code: ((props: MarkdownCodeProps) => {
               const { inline, className, children, ...rest } = props;
               if (inline) {
                 return (
@@ -308,7 +312,7 @@ export default function MarkdownPreview({
                   </code>
                 </pre>
               );
-            }) as CodeComponent,
+            }),
             img: ({ src, alt, ...props }) => (
               <img
                 src={src}

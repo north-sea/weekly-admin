@@ -12,72 +12,22 @@ import {
   PaginationParams
 } from '@/hooks/useApi';
 
-// 周刊数据类型定义
-export interface WeeklyIssue {
-  id: number;
-  title: string;
-  issue_number: number;
-  description?: string;
-  status: 'draft' | 'published' | 'archived';
-  publication_date?: string;
-  created_at: string;
-  updated_at: string;
-  content_count: number;
-  view_count: number;
-  share_count: number;
-}
+import {
+  WeeklyIssue,
+  WeeklyContent,
+  WeeklyStats,
+  WeeklyInput,
+  WeeklyUpdate,
+} from '@/lib/services/weekly-api';
 
-export interface WeeklyContent {
-  id: number;
-  content_id: number;
-  weekly_issue_id: number;
-  position: number;
-  section?: string;
-  notes?: string;
-  content: {
-    id: number;
-    title: string;
-    slug: string;
-    description?: string;
-    content_type: string;
-    category?: string;
-    tags: string[];
-    published_at?: string;
-  };
-}
-
-export interface WeeklyStats {
-  total_views: number;
-  total_shares: number;
-  total_subscribers: number;
-  avg_engagement_rate: number;
-  top_performing_issues: Array<{
-    issue_number: number;
-    title: string;
-    views: number;
-    engagement_rate: number;
-  }>;
-  growth_metrics: {
-    subscriber_growth: number;
-    engagement_growth: number;
-    content_growth: number;
-  };
-}
-
-export interface WeeklyInput {
-  title: string;
-  issue_number?: number;
-  description?: string;
-  publication_date?: string;
-  status?: 'draft' | 'published';
-}
-
-export interface WeeklyUpdate {
-  title?: string;
-  description?: string;
-  publication_date?: string;
-  status?: 'draft' | 'published' | 'archived';
-}
+// 重新导出类型以保持兼容性
+export type {
+  WeeklyIssue,
+  WeeklyContent,
+  WeeklyStats,
+  WeeklyInput,
+  WeeklyUpdate,
+};
 
 // 周刊列表查询
 export function useWeeklyList(params?: PaginationParams & {

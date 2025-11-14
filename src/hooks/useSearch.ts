@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { debounce } from 'lodash-es';
 import { useSearchQuery, useSearchSuggestions } from '@/hooks/queries/useSearchQueries';
 
-// Re-export types from the centralized location
+// Re-export hooks and types from the centralized location
+export { useSearchSuggestions } from '@/hooks/queries/useSearchQueries';
 export type { SearchFilters, SearchOptions, SearchResult, SearchHistoryItem } from '@/lib/types/search';
 import type { SearchFilters, SearchOptions, SearchHistoryItem } from '@/lib/types/search';
 

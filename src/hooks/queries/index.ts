@@ -9,6 +9,7 @@ export * from './useWeeklyQueries';
 export * from './useDraftQueries';
 export * from './useSearchQueries';
 export * from './useOperationLogsQueries';
+export * from './useImageUploadQueries';
 
 // 导出缓存配置和管理工具
 export * from '@/lib/cache-config';
