@@ -36,11 +36,13 @@ export function useWeeklyList(params?: PaginationParams & {
   year?: number;
   sort_by?: 'issue_number' | 'publication_date' | 'view_count';
 }) {
+  const queryParams = params ? ({ ...params } as PaginationParams & Record<string, unknown>) : undefined;
+  
   return usePaginatedQuery<WeeklyIssue>(
     '/api/weekly',
-    params,
+    queryParams,
     {
-      queryKey: queryKeys.weekly.list(params),
+      queryKey: queryKeys.weekly.list(queryParams),
       staleTime: 3 * 60 * 1000, // 3分钟缓存
     }
   );
@@ -147,7 +149,7 @@ export function useCreateWeekly() {
       
       return { tempId, optimisticWeekly };
     },
-    onSuccess: (data, variables, context) => {
+    onSuccess: (data, variables, context?: { tempId: number; optimisticWeekly: WeeklyIssue }) => {
       // 移除乐观更新的临时数据
       if (context?.tempId) {
         optimistic.removeItem(queryKeys.weekly.lists(), context.tempId);
@@ -156,7 +158,7 @@ export function useCreateWeekly() {
       // 无效化相关查询
       invalidate.invalidateWeekly();
     },
-    onError: (error, variables, context) => {
+    onError: (error, variables, context?: { tempId: number; optimisticWeekly: WeeklyIssue }) => {
       // 回滚乐观更新
       if (context?.tempId) {
         optimistic.removeItem(queryKeys.weekly.lists(), context.tempId);
@@ -209,7 +211,7 @@ export function useUpdateWeekly() {
         // 无效化相关查询
         invalidate.invalidateWeekly(id);
       },
-      onError: (error, variables, context) => {
+      onError: (error, variables, context?: { id: string | number }) => {
         if (context) {
           // 回滚乐观更新
           invalidate.invalidateWeekly(context.id);
@@ -337,7 +339,7 @@ export function useReorderWeeklyContents() {
         data
       );
     },
-    onError: (error, variables, context) => {
+    onError: (error, variables, context?: { weekly_id: number; previousContents: WeeklyContent[] }) => {
       if (context?.previousContents) {
         // 回滚乐观更新
         invalidate.setQueryData(

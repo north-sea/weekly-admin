@@ -238,7 +238,7 @@ export function usePaginatedQuery<TData = unknown, TError = Error>(
 }
 
 // 无限滚动查询钩子
-export function useInfiniteScrollQuery<TData = unknown, TError = Error>(
+export function useInfiniteScrollQuery<TData = unknown>(
   url: string,
   params?: Omit<PaginationParams, 'page'> & Record<string, unknown>,
   options?: {
