@@ -9,8 +9,10 @@ import {
   useOptimisticUpdate,
   useInvalidateQueries,
   queryKeys,
-  PaginationParams
+  PaginationParams,
+  useApiMutation
 } from '@/hooks/useApi';
+import { apiClient } from '@/lib/api-client';
 
 // 周刊数据类型定义
 export interface WeeklyIssue {
@@ -20,11 +22,18 @@ export interface WeeklyIssue {
   description?: string;
   status: 'draft' | 'published' | 'archived';
   publication_date?: string;
+  start_date: string;
+  end_date: string;
   created_at: string;
   updated_at: string;
   content_count: number;
+  total_items: number;
+  total_word_count?: number;
+  reading_time?: number;
   view_count: number;
   share_count: number;
+  published_at?: string;
+  contents?: unknown[];
 }
 
 export interface WeeklyContent {
@@ -121,7 +130,7 @@ export function useWeeklyContents(weeklyId: string | number, enabled = true) {
 }
 
 // 可用于添加到周刊的内容查询
-export function useAvailableContents(params?: {
+export function useAvailableContents(_params?: {
   content_type?: string;
   category_id?: number;
   tag_ids?: number[];
@@ -220,8 +229,11 @@ export function useUpdateWeekly() {
   const invalidate = useInvalidateQueries();
   const optimistic = useOptimisticUpdate();
   
-  return usePut<WeeklyIssue, WeeklyUpdate & { id: string | number }>(
-    ({ id }) => `/api/weekly/${id}`,
+  return useApiMutation<WeeklyIssue, WeeklyUpdate & { id: string | number }>(
+    async (variables) => {
+      const { id, ...data } = variables;
+      return apiClient.put<WeeklyIssue>(`/api/weekly/${id}`, data);
+    },
     {
       onMutate: async (updateData) => {
         const { id, ...updates } = updateData;
@@ -274,8 +286,10 @@ export function useDeleteWeekly() {
   const invalidate = useInvalidateQueries();
   const optimistic = useOptimisticUpdate();
   
-  return useDelete<void, { id: string | number }>(
-    ({ id }) => `/api/weekly/${id}`,
+  return useApiMutation<void, { id: string | number }>(
+    async ({ id }) => {
+      await apiClient.delete(`/api/weekly/${id}`);
+    },
     {
       onMutate: async ({ id }) => {
         // 乐观更新：立即从列表中移除
@@ -283,7 +297,7 @@ export function useDeleteWeekly() {
         
         return { id };
       },
-      onSuccess: (data, variables) => {
+      onSuccess: (_data, variables) => {
         // 移除相关缓存
         invalidate.remove(queryKeys.weekly.detail(variables.id));
         invalidate.remove(queryKeys.weekly.contents(variables.id));
@@ -292,7 +306,7 @@ export function useDeleteWeekly() {
         // 无效化列表查询
         invalidate.invalidateWeekly();
       },
-      onError: (error, variables, context) => {
+      onError: (_error, _variables, context) => {
         if (context) {
           // 回滚：重新获取数据
           invalidate.invalidateWeekly();
@@ -422,8 +436,10 @@ export function usePublishWeekly() {
 export function useArchiveWeekly() {
   const invalidate = useInvalidateQueries();
   
-  return usePut<WeeklyIssue, { id: number }>(
-    ({ id }) => `/api/weekly/${id}/archive`,
+  return useApiMutation<WeeklyIssue, { id: number }>(
+    async ({ id }) => {
+      return apiClient.put<WeeklyIssue>(`/api/weekly/${id}/archive`, {});
+    },
     {
       onSuccess: (data, variables) => {
         // 更新周刊状态

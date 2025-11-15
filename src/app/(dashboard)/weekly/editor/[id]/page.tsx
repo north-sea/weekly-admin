@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,20 +14,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { Save, Eye, Send, Loader2, ArrowLeft } from 'lucide-react';
 import dayjs from 'dayjs';
 import WeeklyEditor from '@/components/weekly/WeeklyEditor';
-
-interface WeeklyIssue {
-  id: number;
-  issue_number: number;
-  title: string;
-  description?: string;
-  status: 'draft' | 'published' | 'archived';
-  start_date: string;
-  end_date: string;
-  total_items: number;
-  contents?: unknown[];
-  created_at: string;
-  updated_at: string;
-}
+import { useWeeklyDetail, useCreateWeekly, useUpdateWeekly, type WeeklyIssue } from '@/hooks/queries';
 
 const WeeklyEditorPage: React.FC = () => {
   const router = useRouter();
@@ -36,10 +23,6 @@ const WeeklyEditorPage: React.FC = () => {
   const isNew = params.id === 'new';
   const issueId = isNew ? null : parseInt(params.id as string);
 
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [issue, setIssue] = useState<WeeklyIssue | null>(null);
-
   // 表单字段
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -47,40 +30,51 @@ const WeeklyEditorPage: React.FC = () => {
   const [endDate, setEndDate] = useState('');
   const [status, setStatus] = useState<'draft' | 'published' | 'archived'>('draft');
 
-  const fetchIssue = useCallback(async () => {
-    if (!issueId) return;
-
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/weekly/${issueId}`);
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.error?.message || '获取周刊详情失败');
-      }
-
-      setIssue(result.data);
-      setTitle(result.data.title);
-      setDescription(result.data.description || '');
-      setStartDate(result.data.start_date);
-      setEndDate(result.data.end_date);
-      setStatus(result.data.status);
-    } catch (error) {
+  // React Query hooks
+  const { data: issue, isLoading, error } = useWeeklyDetail(issueId || '', !isNew && !!issueId);
+  
+  const createWeekly = useCreateWeekly({
+    onSuccess: (data) => {
       toast({
-        title: '加载失败',
-        description: error instanceof Error ? error.message : '获取周刊详情失败',
+        title: '创建成功',
+        description: '周刊已创建',
+      });
+      router.replace(`/weekly/editor/${data.id}`);
+    },
+    onError: (error) => {
+      toast({
+        title: '创建失败',
+        description: error instanceof Error ? error.message : '创建失败',
         variant: 'destructive',
       });
-      router.push('/weekly');
-    } finally {
-      setLoading(false);
-    }
-  }, [issueId, router, toast]);
+    },
+  });
+  
+  const updateWeekly = useUpdateWeekly({
+    onSuccess: () => {
+      toast({
+        title: '保存成功',
+        description: '周刊信息已保存',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: '保存失败',
+        description: error instanceof Error ? error.message : '保存失败',
+        variant: 'destructive',
+      });
+    },
+  });
 
+  // Initialize form fields when issue data is loaded
   useEffect(() => {
-    if (!isNew && issueId) {
-      void fetchIssue();
-    } else {
+    if (!isNew && issue) {
+      setTitle(issue.title);
+      setDescription(issue.description || '');
+      setStartDate(issue.start_date);
+      setEndDate(issue.end_date);
+      setStatus(issue.status);
+    } else if (isNew) {
       // 新建周刊的默认值
       const today = dayjs();
       const startOfWeek = today.startOf('week');
@@ -89,23 +83,22 @@ const WeeklyEditorPage: React.FC = () => {
       setStartDate(startOfWeek.format('YYYY-MM-DD'));
       setEndDate(endOfWeek.format('YYYY-MM-DD'));
       setStatus('draft');
-      setIssue({
-        id: 0,
-        issue_number: 0,
-        title: '',
-        description: '',
-        status: 'draft',
-        start_date: startOfWeek.format('YYYY-MM-DD'),
-        end_date: endOfWeek.format('YYYY-MM-DD'),
-        total_items: 0,
-        contents: [],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
     }
-  }, [isNew, issueId, fetchIssue]);
+  }, [isNew, issue]);
 
-  const handleSave = async () => {
+  // Handle error
+  useEffect(() => {
+    if (error && !isNew) {
+      toast({
+        title: '加载失败',
+        description: error instanceof Error ? error.message : '获取周刊详情失败',
+        variant: 'destructive',
+      });
+      router.push('/weekly');
+    }
+  }, [error, isNew, router, toast]);
+
+  const handleSave = () => {
     if (!title.trim()) {
       toast({
         title: '验证失败',
@@ -124,99 +117,54 @@ const WeeklyEditorPage: React.FC = () => {
       return;
     }
 
-    setSaving(true);
-    try {
-      const data = {
-        title: title.trim(),
-        description: description.trim(),
-        start_date: startDate,
-        end_date: endDate,
-        status,
-      };
+    const data = {
+      title: title.trim(),
+      description: description.trim(),
+      start_date: startDate,
+      end_date: endDate,
+      status,
+    };
 
-      let response;
-      if (isNew) {
-        response = await fetch('/api/weekly', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
-      } else {
-        response = await fetch(`/api/weekly/${issueId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
-      }
-
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.error?.message || '保存失败');
-      }
-
-      toast({
-        title: '保存成功',
-        description: '周刊信息已保存',
-      });
-
-      if (isNew) {
-        router.replace(`/weekly/editor/${result.data.id}`);
-      } else {
-        setIssue(result.data);
-      }
-    } catch (error) {
-      toast({
-        title: '保存失败',
-        description: error instanceof Error ? error.message : '保存失败',
-        variant: 'destructive',
-      });
-    } finally {
-      setSaving(false);
+    if (isNew) {
+      createWeekly.mutate(data);
+    } else if (issueId) {
+      updateWeekly.mutate({ id: issueId, ...data });
     }
   };
 
-  const handlePublish = async () => {
-    if (!issue) return;
+  const handlePublish = () => {
+    if (!issue || !issueId) return;
 
-    setSaving(true);
-    try {
-      const response = await fetch(`/api/weekly/${issue.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'published' }),
-      });
-
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.error?.message || '发布失败');
+    updateWeekly.mutate(
+      { id: issueId, status: 'published' },
+      {
+        onSuccess: () => {
+          toast({
+            title: '发布成功',
+            description: '周刊已发布',
+          });
+          setStatus('published');
+        },
+        onError: (error) => {
+          toast({
+            title: '发布失败',
+            description: error instanceof Error ? error.message : '发布失败',
+            variant: 'destructive',
+          });
+        },
       }
-
-      toast({
-        title: '发布成功',
-        description: '周刊已发布',
-      });
-      setIssue({ ...issue, status: 'published' });
-      setStatus('published');
-    } catch (error) {
-      toast({
-        title: '发布失败',
-        description: error instanceof Error ? error.message : '发布失败',
-        variant: 'destructive',
-      });
-    } finally {
-      setSaving(false);
-    }
+    );
   };
 
   const handlePreview = () => {
-    if (issue?.id) {
-      window.open(`/weekly/preview/${issue.id}`, '_blank');
+    if (issue?.id || (!isNew && issueId)) {
+      window.open(`/weekly/preview/${issue?.id || issueId}`, '_blank');
     }
   };
 
-  if (loading) {
+  const saving = createWeekly.isPending || updateWeekly.isPending;
+
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -227,7 +175,7 @@ const WeeklyEditorPage: React.FC = () => {
     );
   }
 
-  if (!issue) {
+  if (!isNew && !issue) {
     return null;
   }
 
@@ -242,9 +190,9 @@ const WeeklyEditorPage: React.FC = () => {
               </Button>
               <div>
                 <CardTitle className="text-2xl">
-                  {isNew ? '创建周刊' : `编辑第 ${issue.issue_number} 期周刊`}
+                  {isNew ? '创建周刊' : `编辑第 ${issue?.issue_number} 期周刊`}
                 </CardTitle>
-                {!isNew && (
+                {!isNew && issue && (
                   <p className="text-sm text-muted-foreground mt-1">
                     已包含 {issue.total_items} 篇内容
                   </p>
@@ -350,7 +298,7 @@ const WeeklyEditorPage: React.FC = () => {
             </Select>
           </div>
 
-          {!isNew && (
+          {!isNew && issue && (
             <>
               <Separator className="my-6" />
               <div className="space-y-2">

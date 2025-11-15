@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Card, Button, Space, message, Spin, Typography, Divider, Tag, Row, Col } from 'antd';
+import React from 'react';
+import { Button, Space, message, Spin, Typography, Divider, Tag, Row, Col } from 'antd';
 import { ArrowLeftOutlined, ShareAltOutlined, DownloadOutlined, PrinterOutlined } from '@ant-design/icons';
 import { useRouter, useParams } from 'next/navigation';
 import StructuredPreview from '@/components/content/StructuredPreview';
 import MarkdownPreview from '@/components/content/MarkdownPreview';
+import { useWeeklyDetail } from '@/hooks/queries';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -32,53 +33,20 @@ interface Content {
   featured?: boolean;
 }
 
-interface WeeklyIssue {
-  id: number;
-  issue_number: number;
-  title: string;
-  description?: string;
-  status: 'draft' | 'published' | 'archived';
-  start_date: string;
-  end_date: string;
-  total_items: number;
-  total_word_count: number;
-  reading_time: number;
-  published_at?: string;
-  contents: Content[];
-}
-
 const WeeklyPreviewPage: React.FC = () => {
   const router = useRouter();
   const params = useParams();
   const issueId = parseInt(params.id as string);
 
-  const [loading, setLoading] = useState(true);
-  const [issue, setIssue] = useState<WeeklyIssue | null>(null);
+  const { data: issue, isLoading, error } = useWeeklyDetail(issueId, true);
 
-  useEffect(() => {
-    if (issueId) {
-      fetchIssue();
-    }
-  }, [issueId]);
-
-  const fetchIssue = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/weekly/${issueId}`);
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.error?.message || '获取周刊详情失败');
-      }
-
-      setIssue(result.data);
-    } catch (error) {
+  // Handle error
+  React.useEffect(() => {
+    if (error) {
       message.error(error instanceof Error ? error.message : '获取周刊详情失败');
       router.push('/weekly');
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [error, router]);
 
   const handleShare = () => {
     const shareUrl = `${window.location.origin}/weekly/share/${issueId}`;
@@ -95,7 +63,7 @@ const WeeklyPreviewPage: React.FC = () => {
     message.info('PDF 导出功能开发中...');
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div style={{ padding: '24px', textAlign: 'center' }}>
         <Spin size="large" />

@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Card, Button, Space, message, Spin } from 'antd';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Button, Space, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { ProTable, PageContainer } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
 import { useRouter } from 'next/navigation';
+import { useWeeklyList } from '@/hooks/queries';
 
 interface WeeklyIssue {
   id: number;
@@ -21,11 +22,38 @@ interface WeeklyIssue {
   updated_at: string;
 }
 
+interface TableParams {
+  page: number;
+  pageSize: number;
+  status?: WeeklyIssue['status'];
+  search?: string;
+  sort_by?: 'issue_number' | 'publication_date' | 'view_count';
+  sortOrder?: 'asc' | 'desc';
+}
+
 const WeeklyManagePage: React.FC = () => {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const [tableParams, setTableParams] = useState<TableParams>({
+    page: 1,
+    pageSize: 10,
+  });
 
-  const columns: ProColumns<WeeklyIssue>[] = [
+  const { data, isLoading } = useWeeklyList({
+    page: tableParams.page,
+    pageSize: tableParams.pageSize,
+    status: tableParams.status,
+    search: tableParams.search,
+    sort_by: tableParams.sort_by,
+    sortOrder: tableParams.sortOrder,
+  });
+
+  const handleShare = useCallback((issue: WeeklyIssue) => {
+    const shareUrl = `${window.location.origin}/weekly/share/${issue.id}`;
+    navigator.clipboard.writeText(shareUrl);
+    message.success('分享链接已复制到剪贴板');
+  }, []);
+
+  const columns: ProColumns<WeeklyIssue>[] = useMemo(() => [
     {
       title: '期号',
       dataIndex: 'issue_number',
@@ -57,6 +85,7 @@ const WeeklyManagePage: React.FC = () => {
     },
     {
       title: '时间范围',
+      dataIndex: 'timeRange',
       width: 200,
       render: (_, record) => (
         <div>
@@ -64,17 +93,20 @@ const WeeklyManagePage: React.FC = () => {
           <div style={{ color: '#666', fontSize: '12px' }}>至 {record.end_date}</div>
         </div>
       ),
+      search: false,
     },
     {
       title: '发布时间',
       dataIndex: 'published_at',
       width: 150,
-      render: (text: any) => text ? new Date(text as string).toLocaleString() : '-',
+      render: (text: string | undefined) => (text ? new Date(text).toLocaleString() : '-'),
+      search: false,
     },
     {
       title: '操作',
       width: 200,
       fixed: 'right',
+      valueType: 'option',
       render: (_, record) => (
         <Space>
           <Button
@@ -101,47 +133,48 @@ const WeeklyManagePage: React.FC = () => {
         </Space>
       ),
     },
-  ];
-
-  const handleShare = (issue: WeeklyIssue) => {
-    const shareUrl = `${window.location.origin}/weekly/share/${issue.id}`;
-    navigator.clipboard.writeText(shareUrl);
-    message.success('分享链接已复制到剪贴板');
-  };
+  ], [handleShare, router]);
 
   const handleCreateIssue = () => {
     router.push('/weekly/editor/new');
   };
 
-  const fetchWeeklyIssues = async (params: any) => {
-    try {
-      const searchParams = new URLSearchParams();
-      
-      if (params.current) searchParams.append('page', params.current.toString());
-      if (params.pageSize) searchParams.append('pageSize', params.pageSize.toString());
-      if (params.status) searchParams.append('status', params.status);
-      if (params.title) searchParams.append('search', params.title);
+  const handleTableChange = (
+    pagination: { current?: number; pageSize?: number },
+    _filters: Record<string, unknown>,
+    sorter: unknown,
+  ) => {
+    const normalizedSorter = Array.isArray(sorter)
+      ? undefined
+      : (sorter as { field?: string; order?: 'ascend' | 'descend' | undefined });
 
-      const response = await fetch(`/api/weekly?${searchParams.toString()}`);
-      const result = await response.json();
+    setTableParams((prev) => ({
+      ...prev,
+      page: pagination.current || 1,
+      pageSize: pagination.pageSize || prev.pageSize,
+      sort_by: normalizedSorter?.field as TableParams['sort_by'] | undefined,
+      sortOrder: normalizedSorter?.order
+        ? normalizedSorter.order === 'ascend'
+          ? 'asc'
+          : 'desc'
+        : undefined,
+    }));
+  };
 
-      if (!result.success) {
-        throw new Error(result.error?.message || '获取周刊列表失败');
-      }
+  const handleSearch = (values: Record<string, unknown>) => {
+    setTableParams((prev) => ({
+      ...prev,
+      page: 1,
+      search: (values.title as string) || undefined,
+      status: (values.status as WeeklyIssue['status']) || undefined,
+    }));
+  };
 
-      return {
-        data: result.data.issues,
-        success: true,
-        total: result.data.total,
-      };
-    } catch (error) {
-      message.error(error instanceof Error ? error.message : '获取周刊列表失败');
-      return {
-        data: [],
-        success: false,
-        total: 0,
-      };
-    }
+  const handleReset = () => {
+    setTableParams({
+      page: 1,
+      pageSize: 10,
+    });
   };
 
   return (
@@ -160,19 +193,26 @@ const WeeklyManagePage: React.FC = () => {
       ]}
     >
       <ProTable<WeeklyIssue>
-        columns={columns}
-        request={fetchWeeklyIssues}
         rowKey="id"
+        columns={columns}
+        dataSource={data?.data ?? []}
+        loading={isLoading}
         search={{
           labelWidth: 'auto',
+          defaultCollapsed: false,
         }}
         pagination={{
-          defaultPageSize: 10,
+          current: tableParams.page,
+          pageSize: tableParams.pageSize,
+          total: data?.pagination.total,
           showSizeChanger: true,
         }}
+        onSubmit={handleSearch}
+        onReset={handleReset}
+        onChange={handleTableChange}
         options={{
           setting: true,
-          reload: true,
+          reload: false,
           density: true,
         }}
       />
