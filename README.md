@@ -6,14 +6,11 @@
 
 **本项目正在进行大规模重构!** 我们正在将 UI 库从 Ant Design 迁移到 shadcn/ui,并简化工作流程。
 
-详细信息请查看: **[重构文档中心 (docs/)](./docs/README.md)**
+重构相关的文档目前精简为三份:
 
-- 📋 [产品需求文档](./docs/MAIN_PRD.md)
-- 🏗️ [技术架构文档](./docs/TECHNICAL_ARCHITECTURE.md)
-- ✅ [任务清单](./docs/TASKS.md)
-- 🎨 [设计系统](./docs/DESIGN_SYSTEM.md)
-- 📖 [迁移指南](./docs/MIGRATION_GUIDE.md)
-- 🔄 [React Query数据获取指南](./docs/REACT_QUERY_GUIDE.md) - **新增**
+- 📋 **产品需求与整体规划**: `docs/MAIN_PRD.md`
+- ✅ **任务清单与进度追踪**: `docs/TASKS.md`
+- 🧩 **功能概要(汇总)**: `docs/FEATURES_OVERVIEW.md`
 
 ---
 
@@ -55,6 +52,11 @@ pnpm dev
 访问 [http://localhost:3000](http://localhost:3000) 开始开发。
 
 **📋 详细开发指南：[本地开发指南.md](本地开发指南.md)**
+
+### 架构与规范(简要)
+
+- **API 响应格式**: 所有接口统一返回 `{ success, data | error, meta }` 结构, 前端通过类型守卫安全解析; 详细约定见 `docs/archive/API_RESPONSE_FORMAT.md`。
+- **数据库脚本**: 常用命令 `pnpm db:pull`(同步 schema)、`pnpm db:generate`(生成 Prisma 客户端)、`pnpm db:migrate`(执行迁移), 说明见 `docs/archive/DATABASE.md`。
 
 ### 生产环境部署
 
