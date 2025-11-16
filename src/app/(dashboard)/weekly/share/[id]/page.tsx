@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Typography, Divider, Tag, Row, Col, message, Spin } from 'antd';
 import { useParams } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
+import { useWeeklyDetail } from '@/hooks/queries';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -28,58 +29,22 @@ interface Content {
   featured?: boolean;
 }
 
-interface WeeklyIssue {
-  id: number;
-  issue_number: number;
-  title: string;
-  description?: string;
-  status: 'draft' | 'published' | 'archived';
-  start_date: string;
-  end_date: string;
-  total_items: number;
-  total_word_count: number;
-  reading_time: number;
-  published_at?: string;
-  contents: Content[];
-}
-
 const WeeklySharePage: React.FC = () => {
   const params = useParams();
   const issueId = parseInt(params.id as string);
 
-  const [loading, setLoading] = useState(true);
-  const [issue, setIssue] = useState<WeeklyIssue | null>(null);
+  const { data: issue, isLoading, error } = useWeeklyDetail(issueId, true);
 
-  useEffect(() => {
-    if (issueId) {
-      fetchIssue();
-    }
-  }, [issueId]);
-
-  const fetchIssue = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/weekly/${issueId}`);
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.error?.message || '获取周刊详情失败');
-      }
-
-      // 只显示已发布的周刊
-      if (result.data.status !== 'published') {
-        throw new Error('该周刊尚未发布或已下线');
-      }
-
-      setIssue(result.data);
-    } catch (error) {
+  // Handle error and status check
+  React.useEffect(() => {
+    if (error) {
       message.error(error instanceof Error ? error.message : '获取周刊详情失败');
-    } finally {
-      setLoading(false);
+    } else if (issue && issue.status !== 'published') {
+      message.error('该周刊尚未发布或已下线');
     }
-  };
+  }, [error, issue]);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div style={{ 
         minHeight: '100vh', 
@@ -93,7 +58,7 @@ const WeeklySharePage: React.FC = () => {
     );
   }
 
-  if (!issue) {
+  if (!issue || issue.status !== 'published') {
     return (
       <div style={{ 
         minHeight: '100vh', 
