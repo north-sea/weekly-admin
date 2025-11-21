@@ -4,7 +4,8 @@
       "Bash(ls:*)",
       "Bash(npx shadcn@latest add skeleton)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(pnpm add:*)"
     ],
     "deny": [],
     "ask": []
