@@ -1,11 +1,23 @@
 'use client';
 
 import React, { useState } from 'react';
-import { DraftCard } from './draft-card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, XCircle, AlertCircle } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  AlertCircle,
+  Check,
+  ExternalLink,
+  Loader2,
+  Star,
+  Trash2,
+  X,
+  XCircle,
+  Eye,
+  Clock,
+} from 'lucide-react';
 import type { Draft } from '@/hooks/queries/useDraftQueries';
 import {
   useUpdateDraft,
@@ -15,12 +27,61 @@ import {
 } from '@/hooks/queries/useDraftQueries';
 import { useToast } from '@/components/ui/use-toast';
 import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+import 'dayjs/locale/zh-cn';
+
+dayjs.extend(relativeTime);
+dayjs.locale('zh-cn');
 
 interface DraftGridProps {
   drafts: Draft[];
   isLoading?: boolean;
   onPreview?: (draft: Draft) => void;
 }
+
+const statusMap: Record<
+  Draft['status'],
+  { label: string; badgeVariant: 'secondary' | 'default' | 'destructive'; tone: string }
+> = {
+  pending: { label: '待处理', badgeVariant: 'secondary', tone: 'text-amber-600' },
+  adopted: { label: '已采用', badgeVariant: 'default', tone: 'text-green-600' },
+  rejected: { label: '已拒绝', badgeVariant: 'destructive', tone: 'text-red-600' },
+};
+
+const getHostnameFromUrl = (url?: string): string => {
+  if (!url) return '';
+  try {
+    return new URL(url).hostname.replace('www.', '');
+  } catch {
+    try {
+      return new URL(`https://${url}`).hostname.replace('www.', '');
+    } catch {
+      return '';
+    }
+  }
+};
+
+const renderPriority = (priority?: number | null) => {
+  if (!priority || priority <= 0) return null;
+  return (
+    <div className="flex items-center gap-0.5 text-amber-500">
+      {Array.from({ length: Math.min(priority, 5) }).map((_, i) => (
+        <Star key={i} className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+      ))}
+    </div>
+  );
+};
+
+const parseTags = (raw?: string | null) => {
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw) as Array<{ id?: number | string; name: string; attachedBy?: string }>;
+  } catch {
+    return [];
+  }
+};
 
 export function DraftGrid({ drafts, isLoading, onPreview }: DraftGridProps) {
   const router = useRouter();
@@ -108,7 +169,7 @@ export function DraftGrid({ drafts, isLoading, onPreview }: DraftGridProps) {
 
   const handleBatchReject = async () => {
     if (selectedDrafts.size === 0) return;
-    
+
     try {
       await batchUpdate.mutateAsync({
         ids: Array.from(selectedDrafts),
@@ -149,69 +210,252 @@ export function DraftGrid({ drafts, isLoading, onPreview }: DraftGridProps) {
     );
   }
 
+  const allSelected = drafts.length > 0 && selectedDrafts.size === drafts.length;
+
   return (
     <div className="space-y-4">
-      {/* 批量操作工具栏 */}
-      {selectedDrafts.size > 0 && (
-        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border rounded-lg p-4 shadow-md">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-3">
-              <Badge variant="secondary" className="text-sm">
-                已选择 {selectedDrafts.size} 项
-              </Badge>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSelectAll}
-              >
-                {selectedDrafts.size === drafts.length ? '取消全选' : '全选'}
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleBatchReject}
-                disabled={batchUpdate.isPending}
-              >
-                {batchUpdate.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                    处理中...
-                  </>
-                ) : (
-                  <>
-                    <XCircle className="h-4 w-4 mr-1" />
-                    批量拒绝
-                  </>
-                )}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedDrafts(new Set())}
-              >
-                取消选择
-              </Button>
-            </div>
+      {/* 批量操作工具栏，占位以防列表跳动 */}
+      <div className="rounded-lg border bg-muted/40 px-4 py-3 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3 text-sm">
+            <Badge
+              variant="secondary"
+              className="bg-primary/10 text-primary"
+            >
+              已选择 {selectedDrafts.size} 项
+            </Badge>
+            <span className="text-muted-foreground">
+              勾选左侧复选框可批量拒绝当前页草稿
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSelectAll}
+              disabled={drafts.length === 0}
+            >
+              {allSelected ? '取消全选' : '全选当前页'}
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleBatchReject}
+              disabled={batchUpdate.isPending || selectedDrafts.size === 0}
+              className="flex items-center gap-1"
+            >
+              {batchUpdate.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  处理中...
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-4 w-4" />
+                  批量拒绝
+                </>
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedDrafts(new Set())}
+              disabled={selectedDrafts.size === 0}
+            >
+              清空选择
+            </Button>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* 卡片网格 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {drafts.map((draft) => (
-          <DraftCard
-            key={draft.id}
-            draft={draft}
-            onPreview={onPreview}
-            onAdopt={handleAdopt}
-            onReject={handleReject}
-            onDelete={handleDelete}
-            selected={selectedDrafts.has(draft.id)}
-            onSelect={handleSelect}
-          />
-        ))}
+      {/* 表格视图 */}
+      <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="w-10 px-4 py-3 text-left">
+                  <Checkbox
+                    checked={allSelected}
+                    onCheckedChange={handleSelectAll}
+                    aria-label="全选当前页草稿"
+                  />
+                </th>
+                <th className="w-[40%] px-4 py-3 text-left font-semibold text-foreground">标题 / 摘要</th>
+                <th className="w-[16%] px-4 py-3 text-left font-semibold text-foreground">状态</th>
+                <th className="w-[16%] px-4 py-3 text-left font-semibold text-foreground">来源</th>
+                <th className="w-[14%] px-4 py-3 text-left font-semibold text-foreground">时间</th>
+                <th className="w-[14%] px-4 py-3 text-left font-semibold text-foreground">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {drafts.map((draft) => {
+                const status = statusMap[draft.status];
+                const hostname = getHostnameFromUrl(draft.url);
+                const tags = parseTags(draft.tags_suggestion);
+
+                return (
+                  <tr
+                    key={draft.id}
+                    className={cn(
+                      'border-t border-border/80 transition-colors hover:bg-muted/30',
+                      selectedDrafts.has(draft.id) && 'bg-primary/5'
+                    )}
+                  >
+                    <td className="px-4 py-3 align-top">
+                      <Checkbox
+                        checked={selectedDrafts.has(draft.id)}
+                        onCheckedChange={(checked) => handleSelect(draft, checked === true)}
+                        aria-label={`选择 ${draft.title}`}
+                      />
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <div className="flex items-start gap-3">
+                        <Avatar className="h-10 w-10 border border-border/80 bg-muted/60">
+                          {draft.favicon_url && <AvatarImage src={draft.favicon_url} alt={hostname || draft.title} />}
+                          <AvatarFallback className="text-xs">
+                            {draft.title?.slice(0, 2) || '草稿'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="space-y-2">
+                          <button
+                            type="button"
+                            onClick={() => onPreview?.(draft)}
+                            className="line-clamp-2 text-left text-base font-medium leading-snug transition-colors hover:text-primary"
+                          >
+                            {draft.title || '未命名草稿'}
+                          </button>
+                          {(draft.description || draft.note) && (
+                            <p className="text-sm text-muted-foreground line-clamp-2">
+                              {draft.description || draft.note}
+                            </p>
+                          )}
+                          <div className="flex flex-wrap items-center gap-2">
+                            {tags.slice(0, 3).map((tag, idx) => (
+                              <Badge
+                                key={tag.id || idx}
+                                variant="secondary"
+                                className={cn(
+                                  'truncate',
+                                  tag.attachedBy === 'ai' &&
+                                    'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-200'
+                                )}
+                              >
+                                {tag.name}
+                              </Badge>
+                            ))}
+                            {tags.length > 3 && (
+                              <Badge variant="outline">+{tags.length - 3}</Badge>
+                            )}
+                            {draft.category_suggestion && (
+                              <Badge variant="outline" className="bg-accent/20 text-foreground">
+                                {draft.category_suggestion}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <div className="space-y-2">
+                        <Badge variant={status.badgeVariant} className="w-fit">
+                          {status.label}
+                        </Badge>
+                        <div className={cn('text-xs font-medium', status.tone)}>
+                          {draft.status === 'pending' ? '等待处理' : draft.status === 'adopted' ? '已转为内容' : '不采用'}
+                        </div>
+                        {renderPriority(draft.priority)}
+                        {draft.duplicate_of && (
+                          <Badge variant="outline" className="w-fit text-xs">
+                            可能与「{draft.duplicate_of.title}」重复
+                          </Badge>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                        <span className="truncate">{hostname || '本地内容'}</span>
+                        {draft.url && (
+                          <a
+                            href={draft.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-primary hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            打开链接
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        )}
+                        {draft.source && <span className="truncate text-[11px]">来源：{draft.source}</span>}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                        <div className="inline-flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          <span>{draft.karakeep_created_at ? dayjs(draft.karakeep_created_at).fromNow() : '未知时间'}</span>
+                        </div>
+                        {draft.synced_at && (
+                          <span className="text-[11px]">同步于 {dayjs(draft.synced_at).format('MM-DD HH:mm')}</span>
+                        )}
+                        {draft.updated_at && (
+                          <span className="text-[11px]">更新于 {dayjs(draft.updated_at).format('MM-DD HH:mm')}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="transition-transform hover:-translate-y-0.5"
+                          onClick={() => onPreview?.(draft)}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          预览
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="transition-transform hover:-translate-y-0.5"
+                          onClick={() => handleAdopt(draft)}
+                          disabled={convertDraft.isPending || draft.status !== 'pending'}
+                        >
+                          {convertDraft.isPending ? (
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          ) : (
+                            <Check className="h-4 w-4 mr-1" />
+                          )}
+                          采用
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-destructive/40 text-destructive transition-transform hover:-translate-y-0.5 hover:bg-destructive/10"
+                          onClick={() => handleReject(draft)}
+                          disabled={updateDraft.isPending || draft.status !== 'pending'}
+                        >
+                          <X className="h-4 w-4 mr-1" />
+                          拒绝
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive transition-transform hover:-translate-y-0.5 hover:bg-destructive/10"
+                          onClick={() => handleDelete(draft)}
+                          disabled={deleteDraft.isPending}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

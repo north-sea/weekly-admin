@@ -64,7 +64,7 @@ export function DraftPreviewDialog({ draft, open, onOpenChange }: DraftPreviewDi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden p-0">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden bg-card p-0 shadow-2xl">
         <DialogHeader className="p-6 pb-3">
           <DialogTitle className="text-xl font-semibold">{draft.title}</DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
