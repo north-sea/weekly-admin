@@ -184,3 +184,147 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Enhanced visual styles with shadows and glass effects */
+@layer components {
+  /* Card enhancements with subtle shadows and glass effect */
+  [data-slot="card"] {
+    @apply shadow-sm hover:shadow-md transition-shadow duration-200;
+    background: hsl(var(--card) / 0.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  /* Elevated cards for important content */
+  .card-elevated {
+    @apply shadow-lg hover:shadow-xl transition-all duration-300;
+    background: hsl(var(--card) / 0.98);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* Glass effect for modals and popovers */
+  [data-slot="popover"],
+  [data-slot="dialog"] {
+    @apply shadow-2xl;
+    background: hsl(var(--popover) / 0.95);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid hsl(var(--border) / 0.5);
+  }
+
+  /* Button enhancements */
+  button[data-slot="button"] {
+    @apply shadow-sm hover:shadow transition-all duration-200;
+  }
+
+  button[data-slot="button"]:active {
+    @apply scale-[0.98];
+  }
+
+  /* Input field enhancements */
+  input[data-slot="input"],
+  textarea[data-slot="textarea"],
+  select[data-slot="select"] {
+    @apply shadow-inner;
+    background: hsl(var(--background) / 0.5);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  input[data-slot="input"]:focus,
+  textarea[data-slot="textarea"]:focus,
+  select[data-slot="select"]:focus {
+    @apply shadow-md;
+  }
+
+  /* Stat card specific styling */
+  .stat-card {
+    @apply shadow-sm hover:shadow-md transition-all duration-300;
+    background: linear-gradient(135deg, hsl(var(--card) / 0.98) 0%, hsl(var(--card) / 0.95) 100%);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid hsl(var(--border) / 0.5);
+  }
+
+  /* Sidebar glass effect */
+  .sidebar-glass {
+    background: hsl(var(--sidebar) / 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-right: 1px solid hsl(var(--border) / 0.3);
+  }
+
+  /* Floating action button */
+  .fab {
+    @apply shadow-lg hover:shadow-xl transition-all duration-300;
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.9) 100%);
+  }
+
+  /* Smooth scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--muted) / 0.3);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 4px;
+    transition: background 0.2s;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  /* Subtle animations */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  /* Gradient backgrounds for headers */
+  .gradient-header {
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.1) 0%, hsl(var(--accent) / 0.05) 100%);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  /* Enhanced borders */
+  .border-enhanced {
+    border: 1px solid hsl(var(--border) / 0.5);
+    box-shadow: 0 0 0 1px hsl(var(--border) / 0.1);
+  }
+
+  /* Dark mode specific enhancements */
+  .dark [data-slot="card"] {
+    background: hsl(var(--card) / 0.9);
+    border: 1px solid hsl(var(--border) / 0.3);
+  }
+
+  .dark .stat-card {
+    background: linear-gradient(135deg, hsl(var(--card) / 0.95) 0%, hsl(var(--card) / 0.9) 100%);
+    border: 1px solid hsl(var(--border) / 0.3);
+  }
+
+  .dark [data-slot="popover"],
+  .dark [data-slot="dialog"] {
+    background: hsl(var(--popover) / 0.9);
+    border: 1px solid hsl(var(--border) / 0.3);
+  }
+}

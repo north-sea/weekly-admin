@@ -3,7 +3,8 @@
     "allow": [
       "Bash(ls:*)",
       "Bash(npx shadcn@latest add skeleton)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

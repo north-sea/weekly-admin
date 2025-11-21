@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { debounce } from 'lodash-es';
-import { useSearchQuery, useSearchSuggestions } from '@/hooks/queries/useSearchQueries';
+import { useSearchQuery, useSearchSuggestions as useSearchSuggestionsQuery } from '@/hooks/queries/useSearchQueries';
 
 // Re-export types from the centralized location
 export type { SearchFilters, SearchOptions, SearchResult, SearchHistoryItem } from '@/lib/types/search';
 import type { SearchFilters, SearchOptions, SearchHistoryItem } from '@/lib/types/search';
+
+// Re-export useSearchSuggestions for backward compatibility
+export { useSearchSuggestions } from '@/hooks/queries/useSearchQueries';
 
 // Custom hook for search functionality with React Query
 export function useSearch(initialOptions: SearchOptions = {}) {
@@ -24,7 +27,7 @@ export function useSearch(initialOptions: SearchOptions = {}) {
   // Use React Query for suggestions
   const {
     data: suggestionsData,
-  } = useSearchSuggestions(
+  } = useSearchSuggestionsQuery(
     suggestionQuery,
     5,
     Boolean(suggestionQuery.trim())
@@ -222,7 +225,7 @@ export function useSearchSuggestionsOnly() {
   const {
     data: suggestionsData,
     isLoading,
-  } = useSearchSuggestions(query, suggestionLimit, !!query.trim());
+  } = useSearchSuggestionsQuery(query, suggestionLimit, !!query.trim());
   
   const suggestions = suggestionsData?.suggestions || [];
   
