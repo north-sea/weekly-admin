@@ -5,7 +5,8 @@
       "Bash(npx shadcn@latest add skeleton)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(pnpm add:*)"
+      "Bash(pnpm add:*)",
+      "Bash(npx shadcn@latest add table)"
     ],
     "deny": [],
     "ask": []

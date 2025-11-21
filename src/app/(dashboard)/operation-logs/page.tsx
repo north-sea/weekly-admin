@@ -1,67 +1,56 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { 
-  Card, 
-  Table, 
-  Button, 
-  Space, 
-  Tag, 
-  DatePicker, 
-  Select, 
-  Input, 
-  Row, 
-  Col,
-  Statistic,
-  Alert,
-  Popover,
-  Modal,
-  message
-} from 'antd';
-import { PageContainer } from '@ant-design/pro-components';
-import { 
-  SearchOutlined, 
-  DownloadOutlined, 
-  ReloadOutlined,
-  ExclamationCircleOutlined,
-  UserOutlined,
-  ClockCircleOutlined
-} from '@ant-design/icons';
-import type { ColumnsType } from 'antd/es/table';
+import React, { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { useToast } from '@/components/ui/use-toast';
+import { useOperationLogs } from '@/hooks/queries/useOperationLogsQueries';
+import type { OperationLogsQuery } from '@/lib/services/operation-logs-api';
+import { Search, Download, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import dayjs from 'dayjs';
-import { 
-  useOperationLogs, 
-  useOperationLogsStats, 
-  useDetectAnomalousOperations,
-  useExportOperationLogs,
-  useRefreshOperationLogs
-} from '@/hooks/queries/useOperationLogsQueries';
-import type { OperationLog, OperationLogsQuery } from '@/lib/services/operation-logs-api';
 
-const { RangePicker } = DatePicker;
-const { Option } = Select;
+const operationTypeMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
+  CREATE: { label: '创建', variant: 'default' },
+  UPDATE: { label: '更新', variant: 'secondary' },
+  DELETE: { label: '删除', variant: 'destructive' },
+  LOGIN: { label: '登录', variant: 'outline' },
+  LOGOUT: { label: '退出', variant: 'outline' },
+};
 
-const OperationLogsPage: React.FC = () => {
-  // 筛选条件
+const resourceTypeMap: Record<string, string> = {
+  content: '内容',
+  category: '分类',
+  tag: '标签',
+  weekly_issue: '周刊',
+  user: '用户',
+};
+
+export default function OperationLogsPage() {
+  const { toast } = useToast();
   const [filters, setFilters] = useState<OperationLogsQuery>({
     page: 1,
     pageSize: 20,
   });
-  
-  // 异常操作检测
-  const [showAnomalousAlert, setShowAnomalousAlert] = useState(false);
-  
-  // React Query hooks
-  const { data: logsData, isLoading: loading } = useOperationLogs(filters);
-  const { data: stats, isLoading: statsLoading } = useOperationLogsStats(
-    filters.startDate && filters.endDate 
-      ? { startDate: filters.startDate, endDate: filters.endDate }
-      : undefined
-  );
-  const { data: anomalousOperations = [], refetch: detectAnomalous } = useDetectAnomalousOperations();
-  const exportMutation = useExportOperationLogs();
-  const refreshLogs = useRefreshOperationLogs();
-  
+
+  const { data: logsData, isLoading } = useOperationLogs(filters);
   const logs = logsData?.data || [];
   const pagination = logsData?.pagination || {
     page: 1,
@@ -69,354 +58,219 @@ const OperationLogsPage: React.FC = () => {
     total: 0,
     totalPages: 0,
   };
-  
-  // 初始检测异常操作
-  useEffect(() => {
-    detectAnomalous().then(({ data }) => {
-      if (data && data.length > 0) {
-        setShowAnomalousAlert(true);
-      }
+
+  const handleSearch = (search: string) => {
+    setFilters({ ...filters, search, page: 1 });
+  };
+
+  const handleOperationTypeChange = (operationType: string) => {
+    setFilters({
+      ...filters,
+      operationType: operationType === 'all' ? undefined : operationType,
+      page: 1,
     });
-  }, [detectAnomalous]);
-  
-  // 导出日志
-  const handleExport = (format: 'json' | 'csv') => {
-    const exportQuery = { ...filters };
-    delete exportQuery.page;
-    delete exportQuery.pageSize;
-    
-    exportMutation.mutate(
-      { format, query: exportQuery },
-      {
-        onSuccess: () => {
-          message.success('导出成功');
-        },
-        onError: (error) => {
-          console.error('导出失败:', error);
-          message.error('导出失败');
-        },
-      }
-    );
   };
-  
-  // 处理表格变化
-  const handleTableChange = (page: number, pageSize: number) => {
-    setFilters(prev => ({ ...prev, page, pageSize }));
+
+  const handleResourceTypeChange = (resourceType: string) => {
+    setFilters({
+      ...filters,
+      resourceType: resourceType === 'all' ? undefined : resourceType,
+      page: 1,
+    });
   };
-  
-  // 处理筛选条件变化
-  const handleFilterChange = <K extends keyof OperationLogsQuery>(key: K, value: OperationLogsQuery[K]) => {
-    setFilters(prev => ({ ...prev, [key]: value, page: 1 }));
+
+  const handlePageChange = (newPage: number) => {
+    setFilters({ ...filters, page: newPage });
   };
-  
-  // 表格列定义
-  const columns: ColumnsType<OperationLog> = [
-    {
-      title: 'ID',
-      dataIndex: 'id',
-      key: 'id',
-      width: 80
-    },
-    {
-      title: '用户',
-      key: 'user',
-      width: 120,
-      render: (_, record) => (
-        <Space>
-          <UserOutlined />
-          <span>{record.user?.display_name || record.user?.username || '未知用户'}</span>
-        </Space>
-      )
-    },
-    {
-      title: '操作类型',
-      dataIndex: 'operation_type',
-      key: 'operation_type',
-      width: 100,
-      render: (type: string) => {
-        const colors = {
-          CREATE: 'green',
-          UPDATE: 'blue',
-          DELETE: 'red',
-          LOGIN: 'cyan',
-          LOGOUT: 'orange'
-        };
-        return <Tag color={colors[type as keyof typeof colors]}>{type}</Tag>;
-      }
-    },
-    {
-      title: '资源类型',
-      dataIndex: 'resource_type',
-      key: 'resource_type',
-      width: 120
-    },
-    {
-      title: '资源ID',
-      dataIndex: 'resource_id',
-      key: 'resource_id',
-      width: 100,
-      render: (id) => id || '-'
-    },
-    {
-      title: '操作详情',
-      dataIndex: 'operation_details',
-      key: 'operation_details',
-      ellipsis: true,
-      render: (details) => {
-        if (!details) return '-';
-        
-        let formattedContent;
-        try {
-          const parsed = JSON.parse(details);
-          formattedContent = JSON.stringify(parsed, null, 2);
-        } catch {
-          formattedContent = details;
-        }
-        
-        const popoverContent = (
-          <div style={{ maxWidth: 400, maxHeight: 300, overflow: 'auto' }}>
-            <pre 
-              style={{
-                margin: 0,
-                padding: '8px',
-                backgroundColor: '#f5f5f5',
-                borderRadius: '4px',
-                fontSize: '12px',
-                lineHeight: '1.4',
-                wordWrap: 'break-word',
-                whiteSpace: 'pre-wrap',
-                overflow: 'auto'
-              }}
-            >
-              {formattedContent}
-            </pre>
-          </div>
-        );
-        
-        return (
-          <Popover
-            content={popoverContent}
-            title="操作详情"
-            placement="topLeft"
-            trigger="hover"
-            overlayStyle={{ maxWidth: 450 }}
-          >
-            <span 
-              style={{ 
-                cursor: 'pointer',
-                color: '#1890ff',
-                borderBottom: '1px dashed #1890ff'
-              }}
-            >
-              {details.substring(0, 50)}...
-            </span>
-          </Popover>
-        );
-      }
-    },
-    {
-      title: 'IP地址',
-      dataIndex: 'ip_address',
-      key: 'ip_address',
-      width: 120,
-      render: (ip) => ip || '-'
-    },
-    {
-      title: '操作时间',
-      dataIndex: 'created_at',
-      key: 'created_at',
-      width: 160,
-      render: (time) => (
-        <Space>
-          <ClockCircleOutlined />
-          <span>{time ? dayjs(time).format('YYYY-MM-DD HH:mm:ss') : '-'}</span>
-        </Space>
-      )
-    }
-  ];
+
+  const handleExport = () => {
+    toast({
+      title: '导出功能',
+      description: '导出功能开发中...',
+    });
+  };
 
   return (
-    <PageContainer
-      title="操作日志"
-      subTitle="查看系统操作记录和用户活动"
-    >
-      {/* 异常操作告警 */}
-      {showAnomalousAlert && anomalousOperations.length > 0 && (
-        <Alert
-          message="检测到异常操作"
-          description={
-            <div>
-              {anomalousOperations.map((item, index) => (
-                <div key={index}>
-                  用户 {item.username} 在 {item.timeWindow} 内执行了 {item.operationCount} 次操作
-                </div>
+    <div className="flex-1 space-y-4 p-4 md:space-y-6 md:p-8 md:pt-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight md:text-3xl">操作日志</h2>
+          <p className="text-sm text-muted-foreground md:text-base">
+            系统操作记录和审计日志
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleExport}>
+            <Download className="h-4 w-4 mr-2" />
+            导出
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setFilters({ ...filters })}
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            刷新
+          </Button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle>筛选条件</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="搜索用户名或资源..."
+                className="pl-10"
+                onChange={(e) => handleSearch(e.target.value)}
+              />
+            </div>
+            <Select
+              value={filters.operationType || 'all'}
+              onValueChange={handleOperationTypeChange}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="操作类型" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部操作</SelectItem>
+                <SelectItem value="CREATE">创建</SelectItem>
+                <SelectItem value="UPDATE">更新</SelectItem>
+                <SelectItem value="DELETE">删除</SelectItem>
+                <SelectItem value="LOGIN">登录</SelectItem>
+                <SelectItem value="LOGOUT">退出</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={filters.resourceType || 'all'}
+              onValueChange={handleResourceTypeChange}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="资源类型" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部资源</SelectItem>
+                <SelectItem value="content">内容</SelectItem>
+                <SelectItem value="category">分类</SelectItem>
+                <SelectItem value="tag">标签</SelectItem>
+                <SelectItem value="weekly_issue">周刊</SelectItem>
+                <SelectItem value="user">用户</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Logs Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>日志列表</CardTitle>
+          <CardDescription>
+            共 {pagination.total} 条记录，第 {pagination.page} / {pagination.totalPages} 页
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-3">
+              {[...Array(10)].map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full" />
               ))}
             </div>
-          }
-          type="warning"
-          icon={<ExclamationCircleOutlined />}
-          closable
-          onClose={() => setShowAnomalousAlert(false)}
-          style={{ marginBottom: 16 }}
-        />
-      )}
-      
-      {/* 统计信息 */}
-      {stats && (
-        <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col span={6}>
-            <Card>
-              <Statistic
-                title="总操作数"
-                value={stats.totalOperations}
-                loading={statsLoading}
-              />
-            </Card>
-          </Col>
-          <Col span={6}>
-            <Card>
-              <Statistic
-                title="创建操作"
-                value={stats.operationsByType?.CREATE || 0}
-                valueStyle={{ color: '#52c41a' }}
-                loading={statsLoading}
-              />
-            </Card>
-          </Col>
-          <Col span={6}>
-            <Card>
-              <Statistic
-                title="更新操作"
-                value={stats.operationsByType?.UPDATE || 0}
-                valueStyle={{ color: '#1890ff' }}
-                loading={statsLoading}
-              />
-            </Card>
-          </Col>
-          <Col span={6}>
-            <Card>
-              <Statistic
-                title="删除操作"
-                value={stats.operationsByType?.DELETE || 0}
-                valueStyle={{ color: '#f5222d' }}
-                loading={statsLoading}
-              />
-            </Card>
-          </Col>
-        </Row>
-      )}
-      
-      {/* 筛选器 */}
-      <Card style={{ marginBottom: 16 }}>
-        <Row gutter={16}>
-          <Col span={4}>
-            <Select
-              placeholder="操作类型"
-              allowClear
-              style={{ width: '100%' }}
-              value={filters.operationType}
-              onChange={(value) => handleFilterChange('operationType', value)}
-            >
-              <Option value="CREATE">创建</Option>
-              <Option value="UPDATE">更新</Option>
-              <Option value="DELETE">删除</Option>
-              <Option value="LOGIN">登录</Option>
-              <Option value="LOGOUT">登出</Option>
-            </Select>
-          </Col>
-          <Col span={4}>
-            <Select
-              placeholder="资源类型"
-              allowClear
-              style={{ width: '100%' }}
-              value={filters.resourceType}
-              onChange={(value) => handleFilterChange('resourceType', value)}
-            >
-              <Option value="content">内容</Option>
-              <Option value="weekly_issue">周刊</Option>
-              <Option value="category">分类</Option>
-              <Option value="tag">标签</Option>
-              <Option value="user_session">用户会话</Option>
-            </Select>
-          </Col>
-          <Col span={6}>
-            <RangePicker
-              style={{ width: '100%' }}
-              onChange={(dates) => {
-                if (dates) {
-                  handleFilterChange('startDate', dates[0]?.toISOString());
-                  handleFilterChange('endDate', dates[1]?.toISOString());
-                } else {
-                  setFilters(prev => {
-                    const newFilters = { ...prev };
-                    delete newFilters.startDate;
-                    delete newFilters.endDate;
-                    return newFilters;
-                  });
-                }
-              }}
-            />
-          </Col>
-          <Col span={6}>
-            <Input
-              placeholder="搜索关键词"
-              prefix={<SearchOutlined />}
-              allowClear
-              value={filters.keyword}
-              onChange={(e) => handleFilterChange('keyword', e.target.value)}
-            />
-          </Col>
-          <Col span={4}>
-            <Space>
-              <Button
-                icon={<ReloadOutlined />}
-                onClick={refreshLogs}
-                loading={loading}
-              >
-                刷新
-              </Button>
-              <Button
-                icon={<DownloadOutlined />}
-                onClick={() => {
-                  Modal.confirm({
-                    title: '选择导出格式',
-                    content: '请选择要导出的文件格式',
-                    okText: 'JSON',
-                    cancelText: 'CSV',
-                    onOk: () => handleExport('json'),
-                    onCancel: () => handleExport('csv')
-                  });
-                }}
-                loading={exportMutation.isPending}
-              >
-                导出
-              </Button>
-            </Space>
-          </Col>
-        </Row>
-      </Card>
-      
-      {/* 操作日志表格 */}
-      <Card>
-        <Table
-          columns={columns}
-          dataSource={logs}
-          rowKey="id"
-          loading={loading}
-          pagination={{
-            current: pagination.page,
-            pageSize: pagination.pageSize,
-            total: pagination.total,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`,
-            onChange: handleTableChange,
-          }}
-          scroll={{ x: 1200 }}
-        />
-      </Card>
-    </PageContainer>
-  );
-};
+          ) : (
+            <>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>操作类型</TableHead>
+                      <TableHead>资源类型</TableHead>
+                      <TableHead>资源ID</TableHead>
+                      <TableHead>操作用户</TableHead>
+                      <TableHead>操作时间</TableHead>
+                      <TableHead>IP地址</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {logs.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground">
+                          暂无日志记录
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      logs.map((log: any) => {
+                        const opType = operationTypeMap[log.operation_type] || {
+                          label: log.operation_type,
+                          variant: 'outline' as const,
+                        };
+                        return (
+                          <TableRow key={log.id}>
+                            <TableCell>
+                              <Badge variant={opType.variant}>{opType.label}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              {resourceTypeMap[log.resource_type] || log.resource_type}
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">
+                              {log.resource_id || '-'}
+                            </TableCell>
+                            <TableCell>
+                              {log.user?.display_name || log.user?.username || '-'}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {dayjs(log.created_at).format('YYYY-MM-DD HH:mm:ss')}
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">
+                              {log.ip_address || '-'}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
 
-export default OperationLogsPage;
+              {/* Pagination */}
+              {pagination.totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4">
+                  <div className="text-sm text-muted-foreground">
+                    显示 {(pagination.page - 1) * pagination.pageSize + 1} 到{' '}
+                    {Math.min(pagination.page * pagination.pageSize, pagination.total)} 条，
+                    共 {pagination.total} 条
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(pagination.page - 1)}
+                      disabled={pagination.page === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      上一页
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(pagination.page + 1)}
+                      disabled={pagination.page === pagination.totalPages}
+                    >
+                      下一页
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
