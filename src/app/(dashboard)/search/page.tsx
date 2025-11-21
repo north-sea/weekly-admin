@@ -1,265 +1,174 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Row, Col, Card, Space, Button, Typography, Affix } from 'antd';
-import { FilterOutlined, SortAscendingOutlined } from '@ant-design/icons';
-import { PageContainer } from '@ant-design/pro-components';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useSearch } from '@/hooks/useSearch';
-import SearchInput from '@/components/search/SearchInput';
-import SearchResults from '@/components/search/SearchResults';
-import AdvancedFilters from '@/components/search/AdvancedFilters';
-import { useQuery } from '@tanstack/react-query';
-
-const { Title } = Typography;
-
-// Mock data - in real app, these would come from API
-const mockCategories = [
-  { id: 1, name: '技术' },
-  { id: 2, name: '设计' },
-  { id: 3, name: '产品' },
-  { id: 4, name: '管理' },
-];
-
-const mockTags = [
-  { id: 1, name: 'React' },
-  { id: 2, name: 'Vue' },
-  { id: 3, name: 'JavaScript' },
-  { id: 4, name: 'TypeScript' },
-  { id: 5, name: 'Node.js' },
-];
-
-const mockSources = [
-  'GitHub',
-  'Medium',
-  'Dev.to',
-  'Hacker News',
-  'Reddit',
-];
-
-const mockUsers = [
-  { id: 1, name: '张三' },
-  { id: 2, name: '李四' },
-  { id: 3, name: '王五' },
-];
-
-const sortOptions = [
-  { label: '相关性', value: [] },
-  { label: '最新发布', value: ['created_at:desc'] },
-  { label: '最早发布', value: ['created_at:asc'] },
-  { label: '最多浏览', value: ['view_count:desc'] },
-  { label: '字数最多', value: ['word_count:desc'] },
-];
+import React, { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Search, Filter, X } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useRouter } from 'next/navigation';
 
 export default function SearchPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const [showFilters, setShowFilters] = useState(false);
-  const [currentSort, setCurrentSort] = useState<string[]>([]);
-  
-  // Initialize search hook
-  const {
-    searchOptions,
-    searchResult,
-    isSearching,
-    searchError,
-    search,
-    instantSearch,
-    applyFilters,
-    clearFilters,
-    changePage,
-    changeSort,
-    searchHistory,
-    addToHistory,
-    clearHistory,
-    removeFromHistory,
-    applyHistorySearch,
-  } = useSearch();
-  
-  // Initialize from URL parameters
-  useEffect(() => {
-    const query = searchParams.get('q') || '';
-    const contentType = searchParams.get('type') as 'blog' | 'weekly' | undefined;
-    const status = searchParams.get('status')?.split(',');
-    const categoryIds = searchParams.get('categories')?.split(',').map(Number);
-    const tagIds = searchParams.get('tags')?.split(',').map(Number);
-    const page = parseInt(searchParams.get('page') || '1');
-    
-    if (query || contentType || status || categoryIds || tagIds) {
-      search({
-        query,
-        filters: {
-          contentType,
-          status,
-          categoryIds,
-          tagIds,
-        },
-        page,
-      });
-    }
-  }, [searchParams]);
-  
-  // Update URL when search options change
-  useEffect(() => {
-    const params = new URLSearchParams();
-    
-    if (searchOptions.query) {
-      params.set('q', searchOptions.query);
-    }
-    
-    if (searchOptions.filters?.contentType) {
-      params.set('type', searchOptions.filters.contentType);
-    }
-    
-    if (searchOptions.filters?.status && searchOptions.filters.status.length > 0) {
-      params.set('status', searchOptions.filters.status.join(','));
-    }
-    
-    if (searchOptions.filters?.categoryIds && searchOptions.filters.categoryIds.length > 0) {
-      params.set('categories', searchOptions.filters.categoryIds.join(','));
-    }
-    
-    if (searchOptions.filters?.tagIds && searchOptions.filters.tagIds.length > 0) {
-      params.set('tags', searchOptions.filters.tagIds.join(','));
-    }
-    
-    if (searchOptions.page && searchOptions.page > 1) {
-      params.set('page', searchOptions.page.toString());
-    }
-    
-    const newUrl = params.toString() ? `/search?${params.toString()}` : '/search';
-    router.replace(newUrl, { scroll: false });
-  }, [searchOptions, router]);
-  
-  // Handle search
-  const handleSearch = (query: string) => {
-    search({ query, page: 1 });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [contentType, setContentType] = useState<string>('all');
+  const [status, setStatus] = useState<string>('all');
+  const [isSearching, setIsSearching] = useState(false);
+  const [results, setResults] = useState<any[]>([]);
+
+  const handleSearch = () => {
+    setIsSearching(true);
+    // 模拟搜索
+    setTimeout(() => {
+      setResults([]);
+      setIsSearching(false);
+    }, 1000);
   };
-  
-  // Handle instant search
-  const handleInstantSearch = (query: string) => {
-    instantSearch(query);
+
+  const handleClear = () => {
+    setSearchQuery('');
+    setContentType('all');
+    setStatus('all');
+    setResults([]);
   };
-  
-  // Handle filters change
-  const handleFiltersChange = (filters: any) => {
-    // Update search options without triggering search
-    // Search will be triggered when user clicks "Apply"
-  };
-  
-  // Handle apply filters
-  const handleApplyFilters = () => {
-    applyFilters(searchOptions.filters || {});
-  };
-  
-  // Handle clear filters
-  const handleClearFilters = () => {
-    clearFilters();
-  };
-  
-  // Handle page change
-  const handlePageChange = (page: number) => {
-    changePage(page);
-  };
-  
-  // Handle sort change
-  const handleSortChange = (sort: string[]) => {
-    setCurrentSort(sort);
-    changeSort(sort);
-  };
-  
-  // Handle item click
-  const handleItemClick = (item: any) => {
-    // Navigate to content detail page
-    router.push(`/content/${item.id}`);
-  };
-  
+
   return (
-    <PageContainer
-      title="内容搜索"
-      subTitle="搜索和筛选Blog和Weekly内容"
-    >
-      <div style={{ marginBottom: 24 }}>
-        {/* Search Input */}
-        <SearchInput
-          value={searchOptions.query}
-          placeholder="搜索标题、内容、描述..."
-          onSearch={handleSearch}
-          onInstantSearch={handleInstantSearch}
-          searchHistory={searchHistory}
-          onApplyHistory={applyHistorySearch}
-          onRemoveHistory={removeFromHistory}
-          onClearHistory={clearHistory}
-          size="large"
-        />
+    <div className="flex-1 space-y-4 p-4 md:space-y-6 md:p-8 md:pt-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight md:text-3xl">内容搜索</h2>
+          <p className="text-sm text-muted-foreground md:text-base">
+            搜索内容、草稿和周刊
+          </p>
+        </div>
       </div>
-      
-      <Row gutter={24}>
-        {/* Filters Sidebar */}
-        <Col xs={24} lg={6}>
-          <Affix offsetTop={24}>
-            <div style={{ marginBottom: 16 }}>
-              <AdvancedFilters
-                filters={searchOptions.filters || {}}
-                onFiltersChange={handleFiltersChange}
-                onApplyFilters={handleApplyFilters}
-                onClearFilters={handleClearFilters}
-                categories={mockCategories}
-                tags={mockTags}
-                sources={mockSources}
-                users={mockUsers}
-                loading={isSearching}
-              />
-            </div>
-          </Affix>
-        </Col>
-        
-        {/* Main Content */}
-        <Col xs={24} lg={18}>
-          {/* Toolbar */}
-          <Card size="small" style={{ marginBottom: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Space>
-                <Button
-                  icon={<FilterOutlined />}
-                  onClick={() => setShowFilters(!showFilters)}
-                  type={showFilters ? 'primary' : 'default'}
-                  className="lg:hidden"
-                >
-                  筛选
+
+      {/* Search Bar */}
+      <Card>
+        <CardHeader>
+          <CardTitle>搜索</CardTitle>
+          <CardDescription>输入关键词搜索内容</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="搜索标题、内容、标签..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  className="pl-10"
+                />
+              </div>
+              <Button onClick={handleSearch} disabled={!searchQuery}>
+                <Search className="h-4 w-4 mr-2" />
+                搜索
+              </Button>
+              {(searchQuery || contentType !== 'all' || status !== 'all') && (
+                <Button variant="outline" onClick={handleClear}>
+                  <X className="h-4 w-4 mr-2" />
+                  清空
                 </Button>
-              </Space>
-              
-              <Space>
-                <span>排序：</span>
-                {sortOptions.map(option => (
-                  <Button
-                    key={option.label}
-                    type={JSON.stringify(currentSort) === JSON.stringify(option.value) ? 'primary' : 'text'}
-                    size="small"
-                    onClick={() => handleSortChange(option.value)}
-                  >
-                    {option.label}
-                  </Button>
-                ))}
-              </Space>
+              )}
             </div>
-          </Card>
-          
-          {/* Search Results */}
-          <SearchResults
-            hits={searchResult?.hits || []}
-            total={searchResult?.total || 0}
-            page={searchResult?.page || 1}
-            limit={searchResult?.limit || 20}
-            processingTimeMs={searchResult?.processingTimeMs || 0}
-            query={searchResult?.query || ''}
-            loading={isSearching}
-            onPageChange={handlePageChange}
-            onItemClick={handleItemClick}
-          />
-        </Col>
-      </Row>
-    </PageContainer>
+
+            {/* Filters */}
+            <div className="grid gap-4 md:grid-cols-3">
+              <Select value={contentType} onValueChange={setContentType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="内容类型" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部类型</SelectItem>
+                  <SelectItem value="blog">Blog</SelectItem>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="状态" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部状态</SelectItem>
+                  <SelectItem value="published">已发布</SelectItem>
+                  <SelectItem value="draft">草稿</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Results */}
+      <Card>
+        <CardHeader>
+          <CardTitle>搜索结果</CardTitle>
+          <CardDescription>
+            {isSearching ? '搜索中...' : `找到 ${results.length} 条结果`}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isSearching ? (
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="space-y-2">
+                  <Skeleton className="h-6 w-3/4" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-2/3" />
+                </div>
+              ))}
+            </div>
+          ) : results.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Search className="h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-lg font-medium">暂无搜索结果</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                {searchQuery ? '尝试使用不同的关键词' : '输入关键词开始搜索'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {results.map((result: any) => (
+                <div
+                  key={result.id}
+                  className="p-4 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
+                  onClick={() => router.push(`/content/${result.id}`)}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <h3 className="font-semibold mb-2">{result.title}</h3>
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {result.summary || result.content}
+                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Badge variant="secondary">{result.content_type}</Badge>
+                        <Badge variant="outline">{result.status}</Badge>
+                        {result.tags?.map((tag: string) => (
+                          <Badge key={tag} variant="secondary">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
