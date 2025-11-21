@@ -143,7 +143,7 @@ export default function SearchPage() {
               {results.map((result: any) => (
                 <div
                   key={result.id}
-                  className="p-4 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
+                  className="p-4 border rounded hover:bg-accent/50 transition-colors cursor-pointer"
                   onClick={() => router.push(`/content/${result.id}`)}
                 >
                   <div className="flex items-start justify-between gap-4">

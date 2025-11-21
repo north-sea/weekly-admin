@@ -6,7 +6,8 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(pnpm add:*)",
-      "Bash(npx shadcn@latest add table)"
+      "Bash(npx shadcn@latest add table)",
+      "Bash(pnpm store prune:*)"
     ],
     "deny": [],
     "ask": []

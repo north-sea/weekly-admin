@@ -144,7 +144,7 @@ export default function ContentPreview({
           <img
             src={content.cover_image}
             alt={content.title}
-            className="w-full rounded-lg object-cover"
+            className="w-full rounded object-cover"
             style={{ maxHeight: '400px' }}
           />
         </div>
@@ -223,7 +223,7 @@ export default function ContentPreview({
               <img
                 src={src}
                 alt={alt || '图片'}
-                className="rounded-lg w-full"
+                className="rounded w-full"
                 loading="lazy"
                 {...props}
               />
@@ -253,7 +253,7 @@ export default function ContentPreview({
                 );
               }
               return (
-                <pre className="bg-muted rounded-lg p-4 overflow-x-auto">
+                <pre className="bg-muted rounded p-4 overflow-x-auto">
                   <code className={className} {...rest}>
                     {children}
                   </code>
@@ -335,7 +335,7 @@ export default function ContentPreview({
               )}
 
               {section.type === 'code' ? (
-                <pre className="bg-muted p-4 rounded-lg overflow-x-auto">
+                <pre className="bg-muted p-4 rounded overflow-x-auto">
                   <code className={`language-${section.language || 'text'}`}>
                     {section.content}
                   </code>
@@ -349,7 +349,7 @@ export default function ContentPreview({
                   <img
                     src={section.imageUrl}
                     alt={section.heading || '图片'}
-                    className="rounded-lg w-full"
+                    className="rounded w-full"
                     loading="lazy"
                   />
                   {section.content && (
@@ -442,7 +442,7 @@ export default function ContentPreview({
                 <img
                   src={src}
                   alt={alt || '图片'}
-                  className="rounded-lg w-full"
+                  className="rounded w-full"
                   loading="lazy"
                   {...props}
                 />

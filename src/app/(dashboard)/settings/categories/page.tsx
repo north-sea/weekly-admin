@@ -34,6 +34,7 @@ export default function CategoriesSettingsPage() {
   const createCategory = useCreateCategory();
   const updateCategory = useUpdateCategory();
   const deleteCategory = useDeleteCategory();
+  const categories = categoriesData || [];
 
   const handleCreate = async () => {
     try {
@@ -109,7 +110,7 @@ export default function CategoriesSettingsPage() {
         <CardHeader>
           <CardTitle>分类列表</CardTitle>
           <CardDescription>
-            共 {categoriesData?.data?.length || 0} 个分类
+            共 {categories.length} 个分类
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -120,11 +121,11 @@ export default function CategoriesSettingsPage() {
               ))}
             </div>
           ) : (
-            <div className="space-y-3">
-              {categoriesData?.data?.map((category: any) => (
+            <div className="grid gap-3 md:grid-cols-2">
+              {categories.map((category: any) => (
                 <div
                   key={category.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                  className="flex items-center justify-between p-4 border rounded hover:bg-accent/50 transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <FolderOpen className="h-5 w-5 text-primary" />

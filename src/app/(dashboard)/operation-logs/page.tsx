@@ -184,7 +184,7 @@ export default function OperationLogsPage() {
             </div>
           ) : (
             <>
-              <div className="rounded-md border">
+              <div className="rounded border">
                 <Table>
                   <TableHeader>
                     <TableRow>

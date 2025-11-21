@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import EllipsisTooltip from '@/components/ui/ellipsis-tooltip';
 import {
   AlertCircle,
   Check,
@@ -43,11 +45,11 @@ interface DraftGridProps {
 
 const statusMap: Record<
   Draft['status'],
-  { label: string; badgeVariant: 'secondary' | 'default' | 'destructive'; tone: string }
+  { label: string; badgeVariant: 'secondary' | 'default' | 'destructive' }
 > = {
-  pending: { label: '待处理', badgeVariant: 'secondary', tone: 'text-amber-600' },
-  adopted: { label: '已采用', badgeVariant: 'default', tone: 'text-green-600' },
-  rejected: { label: '已拒绝', badgeVariant: 'destructive', tone: 'text-red-600' },
+  pending: { label: '待处理', badgeVariant: 'secondary' },
+  adopted: { label: '已采用', badgeVariant: 'default' },
+  rejected: { label: '已拒绝', badgeVariant: 'destructive' },
 };
 
 const getHostnameFromUrl = (url?: string): string => {
@@ -215,7 +217,7 @@ export function DraftGrid({ drafts, isLoading, onPreview }: DraftGridProps) {
   return (
     <div className="space-y-4">
       {/* 批量操作工具栏，占位以防列表跳动 */}
-      <div className="rounded-lg border bg-muted/40 px-4 py-3 shadow-sm">
+      <div className="rounded border bg-muted/40 px-4 py-3 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3 text-sm">
             <Badge
@@ -269,193 +271,208 @@ export function DraftGrid({ drafts, isLoading, onPreview }: DraftGridProps) {
       </div>
 
       {/* 表格视图 */}
-      <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
-            <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
-              <tr>
-                <th className="w-10 px-4 py-3 text-left">
-                  <Checkbox
-                    checked={allSelected}
-                    onCheckedChange={handleSelectAll}
-                    aria-label="全选当前页草稿"
-                  />
-                </th>
-                <th className="w-[40%] px-4 py-3 text-left font-semibold text-foreground">标题 / 摘要</th>
-                <th className="w-[16%] px-4 py-3 text-left font-semibold text-foreground">状态</th>
-                <th className="w-[16%] px-4 py-3 text-left font-semibold text-foreground">来源</th>
-                <th className="w-[14%] px-4 py-3 text-left font-semibold text-foreground">时间</th>
-                <th className="w-[14%] px-4 py-3 text-left font-semibold text-foreground">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {drafts.map((draft) => {
-                const status = statusMap[draft.status];
-                const hostname = getHostnameFromUrl(draft.url);
-                const tags = parseTags(draft.tags_suggestion);
+      <div className="overflow-hidden rounded border bg-card shadow-sm">
+        <Table>
+          <TableHeader className="bg-muted/50 text-xs uppercase text-muted-foreground">
+            <TableRow>
+              <TableHead className="w-10 pl-4">
+                <Checkbox
+                  checked={allSelected}
+                  onCheckedChange={handleSelectAll}
+                  aria-label="全选当前页草稿"
+                />
+              </TableHead>
+              <TableHead className="min-w-[160px] px-4 py-3 font-semibold text-foreground">标题</TableHead>
+              <TableHead className="min-w-[200px] px-4 py-3 font-semibold text-foreground">描述</TableHead>
+              <TableHead className="min-w-[180px] px-4 py-3 font-semibold text-foreground">标签</TableHead>
+              <TableHead className="min-w-[120px] px-4 py-3 font-semibold text-foreground">分类</TableHead>
+              <TableHead className="min-w-[120px] px-4 py-3 font-semibold text-foreground">状态</TableHead>
+              <TableHead className="min-w-[140px] px-4 py-3 font-semibold text-foreground">来源</TableHead>
+              <TableHead className="min-w-[140px] px-4 py-3 font-semibold text-foreground">时间</TableHead>
+              <TableHead className="min-w-[200px] px-4 py-3 font-semibold text-foreground">操作</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {drafts.map((draft) => {
+              const status = statusMap[draft.status];
+              const hostname = getHostnameFromUrl(draft.url);
+              const tags = parseTags(draft.tags_suggestion);
+              const summaryText = draft.summary || draft.description || draft.note;
 
-                return (
-                  <tr
-                    key={draft.id}
-                    className={cn(
-                      'border-t border-border/80 transition-colors hover:bg-muted/30',
-                      selectedDrafts.has(draft.id) && 'bg-primary/5'
-                    )}
-                  >
-                    <td className="px-4 py-3 align-top">
-                      <Checkbox
-                        checked={selectedDrafts.has(draft.id)}
-                        onCheckedChange={(checked) => handleSelect(draft, checked === true)}
-                        aria-label={`选择 ${draft.title}`}
-                      />
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <div className="flex items-start gap-3">
-                        <Avatar className="h-10 w-10 border border-border/80 bg-muted/60">
-                          {draft.favicon_url && <AvatarImage src={draft.favicon_url} alt={hostname || draft.title} />}
-                          <AvatarFallback className="text-xs">
-                            {draft.title?.slice(0, 2) || '草稿'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="space-y-2">
-                          <button
-                            type="button"
-                            onClick={() => onPreview?.(draft)}
-                            className="line-clamp-2 text-left text-base font-medium leading-snug transition-colors hover:text-primary"
-                          >
-                            {draft.title || '未命名草稿'}
-                          </button>
-                          {(draft.description || draft.note) && (
-                            <p className="text-sm text-muted-foreground line-clamp-2">
-                              {draft.description || draft.note}
-                            </p>
-                          )}
-                          <div className="flex flex-wrap items-center gap-2">
-                            {tags.slice(0, 3).map((tag, idx) => (
-                              <Badge
-                                key={tag.id || idx}
-                                variant="secondary"
-                                className={cn(
-                                  'truncate',
-                                  tag.attachedBy === 'ai' &&
-                                    'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-200'
-                                )}
-                              >
-                                {tag.name}
-                              </Badge>
-                            ))}
-                            {tags.length > 3 && (
-                              <Badge variant="outline">+{tags.length - 3}</Badge>
-                            )}
-                            {draft.category_suggestion && (
-                              <Badge variant="outline" className="bg-accent/20 text-foreground">
-                                {draft.category_suggestion}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <div className="space-y-2">
-                        <Badge variant={status.badgeVariant} className="w-fit">
-                          {status.label}
-                        </Badge>
-                        <div className={cn('text-xs font-medium', status.tone)}>
-                          {draft.status === 'pending' ? '等待处理' : draft.status === 'adopted' ? '已转为内容' : '不采用'}
-                        </div>
-                        {renderPriority(draft.priority)}
-                        {draft.duplicate_of && (
-                          <Badge variant="outline" className="w-fit text-xs">
-                            可能与「{draft.duplicate_of.title}」重复
-                          </Badge>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-                        <span className="truncate">{hostname || '本地内容'}</span>
-                        {draft.url && (
-                          <a
-                            href={draft.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-primary hover:underline"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            打开链接
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                        )}
-                        {draft.source && <span className="truncate text-[11px]">来源：{draft.source}</span>}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-                        <div className="inline-flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          <span>{draft.karakeep_created_at ? dayjs(draft.karakeep_created_at).fromNow() : '未知时间'}</span>
-                        </div>
-                        {draft.synced_at && (
-                          <span className="text-[11px]">同步于 {dayjs(draft.synced_at).format('MM-DD HH:mm')}</span>
-                        )}
-                        {draft.updated_at && (
-                          <span className="text-[11px]">更新于 {dayjs(draft.updated_at).format('MM-DD HH:mm')}</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="transition-transform hover:-translate-y-0.5"
+              return (
+                <TableRow
+                  key={draft.id}
+                  className={cn(
+                    'align-top transition-colors hover:bg-muted/30',
+                    selectedDrafts.has(draft.id) && 'bg-primary/5'
+                  )}
+                >
+                  <TableCell className="pl-4 align-top">
+                    <Checkbox
+                      checked={selectedDrafts.has(draft.id)}
+                      onCheckedChange={(checked) => handleSelect(draft, checked === true)}
+                      aria-label={`选择 ${draft.title}`}
+                    />
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <div className="flex items-start gap-3">
+                      <Avatar className="h-10 w-10 border border-border/80 bg-muted/60">
+                        {draft.favicon_url && <AvatarImage src={draft.favicon_url} alt={hostname || draft.title} />}
+                        <AvatarFallback className="text-xs">
+                          {draft.title?.slice(0, 2) || '草稿'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="space-y-1">
+                        <button
+                          type="button"
                           onClick={() => onPreview?.(draft)}
+                          className="text-left text-base font-medium leading-snug transition-colors hover:text-primary"
                         >
-                          <Eye className="h-4 w-4 mr-1" />
-                          预览
-                        </Button>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          className="transition-transform hover:-translate-y-0.5"
-                          onClick={() => handleAdopt(draft)}
-                          disabled={convertDraft.isPending || draft.status !== 'pending'}
-                        >
-                          {convertDraft.isPending ? (
-                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                          ) : (
-                            <Check className="h-4 w-4 mr-1" />
-                          )}
-                          采用
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="border-destructive/40 text-destructive transition-transform hover:-translate-y-0.5 hover:bg-destructive/10"
-                          onClick={() => handleReject(draft)}
-                          disabled={updateDraft.isPending || draft.status !== 'pending'}
-                        >
-                          <X className="h-4 w-4 mr-1" />
-                          拒绝
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive transition-transform hover:-translate-y-0.5 hover:bg-destructive/10"
-                          onClick={() => handleDelete(draft)}
-                          disabled={deleteDraft.isPending}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                          <EllipsisTooltip
+                            value={draft.title || '未命名草稿'}
+                            width="180px"
+                            line={2}
+                            placement="top"
+                            tooltipMaxWidth={360}
+                            className="text-left"
+                          />
+                        </button>
                       </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <EllipsisTooltip
+                      value={summaryText || undefined}
+                      width="200px"
+                      line={2}
+                      placement="top"
+                      tooltipMaxWidth={420}
+                      className="text-sm text-muted-foreground"
+                    />
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <div className="flex flex-wrap items-center gap-2 max-w-[220px]">
+                      {tags.length === 0 && (
+                        <span className="text-sm text-muted-foreground">-</span>
+                      )}
+                      {tags.map((tag, idx) => (
+                        <Badge
+                          key={tag.id || idx}
+                          variant="secondary"
+                          className={cn(
+                            'truncate',
+                            tag.attachedBy === 'ai' &&
+                              'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-200'
+                          )}
+                        >
+                          {tag.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell className="align-top">
+                    {draft.category_suggestion ? (
+                      <Badge variant="outline" className="bg-accent/20 text-foreground">
+                        {draft.category_suggestion}
+                      </Badge>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <div className="space-y-2">
+                      <Badge variant={status.badgeVariant} className="w-fit">
+                        {status.label}
+                      </Badge>
+                      {renderPriority(draft.priority)}
+                      {draft.duplicate_of && (
+                        <Badge variant="outline" className="w-fit text-xs">
+                          可能与「{draft.duplicate_of.title}」重复
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                      {draft.url && (
+                        <a
+                          href={draft.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-primary hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {hostname}
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                      <div className="inline-flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        <span>{draft.karakeep_created_at ? dayjs(draft.karakeep_created_at).fromNow() : '未知时间'}</span>
+                      </div>
+                      {draft.synced_at && (
+                        <span className="text-[11px]">同步于 {dayjs(draft.synced_at).format('MM-DD HH:mm')}</span>
+                      )}
+                      {draft.updated_at && (
+                        <span className="text-[11px]">更新于 {dayjs(draft.updated_at).format('MM-DD HH:mm')}</span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <div className="flex flex-wrap gap-2 min-w-[200px]">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="transition-transform hover:-translate-y-0.5"
+                        onClick={() => onPreview?.(draft)}
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        预览
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="transition-transform hover:-translate-y-0.5"
+                        onClick={() => handleAdopt(draft)}
+                        disabled={convertDraft.isPending || draft.status !== 'pending'}
+                      >
+                        {convertDraft.isPending ? (
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        ) : (
+                          <Check className="h-4 w-4 mr-1" />
+                        )}
+                        采用
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-destructive/40 text-destructive transition-transform hover:-translate-y-0.5 hover:bg-destructive/10"
+                        onClick={() => handleReject(draft)}
+                        disabled={updateDraft.isPending || draft.status !== 'pending'}
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        拒绝
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive transition-transform hover:-translate-y-0.5 hover:bg-destructive/10"
+                        onClick={() => handleDelete(draft)}
+                        disabled={deleteDraft.isPending}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </div>
     </div>
   );

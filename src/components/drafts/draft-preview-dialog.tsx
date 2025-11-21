@@ -41,15 +41,18 @@ function buildPreviewData(draft: Draft): StructuredPreviewData {
     }
   };
 
+  const description = draft.description || draft.note || undefined;
+  const summary = draft.summary || description;
+
   return {
     title: draft.title,
-    description: draft.description || draft.note || undefined,
-    summary: draft.description || draft.note || undefined,
+    description,
+    summary,
     url: draft.url || undefined,
     image_url: draft.image_url || undefined,
     source: draft.source || getSourceFromUrl(draft.url) || undefined,
     source_url: draft.url || undefined,
-    tags: tags.map((tag, idx) => ({ id: tag.id ?? idx, name: tag.name })) ,
+    tags: tags.map((tag, idx) => ({ id: tag.id ?? idx, name: tag.name })),
     created_at: draft.karakeep_created_at || undefined,
     content: draft.content || undefined,
   };
@@ -64,7 +67,7 @@ export function DraftPreviewDialog({ draft, open, onOpenChange }: DraftPreviewDi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden bg-card p-0 shadow-2xl">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden shadow-2xl">
         <DialogHeader className="p-6 pb-3">
           <DialogTitle className="text-xl font-semibold">{draft.title}</DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
@@ -107,7 +110,7 @@ export function DraftPreviewDialog({ draft, open, onOpenChange }: DraftPreviewDi
 
             <Separator />
 
-            <div className="bg-muted/30 rounded-lg p-4">
+            <div className="bg-muted/30 rounded p-4">
               <StructuredPreview
                 data={previewData}
                 mode="desktop"

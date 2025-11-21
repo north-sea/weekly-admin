@@ -39,24 +39,9 @@ export const menuConfig: MenuDataItem[] = [
     icon: <SearchOutlined />,
   },
   {
-    // 父级使用占位路径，避免与子项重复
-    path: '/_menu/analytics',
+    path: '/analytics',
     name: '内容洞察',
     icon: <BarChartOutlined />,
-    children: [
-      {
-        path: '/analytics',
-        name: '基础统计',
-      },
-      {
-        path: '/analytics/advanced',
-        name: '高级分析',
-      },
-      {
-        path: '/analytics/sources',
-        name: '来源分析',
-      },
-    ],
   },
   {
     path: '/operation-logs',

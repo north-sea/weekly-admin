@@ -160,7 +160,7 @@ export function DraftCard({
 
         {/* 封面图 */}
         {draft.image_url && (
-          <div className="relative w-full h-32 rounded-md overflow-hidden bg-muted">
+          <div className="relative w-full h-32 rounded overflow-hidden bg-muted">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={draft.image_url}

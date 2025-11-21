@@ -50,7 +50,7 @@ const DroppableArea: React.FC<{ id: string; children: React.ReactNode }> = ({ id
   return (
     <div
       ref={setNodeRef}
-      className={`min-h-[200px] rounded-lg transition-all ${
+      className={`min-h-[200px] rounded transition-all ${
         isOver ? 'bg-blue-50 border-2 border-dashed border-blue-300' : ''
       }`}
     >

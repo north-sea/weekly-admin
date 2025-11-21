@@ -47,11 +47,19 @@ export const TAG_ENDPOINTS = {
 /** @deprecated Use useTagQueries hooks instead */
 export class TagApiService {
   /** @deprecated Use useTagList hook instead */
-  static async getTagList(query: TagQuery = { sort_by: 'name', sort_order: 'asc' }): Promise<TagWithStats[]> {
+  static async getTagList(query: TagQuery = { sort_by: 'count', sort_order: 'desc', page: 1, pageSize: 20 }): Promise<{
+    data: TagWithStats[];
+    pagination?: {
+      page: number;
+      pageSize: number;
+      total: number;
+      totalPages: number;
+    };
+  }> {
     console.warn('TagApiService.getTagList is deprecated. Use useTagList hook instead.');
     const { apiClient } = await import('@/lib/api-client');
     const queryString = buildTagQueryParams(query);
-    return apiClient.get<TagWithStats[]>(`${TAG_ENDPOINTS.list}?${queryString}`);
+    return apiClient.get(`${TAG_ENDPOINTS.list}?${queryString}`);
   }
 
   /** @deprecated Use useTagDetail hook instead */

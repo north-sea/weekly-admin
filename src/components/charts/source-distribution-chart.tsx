@@ -53,32 +53,48 @@ export function SourceDistributionChart({
       loading={loading}
     >
       <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={topSources}>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+        <BarChart data={topSources} margin={{ top: 5, right: 10, left: 0, bottom: 60 }}>
+          <defs>
+            {COLORS.map((color, index) => (
+              <linearGradient key={`gradient-${index}`} id={`colorBar${index}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={color} stopOpacity={0.9}/>
+                <stop offset="95%" stopColor={color} stopOpacity={0.6}/>
+              </linearGradient>
+            ))}
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
           <XAxis
             dataKey="source"
-            className="text-xs"
-            tick={{ fill: 'hsl(var(--muted-foreground))' }}
+            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+            tickLine={{ stroke: 'hsl(var(--border))' }}
+            axisLine={{ stroke: 'hsl(var(--border))' }}
             angle={-45}
             textAnchor="end"
             height={80}
           />
           <YAxis
-            className="text-xs"
-            tick={{ fill: 'hsl(var(--muted-foreground))' }}
+            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+            tickLine={{ stroke: 'hsl(var(--border))' }}
+            axisLine={{ stroke: 'hsl(var(--border))' }}
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: 'hsl(var(--popover))',
-              border: '1px solid hsl(var(--border))',
-              borderRadius: '8px',
-              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+              backgroundColor: 'hsl(var(--popover) / 0.95)',
+              border: '1px solid hsl(var(--border) / 0.5)',
+              borderRadius: '12px',
+              boxShadow: '0 8px 16px -4px rgb(0 0 0 / 0.2)',
+              backdropFilter: 'blur(8px)',
             }}
-            labelStyle={{ color: 'hsl(var(--foreground))' }}
+            labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}
+            itemStyle={{ color: 'hsl(var(--foreground))' }}
+            cursor={{ fill: 'hsl(var(--accent) / 0.1)' }}
           />
           <Bar dataKey="count" name="数量" radius={[8, 8, 0, 0]}>
             {topSources.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              <Cell
+                key={`cell-${index}`}
+                fill={`url(#colorBar${index % COLORS.length})`}
+              />
             ))}
           </Bar>
         </BarChart>

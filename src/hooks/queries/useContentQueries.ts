@@ -24,11 +24,29 @@ export function useContentList(params?: PaginationParams & {
   featured?: boolean;
   tag_ids?: number[];
 }) {
+  const queryParams: Record<string, unknown> = {
+    page: params?.page,
+    pageSize: params?.pageSize,
+    status: params?.status,
+    category_id: params?.category_id,
+    keyword: params?.search,
+    featured: params?.featured,
+  };
+
+  // 后端使用 contentType，而UI状态为 content_type
+  if (params?.content_type && params.content_type !== 'all') {
+    queryParams.contentType = params.content_type;
+  }
+
+  if (params?.tag_ids?.length) {
+    queryParams.tag_ids = params.tag_ids.join(',');
+  }
+
   return usePaginatedQuery<ContentWithRelations>(
     '/api/content',
-    params,
+    queryParams,
     {
-      queryKey: queryKeys.content.list(params),
+      queryKey: queryKeys.content.list(queryParams),
       staleTime: 2 * 60 * 1000, // 2分钟缓存
     }
   );

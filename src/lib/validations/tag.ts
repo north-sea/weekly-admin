@@ -15,8 +15,10 @@ export const TagUpdateSchema = TagSchema.partial().extend({
 // 标签查询schema
 export const TagQuerySchema = z.object({
   keyword: z.string().max(100).optional(),
-  sort_by: z.enum(['name', 'count', 'created_at']).default('name'),
-  sort_order: z.enum(['asc', 'desc']).default('asc'),
+  sort_by: z.enum(['name', 'count', 'created_at']).default('count'),
+  sort_order: z.enum(['asc', 'desc']).default('desc'),
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(200).default(20),
 });
 
 // 标签合并schema

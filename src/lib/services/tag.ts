@@ -11,32 +11,70 @@ export interface TagWithStats {
 }
 
 export class TagService {
-  // 获取标签列表
-  static async getTagList(query: TagQuery): Promise<TagWithStats[]> {
-    const { keyword, sort_by, sort_order } = query;
+  // 获取标签列表（支持分页）
+  static async getTagList(query: TagQuery): Promise<{
+    data: TagWithStats[];
+    pagination: {
+      page: number;
+      pageSize: number;
+      total: number;
+      totalPages: number;
+    };
+  }> {
+    const {
+      keyword,
+      sort_by = 'count',
+      sort_order = 'desc',
+      page,
+      pageSize,
+    } = query;
     
     const where: Record<string, unknown> = {};
     
-    // 关键词搜索
     if (keyword) {
       where.name = { contains: keyword };
     }
     
-    // 排序配置
     const orderBy: Record<string, string> = {};
     orderBy[sort_by] = sort_order;
+
+    const usePagination = page !== undefined && pageSize !== undefined;
+    const currentPage = page ?? 1;
+    const currentPageSize = pageSize ?? 20;
+    const skip = usePagination ? (currentPage - 1) * currentPageSize : undefined;
+
+    const [total, tags] = await Promise.all([
+      prisma.tags.count({ where }),
+      prisma.tags.findMany({
+        where,
+        orderBy,
+        skip,
+        take: usePagination ? currentPageSize : undefined,
+      }),
+    ]);
     
-    const tags = await prisma.tags.findMany({
-      where,
-      orderBy
-    });
-    
-    return tags.map(tag => ({
-      ...tag,
-      count: tag.count || 0,
-      created_at: tag.created_at || undefined,
-      updated_at: tag.updated_at || undefined
+    const mapped = await Promise.all(tags.map(async (tag) => {
+      const count = await prisma.content_tags.count({
+        where: { tag_id: tag.id }
+      });
+      
+      return {
+        ...tag,
+        count: count || 0,
+        created_at: tag.created_at || undefined,
+        updated_at: tag.updated_at || undefined
+      };
     }));
+    
+    return {
+      data: mapped,
+      pagination: {
+        page: currentPage,
+        pageSize: currentPageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / currentPageSize)),
+      },
+    };
   }
   
   // 获取单个标签
@@ -47,9 +85,13 @@ export class TagService {
     
     if (!tag) return null;
     
+    const count = await prisma.content_tags.count({
+      where: { tag_id: id }
+    });
+    
     return {
       ...tag,
-      count: tag.count || 0,
+      count: count || 0,
       created_at: tag.created_at || undefined,
       updated_at: tag.updated_at || undefined
     };

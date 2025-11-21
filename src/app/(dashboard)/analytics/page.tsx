@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { useRouter } from 'next/navigation';
 import {
   Select,
   SelectContent,
@@ -23,13 +22,10 @@ import {
   TrendingUp,
   Tag,
   FolderOpen,
-  BarChart3,
-  Globe,
 } from 'lucide-react';
 
 export default function AnalyticsPage() {
   const { user } = useAuth();
-  const router = useRouter();
   const [timeRange, setTimeRange] = React.useState(30);
   const { data: analytics, loading, error, refetch } = useAnalytics(timeRange);
 
@@ -62,24 +58,6 @@ export default function AnalyticsPage() {
               <SelectItem value="365">最近365天</SelectItem>
             </SelectContent>
           </Select>
-          <Button
-            variant="outline"
-            size="sm"
-            className="hidden md:inline-flex"
-            onClick={() => router.push('/analytics/advanced')}
-          >
-            <BarChart3 className="h-4 w-4 mr-2" />
-            高级分析
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="hidden md:inline-flex"
-            onClick={() => router.push('/analytics/sources')}
-          >
-            <Globe className="h-4 w-4 mr-2" />
-            来源分析
-          </Button>
         </div>
       </div>
 

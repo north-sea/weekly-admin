@@ -9,7 +9,6 @@ import {
   FileText,
   Calendar,
   FolderOpen,
-  BarChart3,
 } from 'lucide-react';
 
 export function QuickActions() {

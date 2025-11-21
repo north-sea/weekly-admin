@@ -80,6 +80,7 @@ export default function SimplifiedEditor({
   categories = [],
   tags = [],
 }: SimplifiedEditorProps) {
+  const NO_CATEGORY_VALUE = 'none';
   const { toast } = useToast();
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -380,14 +381,14 @@ export default function SimplifiedEditor({
                       control={control}
                       render={({ field }) => (
                         <Select
-                          value={field.value?.toString() || ''}
-                          onValueChange={(value) => field.onChange(value ? parseInt(value) : null)}
+                          value={field.value?.toString() ?? NO_CATEGORY_VALUE}
+                          onValueChange={(value) => field.onChange(value === NO_CATEGORY_VALUE ? null : parseInt(value, 10))}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="选择分类" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">无分类</SelectItem>
+                            <SelectItem value={NO_CATEGORY_VALUE}>无分类</SelectItem>
                             {categories.map((cat) => (
                               <SelectItem key={cat.id} value={cat.id.toString()}>
                                 {cat.name}

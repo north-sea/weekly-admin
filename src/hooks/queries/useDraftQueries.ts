@@ -111,6 +111,8 @@ export const draftKeys = {
   detail: (id: string) => [...draftKeys.details(), id] as const,
 };
 
+const draftStatsKey = [...draftKeys.all, 'stats'] as const;
+
 // ============================================================================
 // API 函数
 // ============================================================================
@@ -214,6 +216,7 @@ export function useSyncDrafts() {
     onSuccess: () => {
       // 刷新所有草稿列表
       queryClient.invalidateQueries({ queryKey: draftKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: draftStatsKey });
     },
   });
 }
@@ -246,6 +249,8 @@ export function useUpdateDraft() {
       queryClient.invalidateQueries({ queryKey: draftKeys.detail(variables.id) });
       // 刷新列表
       queryClient.invalidateQueries({ queryKey: draftKeys.lists() });
+      // 刷新统计
+      queryClient.invalidateQueries({ queryKey: draftStatsKey });
     },
   });
 }
@@ -261,6 +266,7 @@ export function useDeleteDraft() {
     onSuccess: () => {
       // 刷新列表
       queryClient.invalidateQueries({ queryKey: draftKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: draftStatsKey });
     },
   });
 }
@@ -281,6 +287,8 @@ export function useConvertDraft() {
       queryClient.invalidateQueries({ queryKey: draftKeys.lists() });
       // 刷新内容列表（如果需要）
       queryClient.invalidateQueries({ queryKey: ['content'] });
+      // 刷新统计
+      queryClient.invalidateQueries({ queryKey: draftStatsKey });
     },
   });
 }
@@ -296,6 +304,7 @@ export function useBatchUpdateDrafts() {
     onSuccess: () => {
       // 刷新所有列表
       queryClient.invalidateQueries({ queryKey: draftKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: draftStatsKey });
     },
   });
 }
@@ -313,6 +322,7 @@ export function useSyncSingleDraft() {
       queryClient.invalidateQueries({ queryKey: draftKeys.detail(variables.id) });
       // 刷新列表
       queryClient.invalidateQueries({ queryKey: draftKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: draftStatsKey });
     },
   });
 }
@@ -329,6 +339,7 @@ export function useSyncBatchDrafts() {
     onSuccess: () => {
       // 刷新列表
       queryClient.invalidateQueries({ queryKey: draftKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: draftStatsKey });
     },
   });
 }
@@ -336,4 +347,3 @@ export function useSyncBatchDrafts() {
 // 导出便捷方法
 export const useDrafts = useDraftList;
 export const useDraft = useDraftDetail;
-

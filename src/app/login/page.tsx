@@ -115,8 +115,8 @@ export default function LoginPage() {
       <div className="absolute inset-0 opacity-25 mix-blend-soft-light [background-image:linear-gradient(120deg,rgba(255,255,255,0.12)_1px,transparent_1px),linear-gradient(0deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:28px_28px]" />
 
       <div className="relative z-10 grid w-full max-w-6xl grid-cols-1 items-center gap-8 lg:grid-cols-[1.05fr,_0.95fr]">
-        <div className="rounded-2xl border border-white/15 bg-white/5 p-8 text-white shadow-2xl backdrop-blur-md">
-          <div className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
+        <div className="rounded border border-white/15 bg-white/5 p-8 text-white shadow-2xl backdrop-blur-md">
+          <div className="flex items-center gap-2 rounded bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
             <Lock className="h-3.5 w-3.5" />
             Weekly CMS
           </div>
@@ -129,8 +129,8 @@ export default function LoginPage() {
             </p>
           </div>
           <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-4">
-              <div className="rounded-lg bg-white/10 p-2">
+            <div className="flex items-center gap-3 rounded border border-white/10 bg-white/5 p-4">
+              <div className="rounded bg-white/10 p-2">
                 <LogIn className="h-4 w-4" />
               </div>
               <div>
@@ -138,8 +138,8 @@ export default function LoginPage() {
                 <p className="text-xs text-white/70">记住状态，减少频繁输入</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-4">
-              <div className="rounded-lg bg-white/10 p-2">
+            <div className="flex items-center gap-3 rounded border border-white/10 bg-white/5 p-4">
+              <div className="rounded bg-white/10 p-2">
                 <ShieldCheck className="h-4 w-4" />
               </div>
               <div>
@@ -147,8 +147,8 @@ export default function LoginPage() {
                 <p className="text-xs text-white/70">加密传输与会话有效期控制</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-4">
-              <div className="rounded-lg bg-white/10 p-2">
+            <div className="flex items-center gap-3 rounded border border-white/10 bg-white/5 p-4">
+              <div className="rounded bg-white/10 p-2">
                 <UserRound className="h-4 w-4" />
               </div>
               <div>
@@ -156,8 +156,8 @@ export default function LoginPage() {
                 <p className="text-xs text-white/70">管理员 / 编辑独立权限</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-4">
-              <div className="rounded-lg bg-white/10 p-2">
+            <div className="flex items-center gap-3 rounded border border-white/10 bg-white/5 p-4">
+              <div className="rounded bg-white/10 p-2">
                 <Loader2 className="h-4 w-4 animate-spin text-white/80" />
               </div>
               <div>
@@ -180,7 +180,7 @@ export default function LoginPage() {
           <CardContent className="space-y-6">
             {feedback && (
               <div
-                className={`flex items-center justify-center rounded-md border px-3 py-2 text-sm ${
+                className={`flex items-center justify-center rounded border px-3 py-2 text-sm ${
                   feedback.type === 'success'
                     ? 'border-green-200 bg-green-50 text-green-700'
                     : 'border-destructive/30 bg-destructive/10 text-destructive'

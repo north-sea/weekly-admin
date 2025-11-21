@@ -37,7 +37,7 @@ export default function DashboardPage() {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center space-y-4">
-          <Skeleton className="h-8 w-8 rounded-full mx-auto" />
+          <Skeleton className="h-8 w-8 rounded mx-auto" />
           <Skeleton className="h-4 w-[200px]" />
         </div>
       </div>

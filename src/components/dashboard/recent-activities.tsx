@@ -61,7 +61,7 @@ export function RecentActivities({ activities, loading }: RecentActivitiesProps)
           <div className="space-y-4">
             {[...Array(5)].map((_, i) => (
               <div key={i} className="flex items-start gap-3">
-                <Skeleton className="h-8 w-8 rounded-full" />
+                <Skeleton className="h-8 w-8 rounded" />
                 <div className="flex-1 space-y-2">
                   <Skeleton className="h-4 w-[200px]" />
                   <Skeleton className="h-3 w-[150px]" />
@@ -109,7 +109,7 @@ export function RecentActivities({ activities, loading }: RecentActivitiesProps)
                 key={activity.id}
                 className="flex items-start gap-3 pb-4 border-b last:border-0 last:pb-0"
               >
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                <div className="flex h-8 w-8 items-center justify-center rounded bg-muted">
                   <Icon className="h-4 w-4 text-muted-foreground" />
                 </div>
                 <div className="flex-1 space-y-1">

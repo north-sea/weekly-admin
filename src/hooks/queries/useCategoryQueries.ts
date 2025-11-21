@@ -33,14 +33,31 @@ export function useCategoryList(params?: PaginationParams & {
   search?: string;
   include_stats?: boolean;
 }) {
-  return usePaginatedQuery<CategoryWithStats>(
-    '/api/categories',
-    params,
-    {
-      queryKey: queryKeys.categories.list(params),
-      staleTime: 5 * 60 * 1000, // 5分钟缓存，分类变化频率较低
-    }
-  );
+  const queryParams = new URLSearchParams();
+
+  if (params?.parent_id !== undefined) queryParams.set('parent_id', String(params.parent_id));
+  if (params?.search) queryParams.set('keyword', params.search);
+  if (params?.include_stats !== undefined) queryParams.set('include_children', String(params.include_stats));
+
+  const url = queryParams.toString()
+    ? `/api/categories?${queryParams.toString()}`
+    : '/api/categories';
+
+  return useGet<CategoryWithStats[]>(url, {
+    queryKey: queryKeys.categories.list({
+      parent_id: params?.parent_id,
+      keyword: params?.search,
+      include_children: params?.include_stats,
+    }),
+    staleTime: 5 * 60 * 1000, // 5分钟缓存，分类变化频率较低
+    select: (data) => {
+      // 兼容非数组结构（旧接口或分页数据）
+      if (Array.isArray(data)) return data;
+      // @ts-expect-error 兼容 data 字段
+      if (Array.isArray((data as any)?.data)) return (data as any).data;
+      return [];
+    },
+  });
 }
 
 // 获取所有分类（不分页，用于选择器）

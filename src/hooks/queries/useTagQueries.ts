@@ -16,15 +16,11 @@ import { TagWithStats } from '@/lib/services/tag-api';
 export interface TagInput {
   name: string;
   slug?: string;
-  description?: string;
-  color?: string;
 }
 
 export interface TagUpdate {
   name?: string;
   slug?: string;
-  description?: string;
-  color?: string;
 }
 
 export interface TagMergeParams {
@@ -33,20 +29,57 @@ export interface TagMergeParams {
 }
 
 // 标签列表查询
+export interface TagListResponse {
+  data: TagWithStats[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
 export function useTagList(params?: PaginationParams & {
   search?: string;
   sort_by?: 'name' | 'count' | 'created_at';
   sort_order?: 'asc' | 'desc';
-  min_count?: number;
 }) {
-  return usePaginatedQuery<TagWithStats>(
-    '/api/tags',
-    params,
-    {
-      queryKey: queryKeys.tags.list(params),
-      staleTime: 3 * 60 * 1000, // 3分钟缓存
-    }
-  );
+  const queryParams = new URLSearchParams();
+
+  queryParams.set('page', String(params?.page ?? 1));
+  queryParams.set('pageSize', String(params?.pageSize ?? 20));
+  queryParams.set('sort_by', params?.sort_by ?? 'count');
+  queryParams.set('sort_order', params?.sort_order ?? 'desc');
+
+  if (params?.search) queryParams.set('keyword', params.search);
+
+  const url = `/api/tags?${queryParams.toString()}`;
+
+  return useGet<TagListResponse | TagWithStats[]>(url, {
+    queryKey: queryKeys.tags.list({
+      keyword: params?.search,
+      sort_by: params?.sort_by ?? 'count',
+      sort_order: params?.sort_order ?? 'desc',
+      page: params?.page ?? 1,
+      pageSize: params?.pageSize ?? 20,
+    }),
+    staleTime: 3 * 60 * 1000, // 3分钟缓存
+    keepPreviousData: true,
+    select: (data) => {
+      if (Array.isArray(data)) {
+        return {
+          data,
+          pagination: {
+            page: 1,
+            pageSize: data.length,
+            total: data.length,
+            totalPages: 1,
+          },
+        };
+      }
+      return data as TagListResponse;
+    },
+  });
 }
 
 // 获取所有标签（不分页，用于选择器）
@@ -55,7 +88,14 @@ export function useAllTags(params?: {
   sort_order?: 'asc' | 'desc';
   limit?: number;
 }) {
-  return useGet<TagWithStats[]>('/api/tags/all', {
+  const queryParams = new URLSearchParams();
+  if (params?.sort_by) queryParams.set('sort_by', params.sort_by);
+  if (params?.sort_order) queryParams.set('sort_order', params.sort_order);
+  if (params?.limit) queryParams.set('limit', String(params.limit));
+
+  const url = queryParams.toString() ? `/api/tags/all?${queryParams.toString()}` : '/api/tags/all';
+
+  return useGet<TagWithStats[]>(url, {
     queryKey: [...queryKeys.tags.all, 'all', params],
     staleTime: 5 * 60 * 1000, // 5分钟缓存
   });

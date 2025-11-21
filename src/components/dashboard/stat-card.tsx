@@ -3,7 +3,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { LucideIcon } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface StatCardProps {
@@ -33,7 +33,7 @@ export function StatCard({
       <Card className={className}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <Skeleton className="h-4 w-[100px]" />
-          <Skeleton className="h-4 w-4 rounded-full" />
+          <Skeleton className="h-4 w-4 rounded" />
         </CardHeader>
         <CardContent>
           <Skeleton className="h-8 w-[60px] mb-2" />
@@ -50,7 +50,7 @@ export function StatCard({
           {title}
         </CardTitle>
         {Icon && (
-          <div className="rounded-lg bg-primary/10 p-2 group-hover:bg-primary/20 transition-colors">
+          <div className="rounded bg-primary/10 p-2 group-hover:bg-primary/20 transition-colors">
             <Icon className="h-4 w-4 text-primary" />
           </div>
         )}

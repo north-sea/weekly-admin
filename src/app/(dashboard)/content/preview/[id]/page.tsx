@@ -103,7 +103,7 @@ export default function ContentPreviewPage() {
 
             <div className="flex items-center gap-2">
               {/* 预览模式切换 */}
-              <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+              <div className="flex items-center gap-1 bg-muted rounded p-1">
                 <Button
                   variant={previewMode === 'desktop' ? 'default' : 'ghost'}
                   size="sm"

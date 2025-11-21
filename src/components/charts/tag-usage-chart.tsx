@@ -61,23 +61,36 @@ export function TagUsageChart({
               data={topTags}
               cx="50%"
               cy="50%"
-              labelLine={false}
+              labelLine={{
+                stroke: 'hsl(var(--border))',
+                strokeWidth: 1,
+              }}
               label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-              outerRadius={80}
+              outerRadius={85}
+              innerRadius={45}
               fill="#8884d8"
               dataKey="count"
+              paddingAngle={2}
             >
               {topTags.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Cell
+                  key={`cell-${index}`}
+                  fill={COLORS[index % COLORS.length]}
+                  stroke="hsl(var(--background))"
+                  strokeWidth={2}
+                />
               ))}
             </Pie>
             <Tooltip
               contentStyle={{
-                backgroundColor: 'hsl(var(--popover))',
-                border: '1px solid hsl(var(--border))',
-                borderRadius: '8px',
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                backgroundColor: 'hsl(var(--popover) / 0.95)',
+                border: '1px solid hsl(var(--border) / 0.5)',
+                borderRadius: '12px',
+                boxShadow: '0 8px 16px -4px rgb(0 0 0 / 0.2)',
+                backdropFilter: 'blur(8px)',
               }}
+              labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}
+              itemStyle={{ color: 'hsl(var(--foreground))' }}
             />
           </PieChart>
         </ResponsiveContainer>

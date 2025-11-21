@@ -175,7 +175,7 @@ const AvailableContentsList: React.FC<AvailableContentsListProps> = ({
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+          <div className="animate-spin rounded h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
           <p className="text-sm text-muted-foreground">加载中...</p>
         </div>
       </div>
@@ -205,7 +205,7 @@ const AvailableContentsList: React.FC<AvailableContentsListProps> = ({
                 open={isOpen}
                 onOpenChange={() => toggleSection(categoryName)}
               >
-                <CollapsibleTrigger className="flex items-center justify-between w-full p-2 hover:bg-accent rounded-md">
+                <CollapsibleTrigger className="flex items-center justify-between w-full p-2 hover:bg-accent rounded">
                   <div className="flex items-center gap-2">
                     {isOpen ? (
                       <ChevronDown className="h-4 w-4" />
