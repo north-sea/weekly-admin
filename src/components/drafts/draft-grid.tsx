@@ -121,7 +121,7 @@ export function DraftGrid({ drafts, isLoading, onPreview }: DraftGridProps) {
         description: `草稿已转换为内容，即将跳转到编辑页`,
       });
       setTimeout(() => {
-        router.push(`/content/editor/${content.id}`);
+        router.push(`/content/${content.id}`);
       }, 1000);
     } catch (error) {
       const message = error instanceof Error ? error.message : '转换草稿时发生错误';

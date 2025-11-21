@@ -19,36 +19,19 @@ export const menuConfig: MenuDataItem[] = [
     icon: <DashboardOutlined />,
   },
   {
-    // 父级使用占位路径，避免与子项重复
-    path: '/_menu/content',
-    name: '内容管理',
+    path: '/content/drafts',
+    name: '草稿管理',
     icon: <FileTextOutlined />,
-    children: [
-      {
-        path: '/content/list',
-        name: '内容列表',
-      },
-      {
-        path: '/content/drafts',
-        name: '草稿管理',
-      },
-    ],
   },
   {
-    // 父级使用占位路径，避免与子项重复
-    path: '/_menu/weekly',
+    path: '/content/list',
+    name: '内容库',
+    icon: <AppstoreOutlined />,
+  },
+  {
+    path: '/weekly',
     name: '周刊管理',
     icon: <CalendarOutlined />,
-    children: [
-      {
-        path: '/weekly',
-        name: '周刊列表',
-      },
-      {
-        path: '/weekly/editor',
-        name: '周刊编辑',
-      },
-    ],
   },
   {
     path: '/search',
@@ -58,7 +41,7 @@ export const menuConfig: MenuDataItem[] = [
   {
     // 父级使用占位路径，避免与子项重复
     path: '/_menu/analytics',
-    name: '数据分析',
+    name: '内容洞察',
     icon: <BarChartOutlined />,
     children: [
       {
@@ -81,7 +64,8 @@ export const menuConfig: MenuDataItem[] = [
     icon: <AuditOutlined />,
   },
   {
-    path: '/settings',
+    // 父级使用占位路径，避免与子项重复
+    path: '/_menu/settings',
     name: '系统设置',
     icon: <SettingOutlined />,
     children: [

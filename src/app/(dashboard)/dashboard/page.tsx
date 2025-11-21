@@ -1,389 +1,160 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  Card, 
-  Typography, 
-  Button, 
-  Space, 
-  Spin, 
-  Row, 
-  Col, 
-  message, 
-  Select, 
-  Timeline,
+import {
+  FileText,
+  Calendar,
+  FolderOpen,
   Tag,
-  Divider,
-  Alert
-} from 'antd';
-import { PageContainer } from '@ant-design/pro-components';
-import { 
-  LogoutOutlined, 
-  UserOutlined, 
-  FileTextOutlined, 
-  TagsOutlined, 
-  FolderOutlined,
-  BookOutlined,
-  EditOutlined,
-  EyeOutlined,
-  TrophyOutlined,
-  BarChartOutlined,
-  PlusOutlined,
-  GlobalOutlined,
-  LineChartOutlined
-} from '@ant-design/icons';
-import { useAuthStore } from '@/stores/auth';
+  TrendingUp,
+  Eye,
+  FileEdit,
+} from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useAnalytics } from '@/hooks/useAnalytics';
-import { StatCard } from '@/components/dashboard/StatCard';
-import { PublishTrendChart } from '@/components/charts/PublishTrendChart';
-import { ContentTypeChart } from '@/components/charts/ContentTypeChart';
-import { CategoryChart } from '@/components/charts/CategoryChart';
-
-const { Title, Text } = Typography;
+import { StatCard } from '@/components/dashboard/stat-card';
+import { QuickActions } from '@/components/dashboard/quick-actions';
+import { RecentActivities } from '@/components/dashboard/recent-activities';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
-  const { logout } = useAuthStore();
   const router = useRouter();
-  const [timeRange, setTimeRange] = useState(30);
+  const [timeRange, setTimeRange] = React.useState(30);
   const { data: analytics, loading: analyticsLoading, error: analyticsError, refetch } = useAnalytics(timeRange);
-
-  const handleLogout = async () => {
-    try {
-      // Call logout API if user is authenticated
-      if (user) {
-        await fetch('/api/auth/logout', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${useAuthStore.getState().token}`,
-          },
-        });
-      }
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      logout();
-      router.replace('/login');
-    }
-  };
-
-  const handleTimeRangeChange = (value: number) => {
-    setTimeRange(value);
-  };
-
-  const formatOperationType = (type: string) => {
-    const typeMap: Record<string, { text: string; color: string }> = {
-      CREATE: { text: '创建', color: 'green' },
-      UPDATE: { text: '更新', color: 'blue' },
-      DELETE: { text: '删除', color: 'red' },
-      LOGIN: { text: '登录', color: 'cyan' },
-      LOGOUT: { text: '退出', color: 'default' },
-    };
-    return typeMap[type] || { text: type, color: 'default' };
-  };
-
-  const formatResourceType = (type: string) => {
-    const typeMap: Record<string, string> = {
-      content: '内容',
-      category: '分类',
-      tag: '标签',
-      weekly_issue: '周刊',
-      user: '用户',
-    };
-    return typeMap[type] || type;
-  };
 
   if (authLoading || !user) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh' 
-      }}>
-        <Spin size="large" />
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center space-y-4">
+          <Skeleton className="h-8 w-8 rounded-full mx-auto" />
+          <Skeleton className="h-4 w-[200px]" />
+        </div>
       </div>
     );
   }
 
   return (
-    <PageContainer
-      title="数据仪表板"
-      subTitle={`欢迎回来，${user.displayName || user.username}！`}
-      extra={[
-        <Select
-          key="timeRange"
-          value={timeRange}
-          onChange={handleTimeRangeChange}
-          style={{ width: 120 }}
-          options={[
-            { label: '最近7天', value: 7 },
-            { label: '最近30天', value: 30 },
-            { label: '最近90天', value: 90 },
-            { label: '最近365天', value: 365 },
-          ]}
-        />,
-        <Button 
-          key="logout"
-          type="primary" 
-          danger 
-          icon={<LogoutOutlined />}
-          onClick={handleLogout}
-        >
-          退出登录
-        </Button>,
-      ]}
-    >
+    <div className="flex-1 space-y-6 p-8 pt-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">数据仪表板</h2>
+          <p className="text-muted-foreground">
+            欢迎回来，{user.displayName || user.username}！
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Select
+            value={timeRange.toString()}
+            onValueChange={(value) => setTimeRange(Number(value))}
+          >
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="选择时间范围" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">最近7天</SelectItem>
+              <SelectItem value="30">最近30天</SelectItem>
+              <SelectItem value="90">最近90天</SelectItem>
+              <SelectItem value="365">最近365天</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
-        {analyticsError && (
-          <Alert
-            message="数据加载失败"
-            description={analyticsError}
-            type="error"
-            showIcon
-            style={{ marginBottom: '24px' }}
-            action={
-              <Button size="small" onClick={() => refetch()}>
-                重试
-              </Button>
-            }
+      {/* Error Alert */}
+      {analyticsError && (
+        <Alert variant="destructive">
+          <AlertDescription className="flex items-center justify-between">
+            <span>数据加载失败: {analyticsError}</span>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              重试
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Overview Statistics - First Row */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="总内容数"
+          value={analytics?.overview.totalContents || 0}
+          description={`发布率: ${analytics?.overview.publishRate || 0}%`}
+          icon={FileText}
+          loading={analyticsLoading}
+        />
+        <StatCard
+          title="Blog 内容"
+          value={analytics?.overview.totalBlogContents || 0}
+          icon={FileEdit}
+          loading={analyticsLoading}
+        />
+        <StatCard
+          title="Weekly 内容"
+          value={analytics?.overview.totalWeeklyContents || 0}
+          icon={Calendar}
+          loading={analyticsLoading}
+        />
+        <StatCard
+          title="周刊期号"
+          value={analytics?.overview.totalWeeklyIssues || 0}
+          description={`已发布: ${analytics?.overview.publishedWeeklyIssues || 0}`}
+          icon={TrendingUp}
+          loading={analyticsLoading}
+        />
+      </div>
+
+      {/* Key Stats - Second Row */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="发布率"
+          value={`${analytics?.overview.publishRate || 0}%`}
+          icon={TrendingUp}
+          loading={analyticsLoading}
+        />
+        <StatCard
+          title="已发布内容"
+          value={analytics?.overview.publishedContents || 0}
+          icon={Eye}
+          loading={analyticsLoading}
+        />
+        <StatCard
+          title="草稿内容"
+          value={analytics?.overview.draftContents || 0}
+          icon={FileEdit}
+          loading={analyticsLoading}
+        />
+        <StatCard
+          title="分类数量"
+          value={analytics?.categories.total || 0}
+          description={`标签: ${analytics?.tags.total || 0}`}
+          icon={FolderOpen}
+          loading={analyticsLoading}
+        />
+      </div>
+
+      {/* Quick Actions and Recent Activities */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        <div className="lg:col-span-3">
+          <QuickActions />
+        </div>
+        <div className="lg:col-span-4">
+          <RecentActivities
+            activities={analytics?.activities}
+            loading={analyticsLoading}
           />
-        )}
-
-        {/* Overview Statistics */}
-        <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
-          <Col xs={24} sm={12} md={6}>
-            <StatCard
-              title="总内容数"
-              value={analytics?.overview.totalContents || 0}
-              prefix={<FileTextOutlined />}
-              loading={analyticsLoading}
-              extra={
-                <Text type="secondary" style={{ fontSize: '12px' }}>
-                  发布率: {analytics?.overview.publishRate || 0}%
-                </Text>
-              }
-            />
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-            <StatCard
-              title="Blog 内容"
-              value={analytics?.overview.totalBlogContents || 0}
-              prefix={<EditOutlined />}
-              loading={analyticsLoading}
-            />
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-            <StatCard
-              title="Weekly 内容"
-              value={analytics?.overview.totalWeeklyContents || 0}
-              prefix={<BookOutlined />}
-              loading={analyticsLoading}
-            />
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-            <StatCard
-              title="周刊期号"
-              value={analytics?.overview.totalWeeklyIssues || 0}
-              prefix={<TrophyOutlined />}
-              loading={analyticsLoading}
-              extra={
-                <Text type="secondary" style={{ fontSize: '12px' }}>
-                  已发布: {analytics?.overview.publishedWeeklyIssues || 0}
-                </Text>
-              }
-            />
-          </Col>
-        </Row>
-
-        {/* Key Stats */}
-        <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
-          <Col xs={24} sm={12} md={6}>
-            <StatCard
-              title="发布率"
-              value={analytics?.overview.publishRate || 0}
-              suffix="%"
-              prefix={<BarChartOutlined />}
-              loading={analyticsLoading}
-            />
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-            <StatCard
-              title="已发布内容"
-              value={analytics?.overview.publishedContents || 0}
-              prefix={<EyeOutlined />}
-              loading={analyticsLoading}
-            />
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-            <StatCard
-              title="草稿内容"
-              value={analytics?.overview.draftContents || 0}
-              prefix={<EditOutlined />}
-              loading={analyticsLoading}
-            />
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-            <StatCard
-              title="分类数量"
-              value={analytics?.categories.total || 0}
-              prefix={<FolderOutlined />}
-              loading={analyticsLoading}
-              extra={
-                <Text type="secondary" style={{ fontSize: '12px' }}>
-                  标签: {analytics?.tags.total || 0}
-                </Text>
-              }
-            />
-          </Col>
-        </Row>
-
-        {/* Charts */}
-        <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
-          <Col xs={24} lg={12}>
-            <PublishTrendChart
-              data={analytics?.trends.publishTrend || []}
-              loading={analyticsLoading}
-              title={`发布趋势 (最近${timeRange}天)`}
-            />
-          </Col>
-          <Col xs={24} lg={12}>
-            <ContentTypeChart
-              data={analytics?.trends.contentTypeDistribution || []}
-              loading={analyticsLoading}
-            />
-          </Col>
-        </Row>
-
-        <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
-          <Col xs={24} lg={12}>
-            <CategoryChart
-              data={analytics?.categories.stats || []}
-              loading={analyticsLoading}
-            />
-          </Col>
-          <Col xs={24} lg={12}>
-            <Card title="热门标签" loading={analyticsLoading} size="small">
-              <div style={{ minHeight: 200 }}>
-                {analytics?.tags?.stats?.length ? (
-                  <Space wrap>
-                    {analytics.tags.stats.slice(0, 15).map((tag, index) => (
-                      <Tag 
-                        key={tag.name} 
-                        color={index < 5 ? 'blue' : index < 10 ? 'green' : 'default'}
-                      >
-                        {tag.name} ({tag.count})
-                      </Tag>
-                    ))}
-                  </Space>
-                ) : (
-                  <div style={{ 
-                    height: 200, 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center' 
-                  }}>
-                    <Text type="secondary">暂无标签数据</Text>
-                  </div>
-                )}
-              </div>
-            </Card>
-          </Col>
-        </Row>
-
-        {/* Recent Activities and Quick Actions */}
-        <Row gutter={[16, 16]}>
-          <Col xs={24} lg={16}>
-            <Card title="最近活动" loading={analyticsLoading} size="small">
-              <div style={{ maxHeight: 300, overflowY: 'auto' }}>
-                {analytics?.activities.length ? (
-                  <Timeline
-                    items={analytics.activities.map((activity) => {
-                      const opType = formatOperationType(activity.operationType);
-                      return {
-                        color: opType.color,
-                        children: (
-                          <div>
-                            <div>
-                              <Tag color={opType.color}>{opType.text}</Tag>
-                              <Text strong>{formatResourceType(activity.resourceType)}</Text>
-                              {activity.resourceId && (
-                                <Text type="secondary"> #{activity.resourceId}</Text>
-                              )}
-                            </div>
-                            <div>
-                              <Text type="secondary" style={{ fontSize: '12px' }}>
-                                {activity.user.displayName || activity.user.username} · {' '}
-                                {new Date(activity.createdAt).toLocaleString()}
-                              </Text>
-                            </div>
-                          </div>
-                        ),
-                      };
-                    })}
-                  />
-                ) : (
-                  <Text type="secondary">暂无活动记录</Text>
-                )}
-              </div>
-            </Card>
-          </Col>
-          <Col xs={24} lg={8}>
-            <Card title="快捷操作" size="small">
-              <Space direction="vertical" style={{ width: '100%' }}>
-                <Button 
-                  type="primary" 
-                  icon={<PlusOutlined />} 
-                  block
-                  onClick={() => router.push('/content/list')}
-                >
-                  创建新内容
-                </Button>
-                <Button 
-                  icon={<BookOutlined />} 
-                  block
-                  onClick={() => router.push('/weekly')}
-                >
-                  管理周刊
-                </Button>
-                <Button 
-                  icon={<BarChartOutlined />} 
-                  block
-                  onClick={() => router.push('/operation-logs')}
-                >
-                  查看操作日志
-                </Button>
-                <Button 
-                  icon={<GlobalOutlined />} 
-                  block
-                  onClick={() => router.push('/analytics/sources')}
-                >
-                  来源分析
-                </Button>
-                <Button 
-                  icon={<LineChartOutlined />} 
-                  block
-                  onClick={() => router.push('/analytics/advanced')}
-                >
-                  高级分析
-                </Button>
-                <Divider style={{ margin: '12px 0' }} />
-                <div>
-                  <Text type="secondary" style={{ fontSize: '12px' }}>
-                    系统状态：正常运行
-                  </Text>
-                </div>
-                <div>
-                  <Text type="secondary" style={{ fontSize: '12px' }}>
-                    数据更新时间：{analytics?.timeRange ? new Date().toLocaleString() : '-'}
-                  </Text>
-                </div>
-              </Space>
-            </Card>
-          </Col>
-        </Row>
-    </PageContainer>
+        </div>
+      </div>
+    </div>
   );
 }

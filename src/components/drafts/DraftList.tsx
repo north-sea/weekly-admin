@@ -178,7 +178,7 @@ export const DraftList: React.FC<DraftListProps> = ({
   // 转换为内容
   const handleConvert = async (id: string) => {
     const content = await convertDraft.mutateAsync({ id });
-    router.push(`/content/editor/${content.id}`);
+    router.push(`/content/${content.id}`);
   };
 
   // 表格列定义
@@ -356,7 +356,7 @@ export const DraftList: React.FC<DraftListProps> = ({
                 type="text"
                 size="small"
                 icon={<EditOutlined />}
-                onClick={() => router.push(`/content/editor/${record.content_id}`)}
+                onClick={() => router.push(`/content/${record.content_id}`)}
               />
             </Tooltip>
           )}
