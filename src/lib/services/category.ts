@@ -1,4 +1,4 @@
-import { CategoryInput, CategoryUpdate, CategoryQuery } from '@/lib/validations/category';
+import { CategoryInput, CategoryUpdate, CategoryQuery, CategoryMerge } from '@/lib/validations/category';
 import { prisma } from '@/lib/db';
 
 export interface CategoryWithStats {
@@ -20,6 +20,40 @@ export interface CategoryWithStats {
 }
 
 export class CategoryService {
+  private static slugify(value: string): string {
+    return value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 100);
+  }
+
+  private static async ensureUniqueSlug(desired: string, excludeId?: number): Promise<string> {
+    const base = desired || 'category';
+    let slug = this.slugify(base) || `category-${Date.now()}`;
+    let counter = 1;
+
+    // 保证 slug 唯一（忽略大小写）
+    // 避免死循环，最多尝试 100 次
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const existing = await prisma.categories.findFirst({
+        where: {
+          slug,
+          ...(excludeId ? { id: { not: excludeId } } : {}),
+        },
+      });
+      if (!existing) break;
+      slug = `${this.slugify(base)}-${counter++}`;
+      if (counter > 100) {
+        slug = `${this.slugify(base)}-${Date.now()}`;
+        break;
+      }
+    }
+    return slug;
+  }
+
   // 获取分类列表（支持层级结构）
   static async getCategoryList(query: CategoryQuery): Promise<CategoryWithStats[]> {
     const { parent_id, keyword, include_children } = query;
@@ -87,6 +121,40 @@ export class CategoryService {
     
     return result;
   }
+
+  // 获取所有分类（扁平列表）
+  static async getAllCategories(): Promise<CategoryWithStats[]> {
+    const categories = await prisma.categories.findMany({
+      orderBy: [
+        { sort_order: 'asc' },
+        { name: 'asc' }
+      ]
+    });
+
+    const contentCounts = await prisma.contents.groupBy({
+      by: ['category_id'],
+      _count: { category_id: true },
+    });
+
+    const countMap = new Map<number, number>();
+    contentCounts.forEach(({ category_id, _count }) => {
+      if (category_id) {
+        countMap.set(category_id, _count.category_id || 0);
+      }
+    });
+
+    return categories.map((category) => ({
+      id: category.id,
+      name: category.name,
+      slug: category.slug,
+      parent_id: category.parent_id || undefined,
+      description: category.description || undefined,
+      sort_order: category.sort_order || 0,
+      created_at: category.created_at || undefined,
+      updated_at: category.updated_at || undefined,
+      content_count: countMap.get(category.id) || 0,
+    }));
+  }
   
   // 获取单个分类
   static async getCategoryById(id: number): Promise<CategoryWithStats | null> {
@@ -126,15 +194,17 @@ export class CategoryService {
   
   // 创建分类
   static async createCategory(data: CategoryInput): Promise<CategoryWithStats> {
-    // 检查slug是否已存在
-    const existingCategory = await prisma.categories.findFirst({
-      where: { slug: data.slug }
+    // 检查名称重复（忽略大小写）
+    const existingName = await prisma.categories.findFirst({
+      where: { name: data.name },
     });
-    
-    if (existingCategory) {
-      throw new Error('URL别名已存在');
+    if (existingName) {
+      throw new Error('分类名称已存在');
     }
-    
+
+    // 确保 slug 唯一
+    const slug = await this.ensureUniqueSlug(data.slug || data.name);
+
     // 检查父分类是否存在
     if (data.parent_id) {
       const parentCategory = await prisma.categories.findUnique({
@@ -147,7 +217,7 @@ export class CategoryService {
     }
     
     const category = await prisma.categories.create({
-      data
+      data: { ...data, slug }
     });
     
     return {
@@ -176,18 +246,23 @@ export class CategoryService {
       throw new Error('分类不存在');
     }
     
-    // 检查slug是否与其他分类冲突
-    if (updateData.slug) {
-      const conflictCategory = await prisma.categories.findFirst({
+    // 检查名称重复（忽略大小写）
+    if (updateData.name) {
+      const existingName = await prisma.categories.findFirst({
         where: {
-          slug: updateData.slug,
-          id: { not: id }
-        }
+          name: updateData.name,
+          id: { not: id },
+        },
       });
-      
-      if (conflictCategory) {
-        throw new Error('URL别名已存在');
+      if (existingName) {
+        throw new Error('分类名称已存在');
       }
+    }
+
+    // 检查slug是否与其他分类冲突，并自动修正
+    if (updateData.slug || updateData.name) {
+      const desiredSlug = updateData.slug || updateData.name || existingCategory.slug;
+      updateData.slug = await this.ensureUniqueSlug(desiredSlug, id);
     }
     
     // 检查父分类是否存在且不是自己
@@ -233,29 +308,71 @@ export class CategoryService {
       content_count: contentCount
     };
   }
+
+  // 合并分类：将源分类的内容迁移到目标分类，并删除源分类
+  static async mergeCategories(data: CategoryMerge): Promise<void> {
+    const { source_category_ids, target_category_id } = data;
+
+    const target = await prisma.categories.findUnique({ where: { id: target_category_id } });
+    if (!target) {
+      throw new Error('目标分类不存在');
+    }
+
+    const sources = await prisma.categories.findMany({
+      where: { id: { in: source_category_ids } },
+    });
+    if (sources.length !== source_category_ids.length) {
+      throw new Error('部分源分类不存在');
+    }
+    if (source_category_ids.includes(target_category_id)) {
+      throw new Error('目标分类不能与源分类相同');
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // 迁移内容到目标分类
+      await tx.contents.updateMany({
+        where: { category_id: { in: source_category_ids } },
+        data: { category_id: target_category_id },
+      });
+
+      // 迁移子分类到目标分类下，避免孤儿节点
+      await tx.categories.updateMany({
+        where: { parent_id: { in: source_category_ids } },
+        data: { parent_id: target_category_id, updated_at: new Date() },
+      });
+
+      // 更新目标分类的更新时间
+      await tx.categories.update({
+        where: { id: target_category_id },
+        data: { updated_at: new Date() },
+      });
+
+      // 删除源分类
+      await tx.categories.deleteMany({
+        where: { id: { in: source_category_ids } },
+      });
+    });
+  }
   
   // 删除分类
   static async deleteCategory(id: number): Promise<void> {
-    // 检查是否有子分类
-    const childrenCount = await prisma.categories.count({
-      where: { parent_id: id }
-    });
-    
-    if (childrenCount > 0) {
-      throw new Error('请先删除子分类');
-    }
-    
-    // 检查是否有关联的内容
-    const contentCount = await prisma.contents.count({
-      where: { category_id: id }
-    });
-    
-    if (contentCount > 0) {
-      throw new Error('该分类下还有内容，无法删除');
-    }
-    
-    await prisma.categories.delete({
-      where: { id }
+    await prisma.$transaction(async (tx) => {
+      // 将子分类提升到顶层，避免孤儿引用
+      await tx.categories.updateMany({
+        where: { parent_id: id },
+        data: { parent_id: null },
+      });
+
+      // 将内容的分类置空，避免外键阻塞删除
+      await tx.contents.updateMany({
+        where: { category_id: id },
+        data: { category_id: null },
+      });
+
+      // 删除分类（如果已不存在则忽略）
+      await tx.categories.deleteMany({
+        where: { id },
+      });
     });
   }
   

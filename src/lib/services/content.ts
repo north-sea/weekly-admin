@@ -10,8 +10,21 @@ export interface ContentWithRelations {
   title: string;
   slug: string;
   description?: string;
+  summary?: string | null;
+  image_url?: string | null;
+  cover_image?: string | null;
   content: string;
+  content_format?: string | null;
+  source?: string | null;
+  source_url?: string | null;
   status: string;
+  meta_title?: string | null;
+  meta_description?: string | null;
+  word_count?: number | null;
+  reading_time?: number | null;
+  view_count?: number | null;
+  screenshot_api?: string | null;
+  recommendation_reason?: string | null;
   featured?: boolean;
   published_at?: Date;
   created_at?: Date;
@@ -157,8 +170,21 @@ export class ContentService {
     title: string;
     slug: string;
     description?: string | null;
+    summary?: string | null;
+    image_url?: string | null;
     content: string;
+    content_format?: string | null;
+    source?: string | null;
+    source_url?: string | null;
     status: string;
+    meta_title?: string | null;
+    meta_description?: string | null;
+    word_count?: number | null;
+    reading_time?: number | null;
+    view_count?: bigint | number | null;
+    screenshot_api?: string | null;
+    cover_image?: string | null;
+    recommendation_reason?: string | null;
     featured?: boolean | null;
     published_at?: Date | null;
     created_at?: Date | null;
@@ -208,18 +234,33 @@ export class ContentService {
       attribute_value: attr.attribute_value || '',
       attribute_type: attr.attribute_type?.toString() || 'string'
     }));
+    const coverImageAttr = rawAttributes.find(attr => attr.attribute_name === 'cover_image');
+    const recommendationReasonAttr = rawAttributes.find(attr => attr.attribute_name === 'recommendation_reason');
     
     return {
       id: content.id,
       title: content.title,
       slug: content.slug,
-      description: content.description || undefined,
+      description: content.description ?? undefined,
+      summary: content.summary ?? undefined,
+      image_url: content.image_url ?? undefined,
+      cover_image: (coverImageAttr?.attribute_value as string | null | undefined) ?? undefined,
       content: content.content,
+      content_format: content.content_format ?? undefined,
+      source: content.source ?? undefined,
+      source_url: content.source_url ?? undefined,
       status: content.status,
-      featured: content.featured || undefined,
-      published_at: content.published_at || undefined,
-      created_at: content.created_at || undefined,
-      updated_at: content.updated_at || undefined,
+      meta_title: content.meta_title ?? undefined,
+      meta_description: content.meta_description ?? undefined,
+      word_count: content.word_count ?? undefined,
+      reading_time: content.reading_time ?? undefined,
+      view_count: content.view_count !== null && content.view_count !== undefined ? Number(content.view_count) : undefined,
+      screenshot_api: content.screenshot_api ?? undefined,
+      recommendation_reason: (recommendationReasonAttr?.attribute_value as string | null | undefined) ?? undefined,
+      featured: content.featured ?? undefined,
+      published_at: content.published_at ?? undefined,
+      created_at: content.created_at ?? undefined,
+      updated_at: content.updated_at ?? undefined,
       content_type: contentType!,
       category: category || undefined,
       tags,

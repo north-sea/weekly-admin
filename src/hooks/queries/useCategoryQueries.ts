@@ -12,6 +12,7 @@ import {
   PaginationParams
 } from '@/hooks/useApi';
 import { CategoryWithStats } from '@/lib/services/category-api';
+import { CategoryMerge } from '@/lib/validations/category';
 
 export interface CategoryInput {
   name: string;
@@ -225,6 +226,18 @@ export function useDeleteCategory() {
       },
     }
   );
+}
+
+// 合并分类
+export function useMergeCategories() {
+  const invalidate = useInvalidateQueries();
+
+  return usePost<void, CategoryMerge>('/api/categories/merge', {
+    onSuccess: () => {
+      invalidate.invalidateCategories();
+      invalidate.invalidateContent();
+    },
+  });
 }
 
 // 移动分类（调整父子关系）

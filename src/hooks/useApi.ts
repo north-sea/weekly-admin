@@ -158,7 +158,7 @@ export function usePost<TData = unknown, TVariables = unknown, TError = Error>(
 
 // PUT 突变钩子
 export function usePut<TData = unknown, TVariables = unknown, TError = Error>(
-  url: string,
+  url: string | ((variables: TVariables) => string),
   options?: UseMutationOptions<TData, TError, TVariables> & {
     apiOptions?: ApiOptions;
   }
@@ -166,14 +166,17 @@ export function usePut<TData = unknown, TVariables = unknown, TError = Error>(
   const { apiOptions, ...mutationOptions } = options || {};
   
   return useMutation<TData, TError, TVariables>({
-    mutationFn: (variables: TVariables) => apiClient.put<TData>(url, variables, apiOptions),
+    mutationFn: (variables: TVariables) => {
+      const resolvedUrl = typeof url === 'function' ? url(variables) : url;
+      return apiClient.put<TData>(resolvedUrl, variables, apiOptions);
+    },
     ...mutationOptions,
   });
 }
 
 // DELETE 突变钩子
 export function useDelete<TData = unknown, TVariables = unknown, TError = Error>(
-  url: string,
+  url: string | ((variables: TVariables) => string),
   options?: UseMutationOptions<TData, TError, TVariables> & {
     apiOptions?: ApiOptions;
   }
@@ -181,7 +184,10 @@ export function useDelete<TData = unknown, TVariables = unknown, TError = Error>
   const { apiOptions, ...mutationOptions } = options || {};
   
   return useMutation<TData, TError, TVariables>({
-    mutationFn: (variables: TVariables) => apiClient.delete<TData>(url, apiOptions),
+    mutationFn: (variables: TVariables) => {
+      const resolvedUrl = typeof url === 'function' ? url(variables) : url;
+      return apiClient.delete<TData>(resolvedUrl, apiOptions);
+    },
     ...mutationOptions,
   });
 }

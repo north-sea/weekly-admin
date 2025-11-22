@@ -27,13 +27,9 @@ import {
   Image as ImageIcon,
   List,
   ListOrdered,
-  Heading2,
-  FileText,
-  Braces,
-  RefreshCw
+  Heading2
 } from 'lucide-react';
 import { ContentWithRelations } from '@/lib/services/content-api';
-import { ContentFormatAdapter, ContentFormat } from '@/lib/utils/format-adapter';
 import MDEditor from '@uiw/react-md-editor';
 import MarkdownPreview from './MarkdownPreview';
 import StructuredPreview from './StructuredPreview';
@@ -43,6 +39,8 @@ import { debounce } from 'lodash-es';
 const contentSchema = z.object({
   title: z.string().min(1, '标题不能为空').max(500, '标题长度不能超过500字符'),
   content: z.string().min(1, '内容不能为空'),
+  summary: z.string().max(2000, '摘要长度不能超过2000字符').optional(),
+  image_url: z.string().url('主图必须是有效的URL').optional().or(z.literal('')),
   content_type_id: z.number(),
   category_id: z.number().optional().nullable(),
   tag_ids: z.array(z.number()).optional(),
@@ -61,7 +59,7 @@ const contentSchema = z.object({
 });
 
 type ContentFormData = z.infer<typeof contentSchema>;
-type EditMode = 'markdown' | 'structured';
+type PreviewMode = 'markdown' | 'structured';
 
 interface SimplifiedEditorProps {
   initialValues?: Partial<ContentWithRelations>;
@@ -85,13 +83,9 @@ export default function SimplifiedEditor({
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
-  
-  // 编辑模式：自动检测初始格式
-  const [editMode, setEditMode] = useState<EditMode>(() => {
-    const initialContent = initialValues?.content || '';
-    const detectedFormat = ContentFormatAdapter.detectFormat(initialContent);
-    return detectedFormat === 'markdown' ? 'markdown' : 'structured';
-  });
+  const [previewMode, setPreviewMode] = useState<PreviewMode>(
+    initialValues?.content_type?.id === 3 ? 'structured' : 'markdown'
+  );
   
   const {
     control,
@@ -104,6 +98,8 @@ export default function SimplifiedEditor({
     defaultValues: {
       title: initialValues?.title || '',
       content: initialValues?.content || '',
+      summary: initialValues?.summary || '',
+      image_url: initialValues?.image_url || '',
       content_type_id: initialValues?.content_type?.id || 4,
       category_id: initialValues?.category?.id || null,
       tag_ids: initialValues?.tags?.map(tag => tag.id) || [],
@@ -123,6 +119,11 @@ export default function SimplifiedEditor({
   const contentTypeId = watch('content_type_id');
   const currentContent = watch('content');
   const currentTitle = watch('title');
+  const currentSummary = watch('summary');
+  const currentImage = watch('image_url');
+  const currentSource = watch('source');
+  const currentSourceUrl = watch('source_url');
+  const currentRecommendation = watch('recommendation_reason');
   
   // 自动保存
   const autoSave = useCallback(
@@ -193,32 +194,6 @@ export default function SimplifiedEditor({
     setHasUnsavedChanges(true);
   };
 
-  // 切换编辑模式
-  const handleToggleEditMode = () => {
-    const newMode: EditMode = editMode === 'markdown' ? 'structured' : 'markdown';
-    
-    toast({
-      title: "切换编辑模式",
-      description: `已切换到${newMode === 'markdown' ? 'Markdown' : '结构化'}模式`,
-    });
-    
-    setEditMode(newMode);
-  };
-
-  // 自动检测并建议切换模式
-  useEffect(() => {
-    if (currentContent) {
-      const detectedFormat = ContentFormatAdapter.detectFormat(currentContent);
-      const suggestedMode: EditMode = detectedFormat === 'markdown' ? 'markdown' : 'structured';
-      
-      // 如果检测到的格式与当前模式不一致，可以提示用户（可选）
-      if (suggestedMode !== editMode && currentContent.length > 50) {
-        // 静默处理，不打扰用户
-        // 用户可以手动切换
-      }
-    }
-  }, [currentContent, editMode]);
-
   return (
     <div className="h-full flex flex-col">
       {/* 顶部工具栏 */}
@@ -233,35 +208,6 @@ export default function SimplifiedEditor({
               <ArrowLeft className="h-4 w-4 mr-2" />
               返回
             </Button>
-            <Separator orientation="vertical" className="h-6" />
-            
-            {/* 编辑模式切换 */}
-            <div className="flex items-center gap-2">
-              <Label className="text-sm text-muted-foreground">编辑模式:</Label>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleToggleEditMode}
-                className="gap-2"
-              >
-                {editMode === 'markdown' ? (
-                  <>
-                    <FileText className="h-4 w-4" />
-                    Markdown
-                  </>
-                ) : (
-                  <>
-                    <Braces className="h-4 w-4" />
-                    结构化
-                  </>
-                )}
-                <RefreshCw className="h-3 w-3" />
-              </Button>
-              <span className="text-xs text-muted-foreground">
-                {editMode === 'markdown' ? '适合长文和旧内容' : '适合新版周刊'}
-              </span>
-            </div>
-            
             <Separator orientation="vertical" className="h-6" />
             
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -450,145 +396,189 @@ export default function SimplifiedEditor({
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>内容编辑</CardTitle>
-                    <CardDescription>
-                      {editMode === 'markdown' ? '支持 Markdown 语法' : '结构化内容输入'}
-                    </CardDescription>
+                    <CardTitle>Markdown 内容</CardTitle>
+                    <CardDescription>编辑完整正文，支持 Markdown 语法</CardDescription>
                   </div>
-                  {editMode === 'markdown' && (
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => insertMarkdown('**', '**', '粗体文本')}
-                        title="粗体"
-                      >
-                        <Bold className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => insertMarkdown('*', '*', '斜体文本')}
-                        title="斜体"
-                      >
-                        <Italic className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => insertMarkdown('`', '`', '代码')}
-                        title="代码"
-                      >
-                        <Code className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => insertMarkdown('\n## ', '', '标题')}
-                        title="标题"
-                      >
-                        <Heading2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => insertMarkdown('[', '](https://)', '链接文本')}
-                        title="链接"
-                      >
-                        <Link className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => insertMarkdown('![', '](https://)', '图片描述')}
-                        title="图片"
-                      >
-                        <ImageIcon className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => insertMarkdown('\n- ', '', '列表项')}
-                        title="无序列表"
-                      >
-                        <List className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => insertMarkdown('\n1. ', '', '列表项')}
-                        title="有序列表"
-                      >
-                        <ListOrdered className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => insertMarkdown('**', '**', '粗体文本')}
+                      title="粗体"
+                    >
+                      <Bold className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => insertMarkdown('*', '*', '斜体文本')}
+                      title="斜体"
+                    >
+                      <Italic className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => insertMarkdown('`', '`', '代码')}
+                      title="代码"
+                    >
+                      <Code className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => insertMarkdown('\n## ', '', '标题')}
+                      title="标题"
+                    >
+                      <Heading2 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => insertMarkdown('[', '](https://)', '链接文本')}
+                      title="链接"
+                    >
+                      <Link className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => insertMarkdown('![', '](https://)', '图片描述')}
+                      title="图片"
+                    >
+                      <ImageIcon className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => insertMarkdown('\n- ', '', '列表项')}
+                      title="无序列表"
+                    >
+                      <List className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => insertMarkdown('\n1. ', '', '列表项')}
+                      title="有序列表"
+                    >
+                      <ListOrdered className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
-                {editMode === 'markdown' ? (
-                  // Markdown 编辑器
-                  <>
-                    <Controller
-                      name="content"
-                      control={control}
-                      render={({ field }) => (
-                        <MDEditor
-                          value={field.value}
-                          onChange={(val) => field.onChange(val || '')}
-                          preview="edit"
-                          height={500}
-                          data-color-mode="light"
-                          hideToolbar
-                          textareaProps={{
-                            placeholder: contentTypeId === 4 
-                              ? '请输入 Blog 内容（支持 Markdown 语法）' 
-                              : '请输入 Weekly 内容（旧版 Markdown 格式）',
-                            style: { 
-                              fontSize: '14px', 
-                              lineHeight: '1.6',
-                            },
-                          }}
-                        />
-                      )}
+                <Controller
+                  name="content"
+                  control={control}
+                  render={({ field }) => (
+                    <MDEditor
+                      value={field.value}
+                      onChange={(val) => field.onChange(val || '')}
+                      preview="edit"
+                      height={500}
+                      data-color-mode="light"
+                      hideToolbar
+                      textareaProps={{
+                        placeholder: contentTypeId === 4 
+                          ? '请输入 Blog 内容（支持 Markdown 语法）' 
+                          : '请输入 Weekly 内容（旧版 Markdown 格式）',
+                        style: { 
+                          fontSize: '14px', 
+                          lineHeight: '1.6',
+                        },
+                      }}
                     />
-                    {errors.content && (
-                      <p className="text-sm text-destructive mt-2">{errors.content.message}</p>
-                    )}
-                  </>
-                ) : (
-                  // 结构化输入
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="content">内容 *</Label>
-                      <Controller
-                        name="content"
-                        control={control}
-                        render={({ field }) => (
-                          <Textarea
-                            {...field}
-                            id="content"
-                            placeholder={
-                              contentTypeId === 3
-                                ? '请输入周刊内容的摘要或关键点（200-500字）\n\n可使用简单格式：\n- 列表项\n**重点**\n[链接](URL)'
-                                : '请输入内容摘要'
-                            }
-                            rows={12}
-                            className="font-mono text-sm"
-                          />
-                        )}
-                      />
-                      {errors.content && (
-                        <p className="text-sm text-destructive">{errors.content.message}</p>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        💡 提示：结构化模式适合新版 Weekly，简洁描述核心内容和亮点
-                      </p>
-                    </div>
-                  </div>
+                  )}
+                />
+                {errors.content && (
+                  <p className="text-sm text-destructive mt-2">{errors.content.message}</p>
                 )}
               </CardContent>
             </Card>
+
+            {/* Weekly 结构化数据 */}
+            {contentTypeId === 3 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>结构化数据</CardTitle>
+                  <CardDescription>供周刊卡片渲染的核心字段</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="summary">摘要</Label>
+                    <Controller
+                      name="summary"
+                      control={control}
+                      render={({ field }) => (
+                        <Textarea
+                          {...field}
+                          id="summary"
+                          placeholder="简要概括内容亮点（200字以内）"
+                          rows={4}
+                        />
+                      )}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="image_url">主图</Label>
+                    <Controller
+                      name="image_url"
+                      control={control}
+                      render={({ field }) => (
+                        <Input
+                          {...field}
+                          id="image_url"
+                          placeholder="https://example.com/cover.jpg"
+                        />
+                      )}
+                    />
+                    {errors.image_url && (
+                      <p className="text-sm text-destructive">{errors.image_url.message}</p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="source">来源名称 *</Label>
+                      <Controller
+                        name="source"
+                        control={control}
+                        render={({ field }) => (
+                          <Input
+                            {...field}
+                            id="source"
+                            placeholder="例如: GitHub"
+                          />
+                        )}
+                      />
+                      {errors.source && (
+                        <p className="text-sm text-destructive">{errors.source.message}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="source_url">原文链接 *</Label>
+                      <Controller
+                        name="source_url"
+                        control={control}
+                        render={({ field }) => (
+                          <Input
+                            {...field}
+                            id="source_url"
+                            placeholder="https://example.com"
+                          />
+                        )}
+                      />
+                      {errors.source_url && (
+                        <p className="text-sm text-destructive">{errors.source_url.message}</p>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Blog 专用设置 */}
             {contentTypeId === 4 && (
@@ -680,42 +670,6 @@ export default function SimplifiedEditor({
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="source">来源名称 *</Label>
-                    <Controller
-                      name="source"
-                      control={control}
-                      render={({ field }) => (
-                        <Input
-                          {...field}
-                          id="source"
-                          placeholder="例如: GitHub"
-                        />
-                      )}
-                    />
-                    {errors.source && (
-                      <p className="text-sm text-destructive">{errors.source.message}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="source_url">来源链接 *</Label>
-                    <Controller
-                      name="source_url"
-                      control={control}
-                      render={({ field }) => (
-                        <Input
-                          {...field}
-                          id="source_url"
-                          placeholder="https://example.com"
-                        />
-                      )}
-                    />
-                    {errors.source_url && (
-                      <p className="text-sm text-destructive">{errors.source_url.message}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
                     <Label htmlFor="screenshot_api">截图 API</Label>
                     <Controller
                       name="screenshot_api"
@@ -761,24 +715,43 @@ export default function SimplifiedEditor({
           {/* 右侧预览区 - 占 40% */}
           <div className="w-2/5 flex flex-col">
             <Card className="flex-1 flex flex-col">
-              <CardHeader>
-                <CardTitle>实时预览</CardTitle>
-                <CardDescription>查看内容的最终效果</CardDescription>
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <CardTitle>实时预览</CardTitle>
+                  <CardDescription>查看 Markdown 或结构化卡片效果</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant={previewMode === 'markdown' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setPreviewMode('markdown')}
+                  >
+                    Markdown
+                  </Button>
+                  {contentTypeId === 3 && (
+                    <Button
+                      variant={previewMode === 'structured' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setPreviewMode('structured')}
+                    >
+                      结构化卡片
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="flex-1 overflow-auto">
-                {currentContent ? (
-                  contentTypeId === 3 ? (
-                    // Weekly 预览 - 使用 StructuredPreview
+                {(currentContent || currentSummary) ? (
+                  previewMode === 'structured' && contentTypeId === 3 ? (
                     <StructuredPreview
                       data={{
                         title: currentTitle || '未命名',
-                        url: watch('source_url') || '#',
-                        image_url: watch('cover_image'),
-                        summary: currentContent,
-                        description: watch('recommendation_reason'),
-                        source: watch('source') || '未知来源',
-                        source_url: watch('source_url') || '#',
-                        tags: [],
+                        url: currentSourceUrl || undefined,
+                        image_url: currentImage || undefined,
+                        summary: currentSummary || currentContent,
+                        description: currentRecommendation,
+                        source: currentSource || '未知来源',
+                        source_url: currentSourceUrl || undefined,
+                        tags: initialValues?.tags || [],
                         created_at: initialValues?.created_at || new Date().toISOString(),
                         content: currentContent,
                       }}
@@ -786,14 +759,13 @@ export default function SimplifiedEditor({
                       showMeta={true}
                     />
                   ) : (
-                    // Blog 预览 - 使用 MarkdownPreview
                     <MarkdownPreview
                       content={{
                         title: currentTitle || '未命名',
-                        content: currentContent,
+                        content: currentContent || currentSummary || '',
                         content_type: { 
                           id: contentTypeId, 
-                          name: 'Blog' 
+                          name: contentTypeId === 3 ? 'Weekly' : 'Blog' 
                         },
                         created_at: initialValues?.created_at || new Date().toISOString(),
                       }}

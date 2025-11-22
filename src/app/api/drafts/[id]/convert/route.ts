@@ -149,11 +149,16 @@ ${draft.note ? `\n**笔记**\n${draft.note}` : ''}
           });
           // 不存在则创建
           if (!category) {
-            const catSlug = generateSlug(suggestedName);
+            const baseSlug = generateSlug(suggestedName);
+            let uniqueSlug = baseSlug;
+            let counter = 1;
+            while (await prisma.categories.findFirst({ where: { slug: uniqueSlug } })) {
+              uniqueSlug = `${baseSlug}-${counter++}`;
+            }
             category = await prisma.categories.create({
               data: {
                 name: suggestedName,
-                slug: `${catSlug}-${Date.now()}`,
+                slug: uniqueSlug,
               },
             });
           }
@@ -218,4 +223,3 @@ ${draft.note ? `\n**笔记**\n${draft.note}` : ''}
     return createNextErrorResponse('CONVERT_DRAFT_ERROR', '转换草稿失败', 500);
   }
 }
-

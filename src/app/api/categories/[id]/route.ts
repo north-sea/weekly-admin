@@ -41,7 +41,7 @@ export async function PUT(
   try {
     const authResult = await authenticateRequest(request);
     if (!authResult.success || !authResult.user) {
-      return NextResponse.json({ error: '未授权访问' }, { status: 401 });
+      return createNextErrorResponse('UNAUTHORIZED', '未授权访问', 401);
     }
 
     const { id: idParam } = await params;
@@ -55,25 +55,13 @@ export async function PUT(
     
     const category = await CategoryService.updateCategory(validatedData);
     
-    return NextResponse.json(category);
+    return createNextSuccessResponse(category);
   } catch (error) {
     console.error('更新分类失败:', error);
-    if (error instanceof Error) {
-      if (error.name === 'ZodError') {
-        return NextResponse.json(
-          { error: '数据验证失败', details: error.message },
-          { status: 400 }
-        );
-      }
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      );
+    if (error instanceof Error && error.name === 'ZodError') {
+      return createNextErrorResponse('VALIDATION_ERROR', '数据验证失败', 400, error.message);
     }
-    return NextResponse.json(
-      { error: '更新分类失败' },
-      { status: 500 }
-    );
+    return createNextErrorResponse('UPDATE_CATEGORY_ERROR', error instanceof Error ? error.message : '更新分类失败', 400);
   }
 }
 
@@ -85,7 +73,7 @@ export async function DELETE(
   try {
     const authResult = await authenticateRequest(request);
     if (!authResult.success || !authResult.user) {
-      return NextResponse.json({ error: '未授权访问' }, { status: 401 });
+      return createNextErrorResponse('UNAUTHORIZED', '未授权访问', 401);
     }
 
     const { id: idParam } = await params;
@@ -96,18 +84,9 @@ export async function DELETE(
 
     await CategoryService.deleteCategory(id);
     
-    return NextResponse.json({ message: '分类删除成功' });
+    return createNextSuccessResponse({ message: '分类删除成功' });
   } catch (error) {
     console.error('删除分类失败:', error);
-    if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      );
-    }
-    return NextResponse.json(
-      { error: '删除分类失败' },
-      { status: 500 }
-    );
+    return createNextErrorResponse('DELETE_CATEGORY_ERROR', error instanceof Error ? error.message : '删除分类失败', 400);
   }
 }

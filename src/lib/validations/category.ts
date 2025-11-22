@@ -22,6 +22,13 @@ export const CategoryQuerySchema = z.object({
   include_children: z.coerce.boolean().default(true),
 });
 
+// 分类合并 schema
+export const CategoryMergeSchema = z.object({
+  source_category_ids: z.array(z.number().int().positive()).min(1, '至少选择一个源分类'),
+  target_category_id: z.number().int().positive(),
+});
+
 export type CategoryInput = z.infer<typeof CategorySchema>;
 export type CategoryUpdate = z.infer<typeof CategoryUpdateSchema>;
 export type CategoryQuery = z.infer<typeof CategoryQuerySchema>;
+export type CategoryMerge = z.infer<typeof CategoryMergeSchema>;
