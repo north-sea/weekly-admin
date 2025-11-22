@@ -1,5 +1,7 @@
 import { CategoryInput, CategoryUpdate, CategoryQuery, CategoryMerge } from '@/lib/validations/category';
 import { prisma } from '@/lib/db';
+import { OperationLogger } from '@/lib/middleware/operation-logger';
+import { NextRequest } from 'next/server';
 
 export interface CategoryWithStats {
   id: number;
@@ -193,7 +195,7 @@ export class CategoryService {
   }
   
   // 创建分类
-  static async createCategory(data: CategoryInput): Promise<CategoryWithStats> {
+  static async createCategory(data: CategoryInput, userId?: number, request?: NextRequest): Promise<CategoryWithStats> {
     // 检查名称重复（忽略大小写）
     const existingName = await prisma.categories.findFirst({
       where: { name: data.name },
@@ -220,7 +222,7 @@ export class CategoryService {
       data: { ...data, slug }
     });
     
-    return {
+    const result = {
       id: category.id,
       name: category.name,
       slug: category.slug,
@@ -231,10 +233,22 @@ export class CategoryService {
       updated_at: category.updated_at || undefined,
       content_count: 0
     };
+
+    if (userId) {
+      await OperationLogger.logTaxonomyOperation(
+        userId,
+        'CREATE',
+        'category',
+        category.id,
+        { name: category.name, action: 'create' },
+        request
+      );
+    }
+    return result;
   }
   
   // 更新分类
-  static async updateCategory(data: CategoryUpdate): Promise<CategoryWithStats> {
+  static async updateCategory(data: CategoryUpdate, userId?: number, request?: NextRequest): Promise<CategoryWithStats> {
     const { id, ...updateData } = data;
     
     // 检查分类是否存在
@@ -296,7 +310,7 @@ export class CategoryService {
       where: { category_id: id }
     });
     
-    return {
+    const result = {
       id: category.id,
       name: category.name,
       slug: category.slug,
@@ -307,10 +321,22 @@ export class CategoryService {
       updated_at: category.updated_at || undefined,
       content_count: contentCount
     };
+
+    if (userId) {
+      await OperationLogger.logTaxonomyOperation(
+        userId,
+        'UPDATE',
+        'category',
+        id,
+        { name: category.name, action: 'update', changes: updateData },
+        request
+      );
+    }
+    return result;
   }
 
   // 合并分类：将源分类的内容迁移到目标分类，并删除源分类
-  static async mergeCategories(data: CategoryMerge): Promise<void> {
+  static async mergeCategories(data: CategoryMerge, userId?: number, request?: NextRequest): Promise<void> {
     const { source_category_ids, target_category_id } = data;
 
     const target = await prisma.categories.findUnique({ where: { id: target_category_id } });
@@ -352,10 +378,26 @@ export class CategoryService {
         where: { id: { in: source_category_ids } },
       });
     });
+
+    if (userId) {
+      await OperationLogger.logTaxonomyOperation(
+        userId,
+        'UPDATE',
+        'category',
+        target_category_id,
+        {
+          name: target.name,
+          action: 'merge',
+          affectedContentCount: sources.length,
+          changes: { mergedFrom: source_category_ids },
+        },
+        request
+      );
+    }
   }
   
   // 删除分类
-  static async deleteCategory(id: number): Promise<void> {
+  static async deleteCategory(id: number, userId?: number, request?: NextRequest): Promise<void> {
     await prisma.$transaction(async (tx) => {
       // 将子分类提升到顶层，避免孤儿引用
       await tx.categories.updateMany({
@@ -374,6 +416,17 @@ export class CategoryService {
         where: { id },
       });
     });
+
+    if (userId) {
+      await OperationLogger.logTaxonomyOperation(
+        userId,
+        'DELETE',
+        'category',
+        id,
+        { action: 'delete' },
+        request
+      );
+    }
   }
   
   // 获取分类使用统计

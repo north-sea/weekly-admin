@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = CategorySchema.parse(body);
     
-    const category = await CategoryService.createCategory(validatedData);
+    const category = await CategoryService.createCategory(validatedData, authResult.user.id, request);
     
     return createNextSuccessResponse(category, 201);
   } catch (error) {

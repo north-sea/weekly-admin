@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validated = CategoryMergeSchema.parse(body);
 
-    await CategoryService.mergeCategories(validated);
+    await CategoryService.mergeCategories(validated, authResult.user.id, request);
 
     return createNextSuccessResponse({ message: '分类合并成功' });
   } catch (error) {

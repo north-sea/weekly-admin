@@ -53,7 +53,7 @@ export async function PUT(
     const body = await request.json();
     const validatedData = CategoryUpdateSchema.parse({ ...body, id });
     
-    const category = await CategoryService.updateCategory(validatedData);
+    const category = await CategoryService.updateCategory(validatedData, authResult.user.id, request);
     
     return createNextSuccessResponse(category);
   } catch (error) {
@@ -82,7 +82,7 @@ export async function DELETE(
       return NextResponse.json({ error: '无效的分类ID' }, { status: 400 });
     }
 
-    await CategoryService.deleteCategory(id);
+    await CategoryService.deleteCategory(id, authResult.user.id, request);
     
     return createNextSuccessResponse({ message: '分类删除成功' });
   } catch (error) {
