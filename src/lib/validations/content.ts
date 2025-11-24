@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+const CoverImageSchema = z.preprocess(
+  (val) => (val === '' || val === null ? undefined : val),
+  z.string().url('封面图片必须是有效的URL').optional()
+);
+
 // Base content schema
 export const BaseContentSchema = z.object({
   title: z.string().min(1, '标题不能为空').max(500, '标题长度不能超过500字符'),
@@ -19,7 +24,7 @@ export const BaseContentSchema = z.object({
 export const BlogContentSchema = BaseContentSchema.extend({
   content_type_id: z.literal(4),
   // Blog专用字段
-  cover_image: z.string().url('封面图片必须是有效的URL').optional(),
+  cover_image: CoverImageSchema,
   reading_time: z.number().int().min(0).optional(),
   word_count: z.number().int().min(0).optional(),
 });
@@ -73,7 +78,7 @@ export const ContentUpdateSchema = z.object({
   meta_description: z.string().max(1000, 'SEO描述长度不能超过1000字符').optional(),
   content_type_id: z.union([z.literal(3), z.literal(4)]).optional(),
   // Blog专用字段
-  cover_image: z.string().url('封面图片必须是有效的URL').optional(),
+  cover_image: CoverImageSchema,
   reading_time: z.number().int().min(0).optional(),
   word_count: z.number().int().min(0).optional(),
   // Weekly专用字段

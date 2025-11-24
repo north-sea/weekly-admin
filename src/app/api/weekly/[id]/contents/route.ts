@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { authMiddleware } from '@/lib/auth-middleware';
 import { z } from 'zod';
+import { serializeSpecialTypes } from '@/lib/utils/serialization';
 
 const UpdateWeeklyContentsSchema = z.object({
   contents: z.array(z.object({
-    content_id: z.number().int().positive(),
-    sort_order: z.number().int().min(0).default(0),
+    content_id: z.coerce.number().int().positive(),
+    sort_order: z.coerce.number().int().min(0).default(0),
     section: z.string().optional(),
     featured: z.boolean().default(false),
   })),
@@ -61,7 +62,9 @@ export async function PUT(
       where: {
         id: { in: contentIds },
         content_type_id: 3, // Weekly 类型
-        status: 'published',
+        status: {
+          in: ['draft', 'published'],
+        },
       },
     });
 
@@ -71,7 +74,7 @@ export async function PUT(
           success: false,
           error: {
             code: 'INVALID_CONTENT',
-            message: '只能添加已发布的 Weekly 类型内容',
+            message: '只能添加有效的 Weekly 类型内容',
           },
         },
         { status: 400 }
@@ -143,7 +146,7 @@ export async function PUT(
 
     return NextResponse.json({
       success: true,
-      data: updatedIssue,
+      data: serializeSpecialTypes(updatedIssue),
     });
   } catch (error) {
     console.error('Update weekly contents error:', error);
@@ -216,7 +219,8 @@ export async function GET(
 
     const formattedContents = contents.map((item) => ({
       ...item.content,
-      sort_order: item.sort_order,
+      id: Number(item.content.id),
+      sort_order: item.sort_order ?? 0,
       section: item.section,
       featured: item.featured,
       tags: item.content.content_tags.map((ct) => ct.tag),
@@ -225,7 +229,7 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      data: formattedContents,
+      data: serializeSpecialTypes(formattedContents),
     });
   } catch (error) {
     console.error('Get weekly contents error:', error);

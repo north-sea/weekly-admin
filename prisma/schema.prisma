@@ -219,6 +219,8 @@ model weekly_issues {
   created_at       DateTime?             @default(now()) @db.Timestamp(0)
   updated_at       DateTime?             @default(now()) @db.Timestamp(0)
   created_by       Int?                  @default(1)
+  desc             String?               @db.Text
+  cover            String?               @db.VarChar(500)
 
   // Relations
   weekly_content_items weekly_content_items[]

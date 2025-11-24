@@ -8,20 +8,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { Search, RefreshCw } from 'lucide-react';
-import { DndContext, DragEndEvent } from '@dnd-kit/core';
+import { DndContext } from '@dnd-kit/core';
 import { useDroppable } from '@dnd-kit/core';
 import AvailableContentsList from './AvailableContentsList';
 import SelectedContentsList from './SelectedContentsList';
 import WeeklyPreview from './WeeklyPreview';
 
-interface WeeklyEditorProps {
-  issueId: number;
-}
-
-interface Content {
+export interface WeeklyEditorContent {
   id: number;
   title: string;
   description?: string;
+  summary?: string;
+  image_url?: string;
   content: string;
   source?: string;
   source_url?: string;
@@ -37,6 +35,11 @@ interface Content {
   sort_order?: number;
   section?: string;
   featured?: boolean;
+}
+
+interface WeeklyEditorProps {
+  issueId: number;
+  onContentsChange?: (contents: WeeklyEditorContent[]) => void;
 }
 
 interface Category {
@@ -59,16 +62,17 @@ const DroppableArea: React.FC<{ id: string; children: React.ReactNode }> = ({ id
   );
 };
 
-const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId }) => {
+const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId, onContentsChange }) => {
   const { toast } = useToast();
+  const focusRingClass = 'focus-visible:ring-1 focus-visible:ring-offset-1 focus:ring-1 focus:ring-offset-1';
   const [loading, setLoading] = useState(false);
-  const [selectedContents, setSelectedContents] = useState<Content[]>([]);
-  const [availableContents, setAvailableContents] = useState<Content[]>([]);
-  const [groupedContents, setGroupedContents] = useState<Record<string, Content[]>>({});
+  const [selectedContents, setSelectedContents] = useState<WeeklyEditorContent[]>([]);
+  const [availableContents, setAvailableContents] = useState<WeeklyEditorContent[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [searchInput, setSearchInput] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [hasLoadedContents, setHasLoadedContents] = useState(false);
 
   const fetchSelectedContents = useCallback(async () => {
     if (!issueId) return;
@@ -79,6 +83,7 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId }) => {
 
       if (result.success) {
         setSelectedContents(result.data);
+        setHasLoadedContents(true);
       }
     } catch (error) {
       console.error('获取已选内容失败:', error);
@@ -99,6 +104,7 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId }) => {
         page: '1',
         pageSize: '20',
         excludeIssueId: issueId.toString(),
+        status: 'draft',
       });
 
       if (searchKeyword) {
@@ -113,7 +119,6 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId }) => {
 
       if (result.success) {
         setAvailableContents(result.data.contents);
-        setGroupedContents(result.data.groupedByCategory);
       }
     } catch {
       toast({
@@ -151,7 +156,7 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId }) => {
     void loadCategories();
   }, []);
 
-  const updateWeeklyContents = async (contents: Content[]) => {
+  const updateWeeklyContents = async (contents: WeeklyEditorContent[]) => {
     try {
       const payload = {
         contents: contents.map((content, index) => ({
@@ -182,7 +187,7 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId }) => {
     }
   };
 
-  const handleAddContent = (content: Content) => {
+  const handleAddContent = (content: WeeklyEditorContent) => {
     const newContent = {
       ...content,
       sort_order: selectedContents.length,
@@ -192,22 +197,25 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId }) => {
 
     const nextContents = [...selectedContents, newContent];
     setSelectedContents(nextContents);
+    setHasLoadedContents(true);
     void updateWeeklyContents(nextContents);
   };
 
   const handleRemoveContent = (contentId: number) => {
     const nextContents = selectedContents.filter((item) => item.id !== contentId);
     setSelectedContents(nextContents);
+    setHasLoadedContents(true);
     void updateWeeklyContents(nextContents);
   };
 
-  const handleReorderContents = (newContents: Content[]) => {
+  const handleReorderContents = (newContents: WeeklyEditorContent[]) => {
     const reorderedContents = newContents.map((content, index) => ({
       ...content,
       sort_order: index,
     }));
 
     setSelectedContents(reorderedContents);
+    setHasLoadedContents(true);
     void updateWeeklyContents(reorderedContents);
   };
 
@@ -233,27 +241,21 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId }) => {
     void fetchSelectedContents();
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
+  // 拖拽功能已关闭，保留点击添加
 
-    if (!over) return;
-
-    if (active.id.toString().startsWith('available-') && over.id === 'selected-contents') {
-      const contentId = parseInt(active.id.toString().replace('available-', ''), 10);
-      const content = availableContents.find((item) => item.id === contentId);
-
-      if (content && !selectedContents.find((item) => item.id === contentId)) {
-        handleAddContent(content);
-      }
+  // 通知父组件最新的已选内容（用于 AI 生成等场景）
+  useEffect(() => {
+    if (onContentsChange && hasLoadedContents) {
+      onContentsChange(selectedContents);
     }
-  };
+  }, [selectedContents, onContentsChange, hasLoadedContents]);
 
   return (
-    <DndContext onDragEnd={handleDragEnd}>
+    <DndContext>
       <div className="h-[70vh]">
         <div className="grid grid-cols-12 gap-4 h-full">
-          <div className="col-span-4 h-full">
-            <Card className="h-full flex flex-col">
+          <div className="col-span-4 h-full min-h-0">
+            <Card className="h-full flex flex-col overflow-hidden">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base">可选内容</CardTitle>
@@ -262,13 +264,14 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId }) => {
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="flex-1 space-y-3 overflow-hidden pb-4">
+              <CardContent className="flex-1 space-y-3 overflow-hidden pb-4 min-h-0 flex flex-col">
                 <div className="space-y-2">
                   <div className="flex gap-2">
                     <Input
                       placeholder="搜索内容..."
                       value={searchInput}
                       onChange={(event) => setSearchInput(event.target.value)}
+                      className={focusRingClass}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter') {
                           event.preventDefault();
@@ -281,7 +284,7 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId }) => {
                     </Button>
                   </div>
                   <Select value={selectedCategory} onValueChange={handleCategoryChange}>
-                    <SelectTrigger>
+                    <SelectTrigger className={focusRingClass}>
                       <SelectValue placeholder="选择分类" />
                     </SelectTrigger>
                     <SelectContent>
@@ -295,10 +298,9 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId }) => {
                   </Select>
                 </div>
 
-                <div className="flex-1 overflow-hidden">
+                <div className="flex-1 overflow-hidden min-h-0">
                   <AvailableContentsList
                     contents={availableContents}
-                    groupedContents={groupedContents}
                     loading={loading}
                     onAddContent={handleAddContent}
                     selectedContentIds={selectedContents.map((item) => item.id)}
@@ -308,15 +310,15 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId }) => {
             </Card>
           </div>
 
-          <div className="col-span-4 h-full">
-            <Card className="h-full flex flex-col">
+          <div className="col-span-4 h-full min-h-0">
+            <Card className="h-full flex flex-col overflow-hidden">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base">已选内容</CardTitle>
                   <Badge variant="secondary">{selectedContents.length}</Badge>
                 </div>
               </CardHeader>
-              <CardContent className="flex-1 overflow-hidden pb-4">
+              <CardContent className="flex-1 overflow-hidden pb-4 min-h-0 flex flex-col">
                 <DroppableArea id="selected-contents">
                   <SelectedContentsList
                     contents={selectedContents}
@@ -328,12 +330,12 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId }) => {
             </Card>
           </div>
 
-          <div className="col-span-4 h-full">
-            <Card className="h-full flex flex-col">
+          <div className="col-span-4 h-full min-h-0">
+            <Card className="h-full flex flex-col overflow-hidden">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">实时预览</CardTitle>
               </CardHeader>
-              <CardContent className="flex-1 overflow-hidden pb-4">
+              <CardContent className="flex-1 overflow-hidden pb-4 min-h-0 flex flex-col">
                 <WeeklyPreview issueId={issueId} contents={selectedContents} />
               </CardContent>
             </Card>

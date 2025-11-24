@@ -270,7 +270,7 @@ export class ContentService {
   
   // 创建内容
   static async createContent(data: ContentInput, userId: number, request?: NextRequest): Promise<ContentWithRelations> {
-    const { tag_ids, ...contentData } = data;
+    const { tag_ids, cover_image, recommendation_reason, content_type_id, ...contentData } = data;
     
     // 生成slug
     const slug = this.generateSlug(data.title);
@@ -279,6 +279,7 @@ export class ContentService {
     const content = await prisma.contents.create({
       data: {
         ...contentData,
+        content_type_id,
         slug,
         user_id: userId,
         published_at: data.status === 'published' ? new Date() : null
@@ -296,7 +297,11 @@ export class ContentService {
     }
     
     // 处理特殊属性（Blog和Weekly的专用字段）
-    await this.handleContentAttributes(content.id, data);
+    await this.handleContentAttributes(content.id, {
+      content_type_id,
+      cover_image: cover_image ?? undefined,
+      recommendation_reason: recommendation_reason ?? undefined
+    });
     
     const result = await this.getContentById(Number(content.id));
     if (!result) {
@@ -350,7 +355,7 @@ export class ContentService {
   
   // 更新内容
   static async updateContent(data: ContentUpdate, userId: number, request?: NextRequest): Promise<ContentWithRelations> {
-    const { id, tag_ids, ...updateData } = data;
+    const { id, tag_ids, cover_image, recommendation_reason, content_type_id, ...updateData } = data;
     const contentId = BigInt(id);
     
     // 获取更新前的内容以便比较变化
@@ -367,6 +372,7 @@ export class ContentService {
       where: { id: contentId },
       data: {
         ...updateData,
+        ...(content_type_id !== undefined ? { content_type_id } : {}),
         published_at: updateData.status === 'published' ? new Date() : undefined
       }
     });
@@ -390,8 +396,13 @@ export class ContentService {
     }
     
     // 更新特殊属性
-    if (data.content_type_id) {
-      await this.handleContentAttributes(contentId, data);
+    const shouldUpdateAttributes = content_type_id !== undefined || cover_image !== undefined || recommendation_reason !== undefined;
+    if (shouldUpdateAttributes) {
+      await this.handleContentAttributes(contentId, {
+        content_type_id: content_type_id ?? oldContent.content_type_id,
+        cover_image: cover_image ?? undefined,
+        recommendation_reason: recommendation_reason ?? undefined
+      });
     }
     
     const result = await this.getContentById(id);

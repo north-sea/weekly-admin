@@ -48,6 +48,8 @@ interface WeeklyIssue {
   issue_number: number;
   title: string;
   description?: string;
+  desc?: string;
+  cover?: string;
   status: 'draft' | 'published' | 'archived';
   start_date: string;
   end_date: string;
@@ -61,6 +63,13 @@ const statusMap: Record<string, { label: string; variant: 'default' | 'secondary
   draft: { label: '草稿', variant: 'outline' },
   published: { label: '已发布', variant: 'default' },
   archived: { label: '已归档', variant: 'secondary' },
+};
+
+const focusRingClass = 'focus-visible:ring-1 focus-visible:ring-offset-1 focus:ring-1 focus:ring-offset-1';
+const formatDate = (date?: string) => {
+  if (!date) return '-';
+  const parsed = dayjs(date);
+  return parsed.isValid() ? parsed.format('YYYY-MM-DD') : date;
 };
 
 export default function WeeklyManagePage() {
@@ -175,7 +184,7 @@ export default function WeeklyManagePage() {
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="搜索标题..."
-                className="pl-10"
+                className={`pl-10 ${focusRingClass}`}
                 value={filters.search}
                 onChange={(e) => handleSearch(e.target.value)}
               />
@@ -184,7 +193,7 @@ export default function WeeklyManagePage() {
               value={filters.status || 'all'}
               onValueChange={handleStatusChange}
             >
-              <SelectTrigger>
+              <SelectTrigger className={focusRingClass}>
                 <SelectValue placeholder="状态" />
               </SelectTrigger>
               <SelectContent>
@@ -255,9 +264,9 @@ export default function WeeklyManagePage() {
                             <TableCell>
                               <div className="flex items-center gap-1 text-sm">
                                 <Calendar className="h-3 w-3" />
-                                <span>{issue.start_date}</span>
+                                <span>{formatDate(issue.start_date)}</span>
                                 <span className="text-muted-foreground">至</span>
-                                <span>{issue.end_date}</span>
+                                <span>{formatDate(issue.end_date)}</span>
                               </div>
                             </TableCell>
                             <TableCell className="text-sm">

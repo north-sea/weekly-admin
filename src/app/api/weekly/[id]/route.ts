@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { authMiddleware } from '@/lib/auth-middleware';
 import { z } from 'zod';
+import { serializeSpecialTypes } from '@/lib/utils/serialization';
 
 const UpdateWeeklyIssueSchema = z.object({
   title: z.string().min(1, '标题不能为空').max(500, '标题长度不能超过500字符').optional(),
@@ -9,6 +10,8 @@ const UpdateWeeklyIssueSchema = z.object({
   start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '开始日期格式不正确').optional(),
   end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '结束日期格式不正确').optional(),
   status: z.enum(['draft', 'published', 'archived']).optional(),
+  desc: z.string().optional(),
+  cover: z.string().url().optional(),
 });
 
 const UpdateWeeklyContentsSchema = z.object({
@@ -76,14 +79,14 @@ export async function GET(
       ...issue,
       contents: issue.weekly_content_items.map((item) => ({
         ...item.content,
+        id: Number(item.content.id),
         // 周刊项目的额外字段
-        sort_order: item.sort_order,
+        sort_order: item.sort_order ?? 0,
         section: item.section,
         featured: item.featured,
         // 关联数据
         tags: item.content.content_tags.map((ct) => ct.tag),
         category: item.content.categories,
-        // 确保包含结构化预览字段（image_url, summary 已在 content 中）
       })),
     };
 
@@ -91,7 +94,7 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      data: formattedIssue,
+      data: serializeSpecialTypes(formattedIssue),
     });
   } catch (error) {
     console.error('Get weekly issue error:', error);
@@ -131,14 +134,16 @@ export async function PUT(
       );
     }
 
-    const data = UpdateWeeklyIssueSchema.parse(body);
+  const data = UpdateWeeklyIssueSchema.parse(body);
 
-    const updateData: any = {};
-    if (data.title) updateData.title = data.title;
-    if (data.description !== undefined) updateData.description = data.description;
-    if (data.start_date) updateData.start_date = new Date(data.start_date);
-    if (data.end_date) updateData.end_date = new Date(data.end_date);
-    if (data.status) updateData.status = data.status;
+  const updateData: any = {};
+  if (data.title) updateData.title = data.title;
+  if (data.description !== undefined) updateData.description = data.description;
+  if (data.start_date) updateData.start_date = new Date(data.start_date);
+  if (data.end_date) updateData.end_date = new Date(data.end_date);
+  if (data.status) updateData.status = data.status;
+  if (data.desc !== undefined) updateData.desc = data.desc;
+  if (data.cover !== undefined) updateData.cover = data.cover;
 
     // 如果发布，设置发布时间
     if (data.status === 'published') {
@@ -152,7 +157,7 @@ export async function PUT(
 
     return NextResponse.json({
       success: true,
-      data: issue,
+      data: serializeSpecialTypes(issue),
     });
   } catch (error) {
     console.error('Update weekly issue error:', error);

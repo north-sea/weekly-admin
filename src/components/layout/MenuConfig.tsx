@@ -66,6 +66,10 @@ export const menuConfig: MenuDataItem[] = [
         path: '/settings/tags',
         name: '标签管理',
       },
+      {
+        path: '/settings/ai',
+        name: 'AI 设置',
+      },
     ],
   },
 ];

@@ -6,11 +6,14 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Link2, Star, Loader2 } from 'lucide-react';
+import dayjs from 'dayjs';
 
 interface Content {
   id: number;
   title: string;
   description?: string;
+  summary?: string;
+  image_url?: string;
   content: string;
   source?: string;
   source_url?: string;
@@ -33,6 +36,8 @@ interface WeeklyIssue {
   issue_number: number;
   title: string;
   description?: string;
+  desc?: string;
+  cover?: string;
   start_date: string;
   end_date: string;
 }
@@ -41,6 +46,12 @@ interface WeeklyPreviewProps {
   issueId: number;
   contents: Content[];
 }
+
+const formatDate = (value?: string) => {
+  if (!value) return '-';
+  const parsed = dayjs(value);
+  return parsed.isValid() ? parsed.format('YYYY-MM-DD') : value;
+};
 
 const WeeklyPreview: React.FC<WeeklyPreviewProps> = ({ issueId, contents }) => {
   const [issue, setIssue] = useState<WeeklyIssue | null>(null);
@@ -119,13 +130,15 @@ const WeeklyPreview: React.FC<WeeklyPreviewProps> = ({ issueId, contents }) => {
 
   const renderContentItem = (content: Content, index: number) => (
     <Card key={content.id} className="p-4 hover:shadow-sm transition-all">
-      <div className="flex items-start gap-2">
-        <Badge variant="outline" className="text-xs mt-0.5">
-          {index + 1}
-        </Badge>
-        <div className="flex-1 space-y-2">
+      <div className="flex items-start gap-3">
+        {content.image_url && (
+          <div className="w-24 h-16 rounded bg-muted/60 overflow-hidden">
+            <img src={content.image_url} alt="" className="object-cover w-full h-full" />
+          </div>
+        )}
+        <div className="flex-1 space-y-2 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h4 className="text-sm font-medium leading-tight">{content.title}</h4>
+            <h4 className="text-sm font-medium leading-tight line-clamp-2">{content.title}</h4>
             {content.featured && (
               <Badge variant="destructive" className="flex items-center gap-1 text-xs">
                 <Star className="h-3 w-3" />精选
@@ -133,11 +146,9 @@ const WeeklyPreview: React.FC<WeeklyPreviewProps> = ({ issueId, contents }) => {
             )}
           </div>
 
-          {content.description && (
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              {content.description}
-            </p>
-          )}
+          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+            {content.summary || content.description || '/'}
+          </p>
 
           <div className="flex items-center flex-wrap gap-1">
             {content.source && (
@@ -178,14 +189,24 @@ const WeeklyPreview: React.FC<WeeklyPreviewProps> = ({ issueId, contents }) => {
   return (
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4">
+        {issue.cover && (
+          <div className="overflow-hidden rounded-lg border bg-muted/40">
+            <img
+              src={issue.cover}
+              alt={issue.title}
+              className="h-40 w-full object-cover"
+            />
+          </div>
+        )}
+
         <div className="text-center space-y-2">
           <h3 className="text-xl font-bold">{issue.title}</h3>
           <p className="text-sm text-muted-foreground">
-            第 {issue.issue_number} 期 • {issue.start_date} 至 {issue.end_date}
+            第 {issue.issue_number} 期 • {formatDate(issue.start_date)} 至 {formatDate(issue.end_date)}
           </p>
-          {issue.description && (
+          {(issue.desc || issue.description) && (
             <p className="text-sm text-muted-foreground leading-relaxed">
-              {issue.description}
+              {issue.desc || issue.description}
             </p>
           )}
         </div>

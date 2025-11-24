@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { authMiddleware } from '@/lib/auth-middleware';
 import { z } from 'zod';
+import { serializeSpecialTypes } from '@/lib/utils/serialization';
 
 const GetAvailableContentsSchema = z.object({
   page: z.string().transform(Number).pipe(z.number().int().positive()).default(1),
@@ -11,6 +12,7 @@ const GetAvailableContentsSchema = z.object({
   tagIds: z.string().optional(),
   excludeIssueId: z.string().transform(Number).pipe(z.number().int().positive()).optional(),
   dateRange: z.string().optional(),
+  status: z.enum(['published', 'draft', 'all']).optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -26,12 +28,19 @@ export async function GET(request: NextRequest) {
       tagIds: searchParams.get('tagIds') || undefined,
       excludeIssueId: searchParams.get('excludeIssueId') || undefined,
       dateRange: searchParams.get('dateRange') || undefined,
+      status: searchParams.get('status') as 'published' | 'draft' | 'all' | null,
     });
 
     const where: any = {
       content_type_id: 3, // Weekly 类型
-      status: 'published',
     };
+
+    // 状态筛选（默认 published，支持 all/draft）
+    if (params.status && params.status !== 'all') {
+      where.status = params.status;
+    } else if (!params.status) {
+      where.status = 'published';
+    }
 
     // 搜索条件
     if (params.search) {
@@ -110,6 +119,7 @@ export async function GET(request: NextRequest) {
     // 格式化返回数据
     const formattedContents = contents.map((content) => ({
       ...content,
+      id: Number(content.id),
       tags: content.content_tags.map((ct) => ct.tag),
       category: content.categories,
     }));
@@ -124,16 +134,18 @@ export async function GET(request: NextRequest) {
       return groups;
     }, {});
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        contents: formattedContents,
-        groupedByCategory,
-        total,
-        page: params.page,
-        pageSize: params.pageSize,
-      },
-    });
+    return NextResponse.json(
+      serializeSpecialTypes({
+        success: true,
+        data: {
+          contents: formattedContents,
+          groupedByCategory,
+          total,
+          page: params.page,
+          pageSize: params.pageSize,
+        },
+      })
+    );
   } catch (error) {
     console.error('Get available contents error:', error);
     return NextResponse.json(

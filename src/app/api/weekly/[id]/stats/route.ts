@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { authMiddleware } from '@/lib/auth-middleware';
+import { serializeSpecialTypes } from '@/lib/utils/serialization';
 
 export async function GET(
   request: NextRequest,
@@ -132,10 +133,12 @@ export async function GET(
       qualityStats,
     };
 
-    return NextResponse.json({
-      success: true,
-      data: stats,
-    });
+    return NextResponse.json(
+      serializeSpecialTypes({
+        success: true,
+        data: stats,
+      })
+    );
   } catch (error) {
     console.error('Get weekly stats error:', error);
     return NextResponse.json(

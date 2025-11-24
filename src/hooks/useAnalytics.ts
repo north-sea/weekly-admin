@@ -56,10 +56,10 @@ export interface AnalyticsData {
     sourceRate: number;
   };
   activities: Array<{
-    id: number;
+    id: number | string;
     operationType: string;
     resourceType: string;
-    resourceId: number | null;
+    resourceId: number | string | null;
     details: any;
     user: {
       username: string;
@@ -120,8 +120,19 @@ export const useAnalytics = (timeRange: number = 30) => {
       descriptionRate: 0,
       sourceRate: 0,
     },
-    activities: rawData.recent_activity?.map(activity => ({
-      id: Math.random(), // 临时ID，实际应该从API返回
+    activities: (rawData as any).activities?.map((activity: any) => ({
+      id: activity.id,
+      operationType: activity.operationType,
+      resourceType: activity.resourceType,
+      resourceId: activity.resourceId ?? null,
+      details: activity.details,
+      user: {
+        username: activity.user?.username || 'unknown',
+        displayName: activity.user?.displayName || null,
+      },
+      createdAt: activity.createdAt,
+    })) || rawData.recent_activity?.map(activity => ({
+      id: activity.date,
       operationType: 'VIEW',
       resourceType: 'content',
       resourceId: null,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { authMiddleware } from '@/lib/auth-middleware';
 import { z } from 'zod';
+import { serializeSpecialTypes } from '@/lib/utils/serialization';
 
 const CreateWeeklyIssueSchema = z.object({
   title: z.string().min(1, '标题不能为空').max(500, '标题长度不能超过500字符'),
@@ -9,6 +10,8 @@ const CreateWeeklyIssueSchema = z.object({
   start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '开始日期格式不正确'),
   end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '结束日期格式不正确'),
   status: z.enum(['draft', 'published', 'archived']).default('draft'),
+  desc: z.string().optional(),
+  cover: z.string().url().optional(),
 });
 
 const GetWeeklyIssuesSchema = z.object({
@@ -60,15 +63,17 @@ export async function GET(request: NextRequest) {
       prisma.weekly_issues.count({ where }),
     ]);
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        issues,
-        total,
-        page: params.page,
-        pageSize: params.pageSize,
-      },
-    });
+    return NextResponse.json(
+      serializeSpecialTypes({
+        success: true,
+        data: {
+          issues,
+          total,
+          page: params.page,
+          pageSize: params.pageSize,
+        },
+      })
+    );
   } catch (error) {
     console.error('Get weekly issues error:', error);
     return NextResponse.json(
@@ -110,14 +115,18 @@ export async function POST(request: NextRequest) {
         start_date: new Date(data.start_date),
         end_date: new Date(data.end_date),
         status: data.status as any,
+        desc: data.desc,
+        cover: data.cover,
         created_by: user.id,
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      data: issue,
-    });
+    return NextResponse.json(
+      serializeSpecialTypes({
+        success: true,
+        data: issue,
+      })
+    );
   } catch (error) {
     console.error('Create weekly issue error:', error);
     
