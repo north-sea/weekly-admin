@@ -261,91 +261,47 @@ export default function MarkdownPreview({
 
       {/* Weekly Content */}
       <div className="preview-content">
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          rehypePlugins={[rehypeHighlight, rehypeRaw]}
-          components={{
-            h1: ({ children }) => <Title level={3}>{children}</Title>,
-            h2: ({ children }) => <Title level={4}>{children}</Title>,
-            h3: ({ children }) => <Title level={5}>{children}</Title>,
-            p: ({ children }) => <Paragraph>{children}</Paragraph>,
-            blockquote: ({ children }) => (
-              <div style={{ 
-                borderLeft: '4px solid #52c41a',
-                paddingLeft: '16px',
-                margin: '16px 0',
-                backgroundColor: '#f6ffed'
-              }}>
-                {children}
-              </div>
-            ),
-            code: ((props) => {
-              const { inline, className, children, ...rest } = props;
-              if (inline) {
-                return (
-                  <code 
-                    style={{ 
-                      backgroundColor: '#f6f8fa',
-                      padding: '2px 4px',
-                      borderRadius: '3px',
-                      fontSize: '0.9em'
-                    }}
-                    {...rest}
-                  >
-                    {children}
-                  </code>
-                );
-              }
-              return (
-                <pre style={{ 
-                  backgroundColor: '#f6f8fa',
-                  padding: '16px',
-                  borderRadius: '6px',
-                  overflow: 'auto'
-                }}>
-                  <code className={className} {...rest}>
-                    {children}
-                  </code>
-                </pre>
-              );
-            }) as CodeComponent,
-            img: ({ src, alt, ...props }) => (
-              <img
-                src={src}
-                alt={alt || '图片'}
-                style={{
-                  maxWidth: '100%',
-                  height: 'auto',
-                  borderRadius: '6px',
-                  margin: '16px 0',
-                  display: 'block',
-                  backgroundColor: '#f5f5f5'
-                }}
-                loading="lazy"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  // 创建错误提示元素
-                  const errorDiv = document.createElement('div');
-                  errorDiv.style.cssText = `
-                    padding: 16px;
-                    margin: 16px 0;
-                    background: #fff2f0;
-                    border: 1px solid #ffccc7;
-                    border-radius: 6px;
-                    color: #cf1322;
-                    text-align: center;
-                  `;
-                  errorDiv.innerHTML = `<span>图片加载失败: ${alt || src}</span>`;
-                  target.parentNode?.insertBefore(errorDiv, target);
-                }}
-                {...props}
-              />
-            ),
-          }}
-        >
-          {content.content}
-        </ReactMarkdown>
+        {content.image_url && (
+          <img
+            src={content.image_url}
+            alt={content.title}
+            style={{
+              maxWidth: '100%',
+              height: 'auto',
+              borderRadius: '6px',
+              margin: '16px 0',
+              display: 'block',
+              backgroundColor: '#f5f5f5'
+            }}
+            loading="lazy"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+              const errorDiv = document.createElement('div');
+              errorDiv.style.cssText = `
+                padding: 16px;
+                margin: 16px 0;
+                background: #fff2f0;
+                border: 1px solid #ffccc7;
+                border-radius: 6px;
+                color: #cf1322;
+                text-align: center;
+              `;
+              errorDiv.innerHTML = `<span>图片加载失败</span>`;
+              target.parentNode?.insertBefore(errorDiv, target);
+            }}
+          />
+        )}
+
+        {content.summary ? (
+          <Paragraph>{content.summary}</Paragraph>
+        ) : content.description ? (
+          <Paragraph>{content.description}</Paragraph>
+        ) : content.content ? (
+          <Paragraph>{content.content}</Paragraph>
+        ) : (
+          <Paragraph type="secondary">暂无摘要</Paragraph>
+        )}
 
         {/* Weekly Recommendation Reason */}
         {content.recommendation_reason && (

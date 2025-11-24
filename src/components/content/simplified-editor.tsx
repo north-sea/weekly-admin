@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
 import { 
   Save, 
@@ -34,6 +35,8 @@ import MDEditor from '@uiw/react-md-editor';
 import MarkdownPreview from './MarkdownPreview';
 import StructuredPreview from './StructuredPreview';
 import { debounce } from 'lodash-es';
+import ScreenshotPasteUploader from '@/components/content/ScreenshotPasteUploader';
+import { apiClient } from '@/lib/api-client';
 
 // 表单验证 schema
 const contentSchema = z.object({
@@ -54,12 +57,30 @@ const contentSchema = z.object({
   // Weekly专用字段
   source: z.string().max(200, '来源名称长度不能超过200字符').optional(),
   source_url: z.string().url('请输入有效的URL').optional().or(z.literal('')),
-  screenshot_api: z.enum(['ScreenshotLayer', 'HCTI', 'manual']).optional(),
+  screenshot_api: z.enum(['ScreenshotLayer', 'HCTI', 'manual', 'karakeep']).optional(),
   recommendation_reason: z.string().max(500, '推荐理由长度不能超过500字符').optional(),
 });
 
 type ContentFormData = z.infer<typeof contentSchema>;
 type PreviewMode = 'markdown' | 'structured';
+type ResyncPhase = 'updating' | 'waiting' | 'applying' | 'success' | 'failed';
+
+interface ResyncJobState {
+  jobId: string;
+  contentId: number;
+  karakeepId: string;
+  phase: ResyncPhase;
+  attempt: number;
+  maxAttempts: number;
+  refreshScreenshot: boolean;
+  screenshotLocked: boolean;
+  message?: string;
+  summarizationStatus?: string;
+  taggingStatus?: string;
+  appliedSummary?: string | null;
+  appliedImage?: string | null;
+  updatedAt?: string;
+}
 
 interface SimplifiedEditorProps {
   initialValues?: Partial<ContentWithRelations>;
@@ -86,6 +107,13 @@ export default function SimplifiedEditor({
   const [previewMode, setPreviewMode] = useState<PreviewMode>(
     initialValues?.content_type?.id === 3 ? 'structured' : 'markdown'
   );
+  const [tagSearch, setTagSearch] = useState('');
+  const [refreshScreenshot, setRefreshScreenshot] = useState(
+    initialValues?.screenshot_api !== 'manual'
+  );
+  const [resyncJob, setResyncJob] = useState<ResyncJobState | null>(null);
+  const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastPhaseRef = useRef<ResyncPhase | null>(null);
   
   const {
     control,
@@ -124,6 +152,36 @@ export default function SimplifiedEditor({
   const currentSource = watch('source');
   const currentSourceUrl = watch('source_url');
   const currentRecommendation = watch('recommendation_reason');
+  const selectedTagIds = watch('tag_ids') || [];
+  const selectedCategoryId = watch('category_id');
+  const shouldUseStructuredPreview = contentTypeId === 3;
+  const screenshotLocked = watch('screenshot_api') === 'manual';
+  const karakeepId = useMemo(
+    () => initialValues?.attributes?.find(attr => attr.attribute_name === 'karakeep_id')?.attribute_value || '',
+    [initialValues?.attributes]
+  );
+  const karakeepSyncedAt = useMemo(
+    () => initialValues?.attributes?.find(attr => attr.attribute_name === 'karakeep_synced_at')?.attribute_value || '',
+    [initialValues?.attributes]
+  );
+  const isResyncRunning = resyncJob ? ['updating', 'waiting', 'applying'].includes(resyncJob.phase) : false;
+  const previewTags = useMemo(() => {
+    const ids = new Set((selectedTagIds || []).map((id) => Number(id)));
+    const matched = tags.filter((tag) => ids.has(tag.id));
+    if (matched.length > 0) return matched;
+    return initialValues?.tags || [];
+  }, [initialValues?.tags, selectedTagIds, tags]);
+  const previewCategory = useMemo(() => {
+    if (!contentTypeId || !categories?.length) return null;
+    if (selectedCategoryId === null || selectedCategoryId === undefined) return null;
+    return categories.find((cat) => cat.id === selectedCategoryId) || null;
+  }, [categories, contentTypeId, selectedCategoryId]);
+
+  useEffect(() => {
+    if (shouldUseStructuredPreview && previewMode !== 'structured') {
+      setPreviewMode('structured');
+    }
+  }, [previewMode, shouldUseStructuredPreview]);
   
   // 自动保存
   const autoSave = useCallback(
@@ -160,6 +218,151 @@ export default function SimplifiedEditor({
     });
     return () => subscription.unsubscribe();
   }, [watch, autoSave, initialValues?.id]);
+
+  // 保证手动截图时默认不覆盖
+  useEffect(() => {
+    if (screenshotLocked && refreshScreenshot) {
+      setRefreshScreenshot(false);
+    }
+  }, [refreshScreenshot, screenshotLocked]);
+
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearTimeout(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      stopPolling();
+    };
+  }, [stopPolling]);
+
+  const applyResyncResultToForm = useCallback((job: ResyncJobState) => {
+    if (job.appliedSummary !== undefined) {
+      setValue('summary', job.appliedSummary || '');
+    }
+    if (job.appliedImage !== undefined && job.appliedImage !== null) {
+      setValue('image_url', job.appliedImage);
+    }
+  }, [setValue]);
+
+  const pollResyncStatus = useCallback(async (jobId: string) => {
+    try {
+      const data = await apiClient.get<ResyncJobState>(`/api/content/${initialValues?.id}/karakeep-resync?jobId=${jobId}`);
+      setResyncJob(data);
+
+      if (data.phase === 'success') {
+        applyResyncResultToForm(data);
+        stopPolling();
+        return;
+      }
+
+      if (data.phase === 'failed') {
+        stopPolling();
+        return;
+      }
+
+      pollTimerRef.current = setTimeout(() => pollResyncStatus(jobId), 3000);
+    } catch (error: any) {
+      stopPolling();
+      setResyncJob((prev) => prev ? {
+        ...prev,
+        phase: 'failed',
+        message: error?.message || '查询失败',
+      } : null);
+    }
+  }, [applyResyncResultToForm, initialValues?.id, stopPolling]);
+
+  const handleResync = useCallback(async () => {
+    if (!initialValues?.id) {
+      toast({
+        title: '无法重跑',
+        description: '内容尚未保存，无法通知 Karakeep',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!karakeepId) {
+      toast({
+        title: '未绑定 Karakeep',
+        description: '缺少 karakeep_id，无法重跑',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    stopPolling();
+    try {
+      const data = await apiClient.post<ResyncJobState>(`/api/content/${initialValues.id}/karakeep-resync`, {
+        refreshScreenshot: refreshScreenshot && !screenshotLocked,
+      });
+      setResyncJob(data);
+
+      if (data.phase === 'success') {
+        applyResyncResultToForm(data);
+        toast({
+          title: '已完成',
+          description: 'Karakeep 重跑完成并写回最新结果',
+        });
+        return;
+      }
+
+      if (data.phase === 'failed') {
+        toast({
+          title: '启动失败',
+          description: data.message || 'Karakeep 重跑失败',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      pollTimerRef.current = setTimeout(() => pollResyncStatus(data.jobId), 2000);
+    } catch (error: any) {
+      setResyncJob({
+        jobId: 'local-failed',
+        contentId: Number(initialValues?.id) || 0,
+        karakeepId,
+        phase: 'failed',
+        attempt: 0,
+        maxAttempts: 0,
+        refreshScreenshot,
+        screenshotLocked,
+        message: error?.message || '启动失败',
+        updatedAt: new Date().toISOString(),
+      });
+      toast({
+        title: '启动失败',
+        description: error?.message || '请稍后重试',
+        variant: 'destructive',
+      });
+    }
+  }, [applyResyncResultToForm, initialValues?.id, karakeepId, pollResyncStatus, refreshScreenshot, screenshotLocked, stopPolling, toast]);
+
+  useEffect(() => {
+    if (!resyncJob) return;
+    if (lastPhaseRef.current === resyncJob.phase) return;
+
+    if (resyncJob.phase === 'success') {
+      applyResyncResultToForm(resyncJob);
+      toast({
+        title: '同步完成',
+        description: '已写回 Karakeep 的最新 summary/截图',
+      });
+    }
+
+    if (resyncJob.phase === 'failed') {
+      toast({
+        title: '同步失败',
+        description: resyncJob.message || '请稍后重试',
+        variant: 'destructive',
+      });
+    }
+
+    lastPhaseRef.current = resyncJob.phase;
+  }, [applyResyncResultToForm, resyncJob, toast]);
 
   // 手动保存
   const handleManualSave = handleSubmit(async (data) => {
@@ -366,6 +569,79 @@ export default function SimplifiedEditor({
                       )}
                     />
                   </div>
+
+                  <div className="space-y-2 col-span-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label htmlFor="tag_search">标签</Label>
+                      <Input
+                        id="tag_search"
+                        placeholder="搜索标签"
+                        className="max-w-xs"
+                        value={tagSearch}
+                        onChange={(e) => setTagSearch(e.target.value)}
+                      />
+                    </div>
+                    <Controller
+                      name="tag_ids"
+                      control={control}
+                      render={({ field }) => {
+                        const selected = field.value || [];
+                        const filteredTags = tags.filter((tag) =>
+                          tag.name.toLowerCase().includes(tagSearch.toLowerCase())
+                        );
+
+                        const toggleTag = (tagId: number) => {
+                          const next = selected.includes(tagId)
+                            ? selected.filter((id) => id !== tagId)
+                            : [...selected, tagId];
+                          field.onChange(next);
+                        };
+
+                        return (
+                          <div className="space-y-3">
+                            {selected.length > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                {selected.map((id) => {
+                                  const tag = tags.find((item) => item.id === id);
+                                  if (!tag) return null;
+                                  return (
+                                    <Badge
+                                      key={id}
+                                      variant="secondary"
+                                      className="cursor-pointer"
+                                      onClick={() => toggleTag(id)}
+                                    >
+                                      {tag.name}
+                                    </Badge>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto rounded border p-2">
+                              {filteredTags.length > 0 ? (
+                                filteredTags.map((tag) => (
+                                  <label
+                                    key={tag.id}
+                                    className="flex items-center gap-2 text-sm cursor-pointer"
+                                  >
+                                    <Checkbox
+                                      checked={selected.includes(tag.id)}
+                                      onCheckedChange={() => toggleTag(tag.id)}
+                                    />
+                                    <span>{tag.name}</span>
+                                  </label>
+                                ))
+                              ) : (
+                                <p className="col-span-2 text-center text-sm text-muted-foreground">
+                                  暂无标签
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      }}
+                    />
+                  </div>
                 </div>
 
                 {/* 精选 */}
@@ -527,11 +803,19 @@ export default function SimplifiedEditor({
                       name="image_url"
                       control={control}
                       render={({ field }) => (
-                        <Input
-                          {...field}
-                          id="image_url"
-                          placeholder="https://example.com/cover.jpg"
-                        />
+                        <div className="space-y-3">
+                          <Input
+                            {...field}
+                            id="image_url"
+                            placeholder="https://example.com/cover.jpg"
+                          />
+                          <ScreenshotPasteUploader
+                            value={field.value}
+                            onChange={(url) => field.onChange(url)}
+                            label="主图上传"
+                            helperText="粘贴截图或上传图片，裁剪/旋转后自动回填链接"
+                          />
+                        </div>
                       )}
                     />
                     {errors.image_url && (
@@ -671,23 +955,24 @@ export default function SimplifiedEditor({
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="screenshot_api">截图 API</Label>
-                    <Controller
-                      name="screenshot_api"
-                      control={control}
-                      render={({ field }) => (
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="manual">手动上传</SelectItem>
-                            <SelectItem value="ScreenshotLayer">ScreenshotLayer</SelectItem>
-                            <SelectItem value="HCTI">HCTI</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                  </div>
+                  <Controller
+                    name="screenshot_api"
+                    control={control}
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="manual">手动上传</SelectItem>
+                          <SelectItem value="ScreenshotLayer">ScreenshotLayer</SelectItem>
+                          <SelectItem value="HCTI">HCTI</SelectItem>
+                          <SelectItem value="karakeep">Karakeep</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="recommendation_reason">推荐理由</Label>
@@ -710,38 +995,115 @@ export default function SimplifiedEditor({
                 </CardContent>
               </Card>
             )}
+
+            {/* Karakeep 同步与轮询状态 */}
+            {contentTypeId === 3 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Karakeep 重跑</CardTitle>
+                  <CardDescription>修改 URL 后可通知 Karakeep 重新总结 / 重新截图</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {karakeepId ? (
+                    <>
+                      <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div className="space-y-1">
+                          <p className="text-sm text-muted-foreground">Karakeep ID</p>
+                          <p className="font-mono text-sm break-all">{karakeepId}</p>
+                          {karakeepSyncedAt && (
+                            <p className="text-xs text-muted-foreground">上次同步：{karakeepSyncedAt}</p>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-3">
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              id="karakeep-refresh-screenshot"
+                              checked={refreshScreenshot && !screenshotLocked}
+                              disabled={screenshotLocked}
+                              onCheckedChange={(val) => setRefreshScreenshot(val)}
+                            />
+                            <Label htmlFor="karakeep-refresh-screenshot">
+                              允许覆盖截图
+                            </Label>
+                          </div>
+                          {screenshotLocked && (
+                            <p className="text-xs text-amber-600">
+                              当前主图为手动上传，默认不覆盖
+                            </p>
+                          )}
+                          <Button
+                            size="sm"
+                            onClick={handleResync}
+                            disabled={isResyncRunning}
+                          >
+                            {isResyncRunning ? '轮询中…' : '保存并重跑'}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {resyncJob && (
+                        <div className="rounded-md border bg-muted/40 p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Badge
+                              variant={
+                                resyncJob.phase === 'failed'
+                                  ? 'destructive'
+                                  : resyncJob.phase === 'success'
+                                    ? 'default'
+                                    : 'secondary'
+                              }
+                            >
+                              {resyncJob.phase === 'updating' && '通知 Karakeep'}
+                              {resyncJob.phase === 'waiting' && '等待 AI'}
+                              {resyncJob.phase === 'applying' && '写回中'}
+                              {resyncJob.phase === 'success' && '已完成'}
+                              {resyncJob.phase === 'failed' && '失败'}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              轮询 {resyncJob.attempt}/{resyncJob.maxAttempts}
+                            </span>
+                          </div>
+                          <div className="text-sm space-y-1">
+                            <p className="text-muted-foreground">
+                              总结：{resyncJob.summarizationStatus || 'pending'}
+                              {resyncJob.taggingStatus ? ` · 标签：${resyncJob.taggingStatus}` : ''}
+                            </p>
+                            {resyncJob.message && (
+                              <p className="text-destructive">{resyncJob.message}</p>
+                            )}
+                          </div>
+                          {(resyncJob.phase === 'waiting' || resyncJob.phase === 'applying') && (
+                            <div className="h-1.5 w-full rounded bg-muted">
+                              <div
+                                className="h-1.5 rounded bg-primary transition-all"
+                                style={{
+                                  width: `${Math.min(100, (resyncJob.attempt / resyncJob.maxAttempts) * 100)}%`,
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      未找到 karakeep_id，无法触发 Karakeep 重新总结。请先在内容属性中写入 karakeep_id。
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* 右侧预览区 - 占 40% */}
           <div className="w-2/5 flex flex-col">
             <Card className="flex-1 flex flex-col">
               <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
-                  <CardTitle>实时预览</CardTitle>
-                  <CardDescription>查看 Markdown 或结构化卡片效果</CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant={previewMode === 'markdown' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setPreviewMode('markdown')}
-                  >
-                    Markdown
-                  </Button>
-                  {contentTypeId === 3 && (
-                    <Button
-                      variant={previewMode === 'structured' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setPreviewMode('structured')}
-                    >
-                      结构化卡片
-                    </Button>
-                  )}
-                </div>
+                <CardTitle>实时预览</CardTitle>
               </CardHeader>
               <CardContent className="flex-1 overflow-auto">
                 {(currentContent || currentSummary) ? (
-                  previewMode === 'structured' && contentTypeId === 3 ? (
+                  shouldUseStructuredPreview ? (
                     <StructuredPreview
                       data={{
                         title: currentTitle || '未命名',
@@ -751,7 +1113,10 @@ export default function SimplifiedEditor({
                         description: currentRecommendation,
                         source: currentSource || '未知来源',
                         source_url: currentSourceUrl || undefined,
-                        tags: initialValues?.tags || [],
+                        tags: previewTags,
+                        category: (previewCategory || initialValues?.category)
+                          ? { id: (previewCategory || initialValues?.category)?.id!, name: (previewCategory || initialValues?.category)?.name! }
+                          : undefined,
                         created_at: initialValues?.created_at || new Date().toISOString(),
                         content: currentContent,
                       }}

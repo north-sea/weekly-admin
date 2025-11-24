@@ -35,7 +35,7 @@ export const WeeklyContentSchema = BaseContentSchema.extend({
   // Weekly专用字段
   source: z.string().min(1, '来源名称不能为空').max(200, '来源名称长度不能超过200字符'),
   source_url: z.string().url('来源链接必须是有效的URL'),
-  screenshot_api: z.enum(['ScreenshotLayer', 'HCTI', 'manual']).default('manual'),
+  screenshot_api: z.enum(['ScreenshotLayer', 'HCTI', 'manual', 'karakeep']).default('manual'),
   recommendation_reason: z.string().max(500, '推荐理由长度不能超过500字符').optional(),
 });
 
@@ -84,7 +84,7 @@ export const ContentUpdateSchema = z.object({
   // Weekly专用字段
   source: z.string().min(1, '来源名称不能为空').max(200, '来源名称长度不能超过200字符').optional(),
   source_url: z.string().url('来源链接必须是有效的URL').optional(),
-  screenshot_api: z.enum(['ScreenshotLayer', 'HCTI', 'manual']).optional(),
+  screenshot_api: z.enum(['ScreenshotLayer', 'HCTI', 'manual', 'karakeep']).optional(),
   recommendation_reason: z.string().max(500, '推荐理由长度不能超过500字符').optional(),
 });
 

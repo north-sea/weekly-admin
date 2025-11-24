@@ -284,6 +284,7 @@ enum contents_screenshot_api {
   ScreenshotLayer
   HCTI
   manual
+  karakeep
 }
 
 enum drafts_status {

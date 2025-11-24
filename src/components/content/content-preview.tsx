@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import type { Components } from 'react-markdown';
 import type { CodeComponent } from 'react-markdown/lib/ast-to-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -42,25 +41,25 @@ export default function ContentPreview({
   showMeta = true,
 }: ContentPreviewProps) {
   const isBlog = content.content_type?.id === 4;
+  const isWeekly = content.content_type?.id === 3;
   const isMobile = mode === 'mobile';
 
-  // 检测内容格式
-  const detectedFormat = useMemo(() => {
-    return ContentFormatAdapter.detectFormat(content.content);
-  }, [content.content]);
-
-  // 提取元数据
+  // Blog 的元数据（阅读时长等）
   const metadata = useMemo(() => {
+    if (!isBlog) return null;
     return ContentFormatAdapter.extractMetadata(content.content);
-  }, [content.content]);
+  }, [content.content, isBlog]);
 
-  // 转换为结构化数据（仅用于新格式）
+  // Weekly 的结构化数据（Weekly 内容现在全部为结构化）
   const structuredContent = useMemo<StructuredContent | null>(() => {
-    if (detectedFormat === 'json') {
-      return ContentFormatAdapter.toStructured(content.content);
+    if (!isWeekly) return null;
+    try {
+      const parsed = JSON.parse(content.content);
+      return ContentFormatAdapter.isValidStructured(parsed) ? parsed : null;
+    } catch {
+      return null;
     }
-    return null;
-  }, [content.content, detectedFormat]);
+  }, [content.content, isWeekly]);
 
   // 格式化日期
   const formatDate = (date?: string | Date) => {
@@ -107,10 +106,10 @@ export default function ContentPreview({
                 <span>{formatDate(content.created_at)}</span>
               </div>
             )}
-            {metadata.estimatedReadingTime > 0 && (
+            {metadata?.estimatedReadingTime > 0 && (
               <div className="flex items-center gap-1.5">
                 <Clock className="h-4 w-4" />
-                <span>{metadata.estimatedReadingTime} 分钟阅读</span>
+                <span>{metadata?.estimatedReadingTime} 分钟阅读</span>
               </div>
             )}
             {content.view_count !== undefined && (
@@ -270,7 +269,13 @@ export default function ContentPreview({
 
   // Weekly 预览（结构化格式）
   const renderWeeklyStructuredPreview = () => {
-    if (!structuredContent) return null;
+    if (!structuredContent) {
+      return (
+        <article className="space-y-4 text-sm text-muted-foreground">
+          <p>暂无可用的周刊结构化数据</p>
+        </article>
+      );
+    }
 
     return (
       <article className="space-y-6">
@@ -385,133 +390,10 @@ export default function ContentPreview({
     );
   };
 
-  // Weekly 预览（Markdown 格式）
-  const renderWeeklyMarkdownPreview = () => (
-    <article className="space-y-6">
-      {/* 头部 */}
-      <header className="space-y-4">
-        <h2 className="text-2xl font-bold text-foreground">
-          {content.title}
-        </h2>
-
-        {content.source && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>来源:</span>
-            {content.source_url ? (
-              <a
-                href={content.source_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline inline-flex items-center gap-1"
-              >
-                {content.source}
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            ) : (
-              <span>{content.source}</span>
-            )}
-          </div>
-        )}
-
-        {showMeta && content.created_at && (
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Calendar className="h-4 w-4" />
-            <span>{formatDate(content.created_at)}</span>
-          </div>
-        )}
-
-        {content.tags && content.tags.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {content.tags.map((tag) => (
-              <Badge key={tag.id} variant="outline">
-                {tag.name}
-              </Badge>
-            ))}
-          </div>
-        )}
-      </header>
-
-      {/* 内容 */}
-      <div className="border-l-4 border-primary/20 pl-6">
-        <div className="prose prose-slate dark:prose-invert max-w-none">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeHighlight, rehypeRaw]}
-            components={{
-              img: ({ src, alt, ...props }) => (
-                <img
-                  src={src}
-                  alt={alt || '图片'}
-                  className="rounded w-full"
-                  loading="lazy"
-                  {...props}
-                />
-              ),
-              a: ({ href, children, ...props }) => (
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline inline-flex items-center gap-1"
-                  {...props}
-                >
-                  {children}
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              ),
-              code: ((props) => {
-                const { inline, className, children, ...rest } = props;
-                if (inline) {
-                  return (
-                    <code
-                      className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono"
-                      {...rest}
-                    >
-                      {children}
-                    </code>
-                  );
-                }
-                return (
-                  <code className={className} {...rest}>
-                    {children}
-                  </code>
-                );
-              }) as CodeComponent,
-            }}
-          >
-            {content.content}
-          </ReactMarkdown>
-        </div>
-      </div>
-
-      {/* 推荐理由 */}
-      {content.recommendation_reason && (
-        <Card className="bg-primary/5 border-primary/20">
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-3">
-              <TagIcon className="h-5 w-5 text-primary mt-0.5" />
-              <div className="space-y-1">
-                <p className="font-semibold text-sm">推荐理由</p>
-                <p className="text-sm text-muted-foreground">
-                  {content.recommendation_reason}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </article>
-  );
-
   // 根据内容类型和格式渲染
   if (isBlog) {
     return renderBlogPreview();
-  } else {
-    // Weekly: 根据检测到的格式渲染
-    if (detectedFormat === 'json' && structuredContent) {
-      return renderWeeklyStructuredPreview();
-    } else {
-      return renderWeeklyMarkdownPreview();
-    }
   }
+
+  return renderWeeklyStructuredPreview();
 }

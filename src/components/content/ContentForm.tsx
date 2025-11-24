@@ -72,7 +72,8 @@ export default function ContentForm({
   const screenshotApiOptions = [
     { label: 'ScreenshotLayer', value: 'ScreenshotLayer' },
     { label: 'HCTI', value: 'HCTI' },
-    { label: '手动上传', value: 'manual' }
+    { label: '手动上传', value: 'manual' },
+    { label: 'Karakeep', value: 'karakeep' }
   ];
 
   return (

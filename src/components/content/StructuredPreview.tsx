@@ -4,6 +4,7 @@ import React from 'react';
 import { Card, Typography, Divider, Tag, Space, Image } from 'antd';
 import { CalendarOutlined, LinkOutlined, UserOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { ContentFormatAdapter, StructuredContent } from '@/lib/utils/format-adapter';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -19,6 +20,7 @@ export interface StructuredPreviewData {
   source?: string;
   source_url?: string;
   tags?: Array<{ id: number | string; name: string }>;
+  category?: { id: number | string; name: string };
   created_at?: string;
   user?: { display_name?: string; username?: string };
   featured?: boolean;
@@ -34,28 +36,39 @@ export interface StructuredPreviewProps {
   showImage?: boolean;
 }
 
-/**
- * 从 Markdown 内容中提取图片 URL（兼容旧数据）
- */
-function extractImageFromMarkdown(markdown: string): string | null {
-  const imgRegex = /!\[.*?\]\((.*?)\)/;
-  const match = markdown.match(imgRegex);
-  return match ? match[1] : null;
-}
+const parseStructuredContent = (content?: string): StructuredContent | null => {
+  if (!content) return null;
+  try {
+    const parsed = JSON.parse(content);
+    return ContentFormatAdapter.isValidStructured(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
 
-/**
- * 从 Markdown 内容中提取摘要（兼容旧数据）
- */
-function extractSummaryFromMarkdown(markdown: string): string {
-  // 移除标题（### 开头的行）
-  let text = markdown.replace(/^###\s+\[.*?\]\(.*?\)\s*$/gm, '');
-  // 移除图片
-  text = text.replace(/!\[.*?\]\(.*?\)/g, '');
-  // 移除多余空行
-  text = text.replace(/\n{3,}/g, '\n\n').trim();
-  // 限制长度
-  return text.length > 300 ? text.substring(0, 300) + '...' : text;
-}
+const pickImageFromStructured = (
+  data: StructuredPreviewData,
+  structured?: StructuredContent | null
+) => {
+  if (data.image_url) return data.image_url;
+  if (!structured) return null;
+  const imageSection = structured.sections.find(
+    (section) => section.type === 'image' && section.imageUrl
+  );
+  return imageSection?.imageUrl || null;
+};
+
+const buildSummaryFromStructured = (
+  data: StructuredPreviewData,
+  structured?: StructuredContent | null
+) => {
+  if (data.summary) return data.summary;
+  if (data.description) return data.description;
+  if (structured?.description) return structured.description;
+  const firstText = structured?.sections.find((section) => section.content)?.content || '';
+  if (!firstText) return '';
+  return firstText.length > 300 ? `${firstText.substring(0, 300)}...` : firstText;
+};
 
 /**
  * 结构化预览组件
@@ -71,9 +84,20 @@ export default function StructuredPreview({
   showMeta = true,
   showImage = true,
 }: StructuredPreviewProps) {
-  // 兼容处理：优先使用结构化字段，回退到 Markdown 解析
-  const imageUrl = data.image_url || (data.content ? extractImageFromMarkdown(data.content) : null);
-  const summary = data.summary || data.description || (data.content ? extractSummaryFromMarkdown(data.content) : '');
+  const structuredContent = React.useMemo(
+    () => parseStructuredContent(data.content),
+    [data.content]
+  );
+
+  const imageUrl = React.useMemo(
+    () => pickImageFromStructured(data, structuredContent),
+    [data, structuredContent]
+  );
+
+  const summary = React.useMemo(
+    () => buildSummaryFromStructured(data, structuredContent),
+    [data, structuredContent]
+  );
 
   const isMobile = mode === 'mobile';
 
@@ -191,6 +215,12 @@ export default function StructuredPreview({
             </Text>
           )}
           
+          {data.category && (
+            <Tag style={{ margin: 0, fontSize: '12px', padding: '0 6px', background: '#eef2ff', borderColor: '#eef2ff', color: '#4c51bf' }}>
+              {data.category.name}
+            </Tag>
+          )}
+
           {data.tags && data.tags.length > 0 && (
             <>
               {data.tags.slice(0, 3).map((tag) => (
@@ -247,4 +277,3 @@ export default function StructuredPreview({
     </div>
   );
 }
-

@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 import { Calendar, Tag as TagIcon, ArrowUpRight, Dot } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { ContentFormatAdapter, StructuredContent } from '@/lib/utils/format-adapter';
 
 export interface WeeklyContentItem {
   id: number;
@@ -48,6 +49,10 @@ export interface WeeklyIssueDetail {
   contents: WeeklyContentItem[];
 }
 
+type WeeklyContentWithStructured = WeeklyContentItem & {
+  structured?: StructuredContent | null;
+};
+
 const statusLabel: Record<WeeklyIssueDetail['status'], string> = {
   draft: '草稿',
   published: '已发布',
@@ -60,37 +65,58 @@ const formatDate = (value?: string) => {
   return parsed.isValid() ? parsed.format('YYYY年M月D日') : value;
 };
 
-const extractImageFromMarkdown = (markdown: string) => {
-  const match = markdown.match(/!\[.*?\]\((.*?)\)/);
-  return match ? match[1] : null;
+const parseStructuredContent = (content?: string): StructuredContent | null => {
+  if (!content) return null;
+  try {
+    const parsed = JSON.parse(content);
+    return ContentFormatAdapter.isValidStructured(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
 };
 
-const buildSummary = (content: WeeklyContentItem) => {
+const getStructuredText = (structured?: StructuredContent | null) => {
+  if (!structured) return '';
+  const parts: string[] = [];
+  if (structured.description) {
+    parts.push(structured.description);
+  }
+  structured.sections.forEach((section) => {
+    if (section.content) {
+      parts.push(section.content);
+    }
+  });
+  return parts.join(' ').replace(/\s+/g, ' ').trim();
+};
+
+const findCoverImage = (content: WeeklyContentItem, structured?: StructuredContent | null) => {
+  if (content.image_url) return content.image_url;
+  if (!structured) return null;
+  const imageSection = structured.sections.find(
+    (section) => section.type === 'image' && section.imageUrl
+  );
+  return imageSection?.imageUrl || null;
+};
+
+const buildSummary = (content: WeeklyContentItem, structured?: StructuredContent | null) => {
   if (content.summary) return content.summary;
   if (content.description) return content.description;
-  if (!content.content) return '';
 
-  const clean = content.content
-    .replace(/```[\s\S]*?```/g, '')
-    .replace(/!\[.*?\]\(.*?\)/g, '')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/[#>*`\-]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  if (clean.length <= 180) return clean;
-  return `${clean.slice(0, 177)}...`;
+  const text = getStructuredText(structured);
+  if (!text) return '';
+  return text.length <= 180 ? text : `${text.slice(0, 177)}...`;
 };
 
-const computeWordCount = (content: WeeklyContentItem) => {
+const computeWordCount = (content: WeeklyContentItem, structured?: StructuredContent | null) => {
   if (content.word_count && content.word_count > 0) return content.word_count;
-  if (!content.content) return 0;
-  return content.content.split(/\s+/).filter(Boolean).length;
+  const text = getStructuredText(structured);
+  if (!text) return 0;
+  return text.split(/\s+/).filter(Boolean).length;
 };
 
-const computeReadingTime = (content: WeeklyContentItem) => {
+const computeReadingTime = (content: WeeklyContentItem, structured?: StructuredContent | null) => {
   if (content.reading_time && content.reading_time > 0) return content.reading_time;
-  const words = computeWordCount(content);
+  const words = computeWordCount(content, structured);
   if (!words) return 0;
   return Math.max(1, Math.ceil(words / 200));
 };
@@ -102,11 +128,11 @@ const formatLargeNumber = (value: number) => {
 };
 
 const WeeklyContentCard: React.FC<{
-  content: WeeklyContentItem;
+  content: WeeklyContentWithStructured;
   index: number;
 }> = ({ content, index }) => {
-  const cover = content.image_url || extractImageFromMarkdown(content.content || '');
-  const summary = buildSummary(content);
+  const cover = findCoverImage(content, content.structured);
+  const summary = buildSummary(content, content.structured);
 
   return (
     <article className="group mb-6 break-inside-avoid overflow-hidden rounded-xl border bg-card shadow-sm ring-1 ring-border/50 transition hover:-translate-y-0.5 hover:shadow-md">
@@ -201,8 +227,15 @@ interface WeeklyIssueLayoutProps {
 export const WeeklyIssueLayout: React.FC<WeeklyIssueLayoutProps> = ({ issue, footerNote }) => {
   const contents = issue.contents || [];
 
+  const enrichedContents: WeeklyContentWithStructured[] = useMemo(() => {
+    return contents.map((item) => ({
+      ...item,
+      structured: parseStructuredContent(item.content),
+    }));
+  }, [contents]);
+
   const groupedContents = useMemo(() => {
-    return contents.reduce((groups: Record<string, WeeklyContentItem[]>, content) => {
+    return enrichedContents.reduce((groups: Record<string, WeeklyContentWithStructured[]>, content) => {
       const section = content.section || content.category?.name || '未分类';
       if (!groups[section]) {
         groups[section] = [];
@@ -210,22 +243,28 @@ export const WeeklyIssueLayout: React.FC<WeeklyIssueLayoutProps> = ({ issue, foo
       groups[section].push(content);
       return groups;
     }, {});
-  }, [contents]);
+  }, [enrichedContents]);
 
   const stats = useMemo(() => {
-    const totalItems = Number(issue.total_items || contents.length);
+    const totalItems = Number(issue.total_items || enrichedContents.length);
     const issueWordCount = Number(issue.total_word_count || 0);
     const issueReadingTime = Number(issue.reading_time || 0);
 
     const totalWordCount =
       issueWordCount > 0
         ? issueWordCount
-        : contents.reduce((sum, content) => sum + computeWordCount(content), 0);
+        : enrichedContents.reduce(
+            (sum, content) => sum + computeWordCount(content, content.structured),
+            0
+          );
 
     const readingMinutes =
       issueReadingTime > 0
         ? issueReadingTime
-        : contents.reduce((sum, content) => sum + computeReadingTime(content), 0);
+        : enrichedContents.reduce(
+            (sum, content) => sum + computeReadingTime(content, content.structured),
+            0
+          );
 
     return {
       totalItems,
@@ -233,7 +272,7 @@ export const WeeklyIssueLayout: React.FC<WeeklyIssueLayoutProps> = ({ issue, foo
       readingMinutes,
       sectionCount: Object.keys(groupedContents).length,
     };
-  }, [contents, groupedContents, issue.reading_time, issue.total_items, issue.total_word_count]);
+  }, [enrichedContents, groupedContents, issue.reading_time, issue.total_items, issue.total_word_count]);
 
   const description = issue.desc || issue.description;
 

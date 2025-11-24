@@ -19,17 +19,10 @@ export interface ImageUploadOptions {
 // 图片上传服务
 export class ImageUploadService {
   /**
-   * 获取上传 URL
+   * 获取上传 URL（前端统一走内部 API 代理）
    */
   private static getUploadUrl(): string | undefined {
-    return process.env.IMAGE_UPLOAD_URL;
-  }
-
-  /**
-   * 获取认证令牌
-   */
-  private static getAuthToken(): string | undefined {
-    return process.env.IMAGE_UPLOAD_TOKEN;
+    return '/api/upload/image';
   }
 
   /**
@@ -37,21 +30,8 @@ export class ImageUploadService {
    */
   static validateConfig(): void {
     const uploadUrl = this.getUploadUrl();
-    const authToken = this.getAuthToken();
-
     if (!uploadUrl) {
-      throw new Error('图片上传服务未配置：缺少 IMAGE_UPLOAD_URL 环境变量');
-    }
-    
-    if (!authToken) {
-      throw new Error('图片上传服务未配置：缺少 IMAGE_UPLOAD_TOKEN 环境变量');
-    }
-
-    // 验证 URL 格式
-    try {
-      new URL(uploadUrl);
-    } catch (error) {
-      throw new Error('图片上传服务配置错误：IMAGE_UPLOAD_URL 不是有效的 URL 格式');
+      throw new Error('图片上传服务未配置');
     }
   }
 
@@ -59,9 +39,7 @@ export class ImageUploadService {
    * 检查图片上传服务是否可用
    */
   static isConfigured(): boolean {
-    const uploadUrl = this.getUploadUrl();
-    const authToken = this.getAuthToken();
-    return !!(uploadUrl && authToken);
+    return !!this.getUploadUrl();
   }
 
   /**
@@ -86,13 +64,9 @@ export class ImageUploadService {
       formData.append('file', file);
 
       const uploadUrl = this.getUploadUrl()!;
-      const authToken = this.getAuthToken()!;
 
       const response = await ky.post(uploadUrl, {
         body: formData,
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-        },
         onUploadProgress: onProgress ? (progress: any) => {
           if (progress.loaded && progress.total) {
             onProgress(Math.round((progress.loaded / progress.total) * 100));

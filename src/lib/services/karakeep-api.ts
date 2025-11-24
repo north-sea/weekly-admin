@@ -86,7 +86,7 @@ export class KarakeepApiClient {
       throw new Error('KARAKEEP_KEY 环境变量未配置');
     }
     if (!KARAKEEP_DRAFT_LIST_ID) {
-      throw new Error('KARAKEEP_DRAFT_LIST_ID 环境变量未配置');
+      console.warn('KARAKEEP_DRAFT_LIST_ID 环境变量未配置，默认草稿列表相关操作可能不可用');
     }
 
     // 创建 ky 实例
@@ -239,6 +239,105 @@ export class KarakeepApiClient {
   }
 
   /**
+   * 获取所有书签（全局，不限列表）
+   * GET /bookmarks
+   * 参考: https://docs.karakeep.app/api/get-all-bookmarks
+   * @param options 查询选项
+   */
+  async getBookmarks(options?: {
+    archived?: boolean;
+    favourited?: boolean;
+    limit?: number;
+    includeContent?: boolean;
+  }): Promise<KarakeepBookmark[]> {
+    try {
+      console.log('正在获取 Karakeep 所有书签...', options);
+      
+      let allBookmarks: KarakeepBookmark[] = [];
+      let cursor: string | null = null;
+      let pageCount = 0;
+      
+      const {
+        archived, // 不加默认，交给 API 处理
+        favourited,
+        limit = 100,
+        includeContent = true,
+      } = options || {};
+      
+      do {
+        pageCount++;
+        console.log(`正在获取第 ${pageCount} 页...`);
+        
+        const params = new URLSearchParams();
+        if (cursor) params.append('cursor', cursor);
+        if (archived !== undefined) params.append('archived', String(archived));
+        if (favourited !== undefined) params.append('favourited', String(favourited));
+        if (limit) params.append('limit', String(limit));
+        if (includeContent !== undefined) params.append('includeContent', String(includeContent));
+        
+        const url: string = `bookmarks?${params.toString()}`;
+        const response: any = await this.kyInstance.get(url).json<any>();
+        
+        let bookmarks: KarakeepBookmark[] = [];
+        let nextCursor: string | null = null;
+        
+        if (Array.isArray(response)) {
+          bookmarks = response;
+          nextCursor = null;
+        } else if (response.bookmarks && Array.isArray(response.bookmarks)) {
+          bookmarks = response.bookmarks;
+          nextCursor = response.nextCursor || null;
+        } else if (response.data?.bookmarks && Array.isArray(response.data.bookmarks)) {
+          bookmarks = response.data.bookmarks;
+          nextCursor = response.data.nextCursor || null;
+        } else {
+          console.warn('未知的 Karakeep API 响应格式:', response);
+          throw new KarakeepApiError('无法解析 Karakeep API 响应');
+        }
+
+        console.log(`第 ${pageCount} 页获取了 ${bookmarks.length} 条书签`);
+        allBookmarks.push(...bookmarks);
+        
+        cursor = nextCursor;
+        
+        if (pageCount > 100) {
+          console.warn('已获取超过 100 页，停止分页');
+          break;
+        }
+        
+      } while (cursor);
+
+      console.log(`成功获取所有书签，共 ${allBookmarks.length} 条，分 ${pageCount} 页`);
+      return allBookmarks;
+      
+    } catch (error) {
+      if (error instanceof HTTPError) {
+        const status = error.response.status;
+        let message = `Karakeep API 请求失败 (${status})`;
+        
+        try {
+          const errorBody = await error.response.json();
+          message = errorBody.message || errorBody.error || message;
+        } catch {
+          // 无法解析错误响应
+        }
+        
+        throw new KarakeepApiError(message, status, error);
+      }
+      
+      if (error instanceof Error) {
+        throw new KarakeepApiError(
+          `Karakeep API 请求失败: ${error.message}`,
+          undefined,
+          error
+        );
+      }
+      
+      throw new KarakeepApiError('未知错误');
+    }
+  }
+
+  /**
    * 获取单个书签
    * GET /bookmarks/:bookmarkId
    */
@@ -264,6 +363,8 @@ export class KarakeepApiClient {
     archived?: boolean;
     favourited?: boolean;
     note?: string;
+    url?: string;
+    title?: string;
   }): Promise<KarakeepBookmark> {
     try {
       console.log(`更新 Karakeep 书签 ${bookmarkId}:`, data);
@@ -337,6 +438,121 @@ export class KarakeepApiClient {
   }
 
   /**
+   * 从列表移除书签
+   * DELETE /lists/:listId/bookmarks/:bookmarkId
+   */
+  async removeBookmarkFromList(listId: string, bookmarkId: string): Promise<void> {
+    try {
+      console.log(`从列表 ${listId} 移除书签 ${bookmarkId}`);
+      
+      await this.kyInstance.delete(`lists/${listId}/bookmarks/${bookmarkId}`);
+      
+      console.log('成功从列表移除书签');
+    } catch (error) {
+      if (error instanceof HTTPError) {
+        const status = error.response.status;
+        if (status === 404) {
+          throw new KarakeepApiError('列表或书签不存在', status, error);
+        }
+        
+        let message = `从列表移除书签失败 (${status})`;
+        try {
+          const errorBody = await error.response.json();
+          message = errorBody.message || errorBody.error || message;
+        } catch {
+          // ignore
+        }
+        
+        throw new KarakeepApiError(message, status, error);
+      }
+      
+      throw new KarakeepApiError('从列表移除书签失败', undefined, error as Error);
+    }
+  }
+
+  /**
+   * v1 API: 创建书签
+   * POST /bookmarks
+   */
+  async createBookmark(data: { url: string; title?: string; description?: string; type?: string }): Promise<KarakeepBookmark> {
+    try {
+      const payload = { ...data, type: data.type || 'link' };
+      console.log('创建 Karakeep 书签:', payload.url, 'type:', payload.type);
+      const response = await this.kyInstance.post('bookmarks', {
+        json: payload,
+      }).json<KarakeepBookmark>();
+      return response;
+    } catch (error) {
+      if (error instanceof HTTPError) {
+        const status = error.response.status;
+        let message = `创建 Karakeep 书签失败 (${status})`;
+        try {
+          const errorBody = await error.response.json();
+          if (typeof errorBody === 'string') {
+            message = errorBody;
+          } else if (errorBody?.message) {
+            message = typeof errorBody.message === 'string' ? errorBody.message : JSON.stringify(errorBody.message);
+          } else if (errorBody?.error) {
+            message = typeof errorBody.error === 'string' ? errorBody.error : JSON.stringify(errorBody.error);
+          } else {
+            message = JSON.stringify(errorBody);
+          }
+        } catch {
+          try {
+            message = await error.response.text();
+          } catch {
+            // ignore
+          }
+        }
+        throw new KarakeepApiError(message, status, error);
+      }
+      throw new KarakeepApiError('创建书签失败', undefined, error as Error);
+    }
+  }
+
+  /**
+   * v1 API: 获取书签
+   * GET /bookmarks/:bookmarkId
+   */
+  async getBookmarkV1(bookmarkId: string): Promise<KarakeepBookmark> {
+    try {
+      const response = await this.kyInstance.get(`bookmarks/${bookmarkId}`).json<KarakeepBookmark>();
+      return response;
+    } catch (error) {
+      if (error instanceof HTTPError) {
+        const status = error.response.status;
+        throw new KarakeepApiError(`获取书签失败 (${status})`, status, error);
+      }
+      throw new KarakeepApiError('获取书签失败', undefined, error as Error);
+    }
+  }
+
+  /**
+   * v1 API: 将书签添加到列表
+   * PUT /lists/:listId/bookmarks/:bookmarkId
+   */
+  async addBookmarkToListV1(listId: string, bookmarkId: string): Promise<void> {
+    try {
+      console.log(`添加书签 ${bookmarkId} 到列表 ${listId} (v1)`);
+      await this.kyInstance.put(`lists/${listId}/bookmarks/${bookmarkId}`);
+      console.log('成功添加书签到列表 (v1)');
+    } catch (error) {
+      if (error instanceof HTTPError) {
+        const status = error.response.status;
+        let message = `添加书签到列表失败 (${status})`;
+        try {
+          const errorBody = await error.response.json();
+          message = errorBody.message || errorBody.error || message;
+        } catch {
+          // ignore
+        }
+        throw new KarakeepApiError(message, status, error);
+      }
+      throw new KarakeepApiError('添加书签到列表失败', undefined, error as Error);
+    }
+  }
+
+  /**
    * 测试连接
    * 验证 API 配置是否正确
    */
@@ -364,6 +580,15 @@ export async function fetchKarakeepBookmarks(options?: {
   return karakeepApi.getAllBookmarks(options);
 }
 
+export async function fetchAllKarakeepBookmarks(options?: {
+  archived?: boolean;
+  favourited?: boolean;
+  limit?: number;
+  includeContent?: boolean;
+}): Promise<KarakeepBookmark[]> {
+  return karakeepApi.getBookmarks(options);
+}
+
 export async function updateKarakeepBookmark(bookmarkId: string, data: {
   archived?: boolean;
   favourited?: boolean;
@@ -380,7 +605,22 @@ export async function addBookmarkToKarakeepList(listId: string, bookmarkId: stri
   return karakeepApi.addBookmarkToList(listId, bookmarkId);
 }
 
+export async function removeBookmarkFromKarakeepList(listId: string, bookmarkId: string): Promise<void> {
+  return karakeepApi.removeBookmarkFromList(listId, bookmarkId);
+}
+
 export async function testKarakeepConnection(): Promise<boolean> {
   return karakeepApi.testConnection();
 }
 
+export async function createKarakeepBookmark(data: { url: string; title?: string; description?: string }): Promise<KarakeepBookmark> {
+  return karakeepApi.createBookmark(data);
+}
+
+export async function getKarakeepBookmarkV1(bookmarkId: string): Promise<KarakeepBookmark> {
+  return karakeepApi.getBookmarkV1(bookmarkId);
+}
+
+export async function addBookmarkToKarakeepListV1(listId: string, bookmarkId: string): Promise<void> {
+  return karakeepApi.addBookmarkToListV1(listId, bookmarkId);
+}

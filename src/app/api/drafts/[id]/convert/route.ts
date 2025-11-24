@@ -8,7 +8,14 @@ import { getDraftById, updateDraft } from '@/lib/services/draft';
 import { prisma } from '@/lib/db';
 import { authenticateRequest } from '@/lib/auth';
 import { createNextSuccessResponse, createNextErrorResponse } from '@/lib/utils/serialization';
-import { archiveKarakeepBookmark } from '@/lib/services/karakeep-api';
+import {
+  addBookmarkToKarakeepList,
+  archiveKarakeepBookmark,
+  removeBookmarkFromKarakeepList,
+} from '@/lib/services/karakeep-api';
+
+const KARAKEEP_WEEKLY_LIST_ID = process.env.KARAKEEP_WEEKLY_LIST_ID || 'tsoo93d9t052gp46p6rpalgk';
+const KARAKEEP_DRAFT_LIST_ID = process.env.KARAKEEP_DRAFT_LIST_ID || '';
 
 /**
  * POST /api/drafts/:id/convert
@@ -125,7 +132,7 @@ ${draft.summary || draft.description || ''}
 ${draft.note ? `\n**笔记**\n${draft.note}` : ''}
 `.trim(),
       content_format,
-      status: 'draft', // 转换后仍为草稿状态，需要进一步编辑
+      status: 'published', // 转换后直接设为已发布
       source: draft.source || extractDomain(draft.url),
       source_url: draft.url,
       word_count: draft.word_count || 0,
@@ -200,15 +207,39 @@ ${draft.note ? `\n**笔记**\n${draft.note}` : ''}
       },
     });
 
-    // 【双向同步】在 Karakeep 中归档该书签
-    try {
-      if (draft.karakeep_id) {
-        await archiveKarakeepBookmark(draft.karakeep_id);
-        console.log(`已在 Karakeep 中归档书签: ${draft.karakeep_id}`);
+    // 【双向同步】在 Karakeep 中归档并移动列表
+    if (draft.karakeep_id) {
+      const karakeepId = draft.karakeep_id;
+
+      if (KARAKEEP_WEEKLY_LIST_ID) {
+        try {
+          await addBookmarkToKarakeepList(KARAKEEP_WEEKLY_LIST_ID, karakeepId);
+          console.log(`已将书签添加到 Karakeep 周刊列表: ${KARAKEEP_WEEKLY_LIST_ID}`);
+        } catch (error) {
+          console.error('添加到 Karakeep 周刊列表失败:', error);
+        }
+      } else {
+        console.warn('KARAKEEP_WEEKLY_LIST_ID 未配置，跳过移动到周刊列表');
       }
-    } catch (error) {
-      // 归档失败不影响转换流程，只记录日志
-      console.error('归档 Karakeep 书签失败:', error);
+
+      if (KARAKEEP_DRAFT_LIST_ID) {
+        try {
+          await removeBookmarkFromKarakeepList(KARAKEEP_DRAFT_LIST_ID, karakeepId);
+          console.log(`已从 Karakeep Draft 列表移除书签: ${KARAKEEP_DRAFT_LIST_ID}`);
+        } catch (error) {
+          console.error('从 Karakeep Draft 列表移除失败:', error);
+        }
+      } else {
+        console.warn('KARAKEEP_DRAFT_LIST_ID 未配置，跳过从 Draft 列表移除');
+      }
+
+      try {
+        await archiveKarakeepBookmark(karakeepId);
+        console.log(`已在 Karakeep 中归档书签: ${karakeepId}`);
+      } catch (error) {
+        // 归档失败不影响转换流程，只记录日志
+        console.error('归档 Karakeep 书签失败:', error);
+      }
     }
 
     // 序列化

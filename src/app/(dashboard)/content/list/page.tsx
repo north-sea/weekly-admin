@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -316,11 +317,15 @@ export default function ContentListPage() {
                                     <Eye className="h-4 w-4 mr-2" />
                                     预览
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => router.push(`/content/${content.id}`)}
-                                  >
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    编辑
+                                  <DropdownMenuItem asChild>
+                                    <Link
+                                      href={`/content/${content.id}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                    >
+                                      <Edit className="h-4 w-4 mr-2" />
+                                      编辑
+                                    </Link>
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem
