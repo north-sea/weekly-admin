@@ -1,16 +1,13 @@
 'use client';
 
 import React from 'react';
-import { Card, Typography, Divider, Tag, Space, Image } from 'antd';
-import { CalendarOutlined, LinkOutlined, UserOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { CalendarDays, Link2, User } from 'lucide-react';
 import { ContentFormatAdapter, StructuredContent } from '@/lib/utils/format-adapter';
+import { cn } from '@/lib/utils';
 
-const { Title, Text, Paragraph } = Typography;
-
-/**
- * 结构化预览数据接口
- */
 export interface StructuredPreviewData {
   title: string;
   url?: string;
@@ -25,7 +22,6 @@ export interface StructuredPreviewData {
   user?: { display_name?: string; username?: string };
   featured?: boolean;
   content_type?: { id: number; name: string };
-  // 兼容字段：如果没有结构化数据，回退到 Markdown
   content?: string;
 }
 
@@ -70,210 +66,106 @@ const buildSummaryFromStructured = (
   return firstText.length > 300 ? `${firstText.substring(0, 300)}...` : firstText;
 };
 
-/**
- * 结构化预览组件
- * 用于统一渲染草稿、周刊内容等的预览
- * 
- * 注意：
- * - Blog 类型（content_type.id === 4）应该使用 MarkdownPreview 组件完整渲染
- * - 本组件主要用于 Weekly 类型和草稿的简短预览
- */
 export default function StructuredPreview({
   data,
   mode = 'desktop',
   showMeta = true,
-  showImage = true,
+  showImage = true
 }: StructuredPreviewProps) {
-  const structuredContent = React.useMemo(
-    () => parseStructuredContent(data.content),
-    [data.content]
-  );
-
-  const imageUrl = React.useMemo(
-    () => pickImageFromStructured(data, structuredContent),
-    [data, structuredContent]
-  );
-
-  const summary = React.useMemo(
-    () => buildSummaryFromStructured(data, structuredContent),
-    [data, structuredContent]
-  );
-
-  const isMobile = mode === 'mobile';
+  const structuredContent = parseStructuredContent(data.content);
+  const displayImage = pickImageFromStructured(data, structuredContent);
+  const summary = buildSummaryFromStructured(data, structuredContent);
 
   return (
-    <div className={`structured-preview ${isMobile ? 'mobile-mode' : 'desktop-mode'}`}>
-      <style jsx>{`
-        .structured-preview {
-          max-width: 100%;
-          line-height: 1.7;
-          color: #333;
-        }
-
-        .desktop-mode {
-          padding: 0;
-        }
-
-        .mobile-mode {
-          padding: 12px;
-          font-size: 14px;
-        }
-
-        .preview-header {
-          margin-bottom: 16px;
-        }
-
-        .preview-title {
-          margin-bottom: 8px !important;
-          line-height: 1.4 !important;
-          font-weight: 600 !important;
-          color: #1a1a1a;
-        }
-
-        .mobile-mode .preview-title {
-          font-size: 18px !important;
-        }
-
-        .source-info {
-          margin-bottom: 8px;
-          font-size: 13px;
-          color: #666;
-        }
-
-        .preview-meta {
-          margin-bottom: 12px;
-          font-size: 13px;
-        }
-
-        .preview-tags {
-          margin-bottom: 12px;
-        }
-
-        .preview-image {
-          margin: 12px 0;
-          border-radius: 4px;
-          overflow: hidden;
-          background: #f9f9f9;
-        }
-
-        .preview-content {
-          padding: 0;
-          margin-top: 12px;
-        }
-
-        .mobile-mode .preview-content {
-          font-size: 14px;
-        }
-
-        .preview-summary {
-          white-space: pre-wrap;
-          word-break: break-word;
-          line-height: 1.7;
-          color: #444;
-          font-size: 14px;
-        }
-
-        .url-link {
-          margin-top: 10px;
-          font-size: 13px;
-          color: #666;
-        }
-
-        @media (max-width: 768px) {
-          .preview-header {
-            margin-bottom: 12px;
-          }
-
-          .preview-title {
-            font-size: 16px !important;
-          }
-
-          .preview-content {
-            font-size: 13px;
-          }
-        }
-      `}</style>
-
-      {/* 头部信息区 */}
-      <div className="preview-header">
-        {/* 标题 */}
-        <Title level={4} className="preview-title" style={{ fontSize: '16px', marginBottom: '6px' }}>
-          {data.title}
-        </Title>
-
-        {/* 来源和标签 - 放在同一行 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
-          {data.source && (
-            <Text type="secondary" style={{ fontSize: '13px' }}>
-              {data.source_url ? (
-                <a href={data.source_url} target="_blank" rel="noopener noreferrer" style={{ color: '#666' }}>
-                  {data.source}
-                </a>
-              ) : (
-                data.source
-              )}
-            </Text>
-          )}
-          
-          {data.category && (
-            <Tag style={{ margin: 0, fontSize: '12px', padding: '0 6px', background: '#eef2ff', borderColor: '#eef2ff', color: '#4c51bf' }}>
-              {data.category.name}
-            </Tag>
-          )}
-
-          {data.tags && data.tags.length > 0 && (
-            <>
-              {data.tags.slice(0, 3).map((tag) => (
-                <Tag key={tag.id} style={{ margin: 0, fontSize: '12px', padding: '0 6px' }}>
-                  {tag.name}
-                </Tag>
-              ))}
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* 主图 */}
-      {showImage && imageUrl && (
-        <div className="preview-image">
-          <Image
-            src={imageUrl}
-            alt={data.title}
-            style={{ width: '100%', maxHeight: '400px', objectFit: 'cover' }}
-            placeholder={
-              <div style={{ width: '100%', height: '200px', background: '#f0f0f0' }} />
-            }
-            fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
-          />
-        </div>
-      )}
-
-      {/* 内容摘要 */}
-      {summary && (
-        <div className="preview-content">
-          <div className="preview-summary">
-            {summary}
+    <Card className={cn('overflow-hidden', mode === 'mobile' && 'border-muted') }>
+      <CardContent className={cn('space-y-4 p-6', mode === 'mobile' && 'p-4 text-sm')}>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <h2 className={cn('text-xl font-semibold', mode === 'mobile' && 'text-lg')}>{data.title}</h2>
+            {data.featured && <Badge>精选</Badge>}
+            {data.content_type && (
+              <Badge variant="outline">{data.content_type.name}</Badge>
+            )}
           </div>
-
-          {/* 原文链接 */}
-          {data.url && (
-            <div className="url-link">
-              <a href={data.url} target="_blank" rel="noopener noreferrer" style={{ color: '#1890ff', fontSize: '13px' }}>
-                查看原文 →
-              </a>
+          {summary && <p className="text-muted-foreground">{summary}</p>}
+          {showMeta && (
+            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+              {data.user && (
+                <span className="inline-flex items-center gap-1">
+                  <User className="h-4 w-4" />
+                  {data.user.display_name || data.user.username}
+                </span>
+              )}
+              {data.created_at && (
+                <span className="inline-flex items-center gap-1">
+                  <CalendarDays className="h-4 w-4" />
+                  {dayjs(data.created_at).format('YYYY-MM-DD HH:mm')}
+                </span>
+              )}
+              {data.source && (
+                <span className="inline-flex items-center gap-1">
+                  <Link2 className="h-4 w-4" />
+                  {data.source}
+                </span>
+              )}
+            </div>
+          )}
+          {(data.category || (data.tags && data.tags.length > 0)) && (
+            <div className="flex flex-wrap gap-2">
+              {data.category && <Badge>{data.category.name}</Badge>}
+              {data.tags?.map((tag) => (
+                <Badge key={tag.id} variant="outline">
+                  {tag.name}
+                </Badge>
+              ))}
             </div>
           )}
         </div>
-      )}
 
-      {/* 如果没有摘要但有原文链接 */}
-      {!summary && data.url && (
-        <div style={{ marginTop: 12 }}>
-          <a href={data.url} target="_blank" rel="noopener noreferrer" style={{ color: '#1890ff', fontSize: '13px' }}>
-            查看原文 →
-          </a>
-        </div>
-      )}
-    </div>
+        {showImage && displayImage && (
+          <div className="overflow-hidden rounded-md border">
+            <img
+              src={displayImage}
+              alt={data.title}
+              className="h-48 w-full object-cover"
+            />
+          </div>
+        )}
+
+        {structuredContent?.sections && structuredContent.sections.length > 0 && (
+          <div className="space-y-3 text-sm">
+            {structuredContent.sections.map((section, index) => (
+              <div key={index} className="rounded-md border bg-muted/40 p-3">
+                <div className="text-xs font-semibold uppercase text-muted-foreground">
+                  {section.type}
+                </div>
+                {section.title && (
+                  <div className="mt-1 font-medium">{section.title}</div>
+                )}
+                {section.content && (
+                  <p className="mt-1 text-sm text-muted-foreground">{section.content}</p>
+                )}
+                {section.links && section.links.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {section.links.map((link, i) => (
+                      <a
+                        key={i}
+                        href={link.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-1 text-sm text-primary underline"
+                      >
+                        <Link2 className="h-3 w-3" />
+                        {link.title || link.url}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

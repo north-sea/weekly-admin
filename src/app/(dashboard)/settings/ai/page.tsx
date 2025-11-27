@@ -45,6 +45,10 @@ export default function AiSettingsPage() {
   );
   const [password, setPassword] = useState('');
   const [testing, setTesting] = useState(false);
+  const [availability, setAvailability] = useState<{
+    status: 'idle' | 'success' | 'error';
+    message?: string;
+  }>({ status: 'idle' });
 
   const hasStored = useMemo(() => status !== 'empty' && Boolean(meta), [status, meta]);
   const isUnlocked = status === 'unlocked';
@@ -150,6 +154,7 @@ export default function AiSettingsPage() {
     }
 
     setTesting(true);
+    setAvailability({ status: 'idle' });
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
     try {
@@ -166,8 +171,13 @@ export default function AiSettingsPage() {
           apiKey: keyToUse,
         },
       });
+      setAvailability({ status: 'success', message: '成功发起测试请求，AI 服务可用' });
       toast({ title: '连接正常', description: '成功发起测试请求' });
     } catch (err: any) {
+      setAvailability({
+        status: 'error',
+        message: err.message || '无法调用模型，请检查配置或浏览器 CORS',
+      });
       toast({
         title: '测试失败',
         description: err.message || '无法调用模型，请检查配置或浏览器 CORS',
@@ -321,13 +331,22 @@ export default function AiSettingsPage() {
             </Button>
             <Button variant="outline" onClick={handleTest} disabled={testing || loading}>
               <Wand2 className="mr-2 h-4 w-4" />
-              {testing ? '测试中...' : '测试连接'}
+              {testing ? '测试中...' : '一键检测可用性'}
             </Button>
             <Button variant="ghost" onClick={handleClear}>
               <Trash2 className="mr-2 h-4 w-4" />
               清除配置
             </Button>
           </div>
+
+          {availability.status !== 'idle' && (
+            <Alert variant={availability.status === 'success' ? 'default' : 'destructive'}>
+              <AlertTitle>可用性检测{availability.status === 'success' ? '通过' : '失败'}</AlertTitle>
+              <AlertDescription>
+                {availability.message || '请检查配置后重试'}
+              </AlertDescription>
+            </Alert>
+          )}
 
           <Alert className="bg-muted/60">
             <KeyRound className="h-4 w-4" />
