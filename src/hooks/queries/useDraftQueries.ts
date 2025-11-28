@@ -1,10 +1,21 @@
+'use client';
+
 /**
  * 草稿相关的 React Query Hooks
  * 用于管理草稿数据的查询和 mutations
  */
 
-import { useMutation, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api-client';
+import { UseQueryOptions } from '@tanstack/react-query';
+import {
+  useDelete,
+  useGet,
+  usePaginatedQuery,
+  usePatch,
+  usePost,
+  useInvalidateQueries,
+  queryKeys,
+  type PaginatedResponse,
+} from '@/hooks/useApi';
 
 // ============================================================================
 // 类型定义
@@ -53,15 +64,7 @@ export interface DraftListParams {
   stage?: 'inbox' | 'editor' | 'all';
 }
 
-export interface DraftListResponse {
-  data: Draft[];
-  pagination: {
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-  };
-}
+export type DraftListResponse = PaginatedResponse<Draft>;
 
 export interface SyncStats {
   total: number;
@@ -100,75 +103,21 @@ export interface BatchUpdateParams {
 }
 
 // ============================================================================
-// Query Keys
+// 辅助方法
 // ============================================================================
 
-export const draftKeys = {
-  all: ['drafts'] as const,
-  lists: () => [...draftKeys.all, 'list'] as const,
-  list: (params: DraftListParams) => [...draftKeys.lists(), params] as const,
-  details: () => [...draftKeys.all, 'detail'] as const,
-  detail: (id: string) => [...draftKeys.details(), id] as const,
-};
-
-const draftStatsKey = [...draftKeys.all, 'stats'] as const;
-
-// ============================================================================
-// API 函数
-// ============================================================================
-
-async function fetchDraftList(params: DraftListParams): Promise<DraftListResponse> {
-  const query = new URLSearchParams();
-  
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null) {
-      query.set(key, value.toString());
-    }
-  });
-
-  return apiClient.get<DraftListResponse>(`/api/drafts?${query.toString()}`);
-}
-
-async function fetchDraftDetail(id: string): Promise<Draft> {
-  return apiClient.get<Draft>(`/api/drafts/${id}`);
-}
-
-async function syncDrafts(): Promise<SyncStats> {
-  return apiClient.post<SyncStats>('/api/drafts/sync');
-}
-
-async function updateDraft(id: string, data: UpdateDraftParams): Promise<Draft> {
-  return apiClient.patch<Draft>(`/api/drafts/${id}`, data);
-}
-
-async function deleteDraft(id: string): Promise<void> {
-  return apiClient.delete<void>(`/api/drafts/${id}`);
-}
-
-async function convertDraft(id: string, data: ConvertDraftParams): Promise<{ id: string }> {
-  return apiClient.post<{ id: string }>(`/api/drafts/${id}/convert`, data);
-}
-
-async function batchUpdateDrafts(data: BatchUpdateParams): Promise<{ count: number }> {
-  return apiClient.post<{ count: number }>('/api/drafts/batch', data);
-}
-
-async function syncSingleDraft(id: string, addToList?: string): Promise<{ success: boolean; message: string }> {
-  return apiClient.post(`/api/drafts/${id}/sync`, { addToList });
-}
-
-async function syncBatchDrafts(draftIds: string[], addToList?: string): Promise<{
-  total: number;
-  success: number;
-  failed: number;
-  updated: number;
-  unchanged: number;
-}> {
-  return apiClient.post('/api/drafts/sync-batch', { draftIds, addToList });
-}
-
-async function fetchDraftStats(): Promise<DraftStatsResponse> {
-  return apiClient.get<DraftStatsResponse>('/api/drafts/stats');
+function buildDraftListQuery(params: DraftListParams = {}) {
+  return {
+    page: params.page,
+    pageSize: params.pageSize,
+    status: params.status,
+    priority: params.priority,
+    keyword: params.keyword,
+    show_duplicates: params.showDuplicates,
+    sortBy: params.sortBy,
+    sortOrder: params.sortOrder,
+    stage: params.stage,
+  } satisfies Record<string, unknown>;
 }
 
 // ============================================================================
@@ -182,12 +131,17 @@ export function useDraftList(
   params: DraftListParams = {},
   options?: Omit<UseQueryOptions<DraftListResponse>, 'queryKey' | 'queryFn'>
 ) {
-  return useQuery({
-    queryKey: draftKeys.list(params),
-    queryFn: () => fetchDraftList(params),
-    staleTime: 30000, // 30秒
-    ...options,
-  });
+  const queryParams = buildDraftListQuery(params);
+
+  return usePaginatedQuery<Draft>(
+    '/api/drafts',
+    queryParams,
+    {
+      queryKey: queryKeys.drafts.list(queryParams),
+      staleTime: 30 * 1000, // 30秒
+      ...options,
+    }
+  );
 }
 
 /**
@@ -197,10 +151,10 @@ export function useDraftDetail(
   id: string,
   options?: Omit<UseQueryOptions<Draft>, 'queryKey' | 'queryFn'>
 ) {
-  return useQuery({
-    queryKey: draftKeys.detail(id),
-    queryFn: () => fetchDraftDetail(id),
+  return useGet<Draft>(`/api/drafts/${id}`, {
+    queryKey: queryKeys.drafts.detail(id),
     enabled: !!id,
+    staleTime: 60 * 1000,
     ...options,
   });
 }
@@ -209,14 +163,12 @@ export function useDraftDetail(
  * 同步草稿
  */
 export function useSyncDrafts() {
-  const queryClient = useQueryClient();
+  const invalidate = useInvalidateQueries();
 
-  return useMutation({
-    mutationFn: syncDrafts,
+  return usePost<SyncStats, void>('/api/drafts/sync', {
+    mutationKey: [...queryKeys.drafts.all, 'sync'],
     onSuccess: () => {
-      // 刷新所有草稿列表
-      queryClient.invalidateQueries({ queryKey: draftKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: draftStatsKey });
+      invalidate.invalidateDrafts();
     },
   });
 }
@@ -227,10 +179,9 @@ export function useSyncDrafts() {
 export function useDraftStats(
   options?: Omit<UseQueryOptions<DraftStatsResponse>, 'queryKey' | 'queryFn'>
 ) {
-  return useQuery({
-    queryKey: [...draftKeys.all, 'stats'],
-    queryFn: fetchDraftStats,
-    staleTime: 30000,
+  return useGet<DraftStatsResponse>('/api/drafts/stats', {
+    queryKey: queryKeys.drafts.stats(),
+    staleTime: 30 * 1000,
     ...options,
   });
 }
@@ -239,109 +190,111 @@ export function useDraftStats(
  * 更新草稿
  */
 export function useUpdateDraft() {
-  const queryClient = useQueryClient();
+  const invalidate = useInvalidateQueries();
 
-  return useMutation({
-    mutationFn: ({ id, ...data }: UpdateDraftParams & { id: string }) =>
-      updateDraft(id, data),
-    onSuccess: (data, variables) => {
-      // 刷新详情
-      queryClient.invalidateQueries({ queryKey: draftKeys.detail(variables.id) });
-      // 刷新列表
-      queryClient.invalidateQueries({ queryKey: draftKeys.lists() });
-      // 刷新统计
-      queryClient.invalidateQueries({ queryKey: draftStatsKey });
-    },
-  });
+  return usePatch<Draft, UpdateDraftParams & { id: string }>(
+    ({ id }) => `/api/drafts/${id}`,
+    {
+      mutationKey: [...queryKeys.drafts.all, 'update'],
+      onSuccess: (data, variables) => {
+        invalidate.setQueryData(queryKeys.drafts.detail(variables.id), data);
+        invalidate.invalidateDrafts(variables.id);
+      },
+    }
+  );
 }
 
 /**
  * 删除草稿
  */
 export function useDeleteDraft() {
-  const queryClient = useQueryClient();
+  const invalidate = useInvalidateQueries();
 
-  return useMutation({
-    mutationFn: deleteDraft,
-    onSuccess: () => {
-      // 刷新列表
-      queryClient.invalidateQueries({ queryKey: draftKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: draftStatsKey });
-    },
-  });
+  return useDelete<void, { id: string }>(
+    ({ id }) => `/api/drafts/${id}`,
+    {
+      mutationKey: [...queryKeys.drafts.all, 'delete'],
+      onSuccess: (_data, variables) => {
+        invalidate.remove(queryKeys.drafts.detail(variables.id));
+        invalidate.invalidateDrafts();
+      },
+    }
+  );
 }
 
 /**
  * 转换草稿为内容
  */
 export function useConvertDraft() {
-  const queryClient = useQueryClient();
+  const invalidate = useInvalidateQueries();
 
-  return useMutation({
-    mutationFn: ({ id, ...data }: ConvertDraftParams & { id: string }) =>
-      convertDraft(id, data),
-    onSuccess: (data, variables) => {
-      // 刷新草稿详情
-      queryClient.invalidateQueries({ queryKey: draftKeys.detail(variables.id) });
-      // 刷新列表
-      queryClient.invalidateQueries({ queryKey: draftKeys.lists() });
-      // 刷新内容列表（如果需要）
-      queryClient.invalidateQueries({ queryKey: ['content'] });
-      // 刷新统计
-      queryClient.invalidateQueries({ queryKey: draftStatsKey });
-    },
-  });
+  return usePost<{ id: string }, ConvertDraftParams & { id: string }>(
+    ({ id }) => `/api/drafts/${id}/convert`,
+    {
+      mutationKey: [...queryKeys.drafts.all, 'convert'],
+      onSuccess: (_data, variables) => {
+        invalidate.invalidateDrafts(variables.id);
+        invalidate.invalidateContent();
+      },
+    }
+  );
 }
 
 /**
  * 批量更新草稿
  */
 export function useBatchUpdateDrafts() {
-  const queryClient = useQueryClient();
+  const invalidate = useInvalidateQueries();
 
-  return useMutation({
-    mutationFn: batchUpdateDrafts,
-    onSuccess: () => {
-      // 刷新所有列表
-      queryClient.invalidateQueries({ queryKey: draftKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: draftStatsKey });
-    },
-  });
+  return usePost<{ count: number }, BatchUpdateParams>(
+    '/api/drafts/batch',
+    {
+      mutationKey: [...queryKeys.drafts.all, 'batch-update'],
+      onSuccess: () => {
+        invalidate.invalidateDrafts();
+      },
+    }
+  );
 }
 
 /**
  * 单独同步草稿
  */
 export function useSyncSingleDraft() {
-  const queryClient = useQueryClient();
+  const invalidate = useInvalidateQueries();
 
-  return useMutation({
-    mutationFn: ({ id, addToList }: { id: string; addToList?: string }) => syncSingleDraft(id, addToList),
-    onSuccess: (data, variables) => {
-      // 刷新草稿详情
-      queryClient.invalidateQueries({ queryKey: draftKeys.detail(variables.id) });
-      // 刷新列表
-      queryClient.invalidateQueries({ queryKey: draftKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: draftStatsKey });
-    },
-  });
+  return usePost<{ success: boolean; message: string }, { id: string; addToList?: string }>(
+    ({ id }) => `/api/drafts/${id}/sync`,
+    {
+      mutationKey: [...queryKeys.drafts.all, 'sync-single'],
+      onSuccess: (_data, variables) => {
+        invalidate.invalidateDrafts(variables.id);
+      },
+    }
+  );
 }
 
 /**
  * 批量同步草稿
  */
 export function useSyncBatchDrafts() {
-  const queryClient = useQueryClient();
+  const invalidate = useInvalidateQueries();
 
-  return useMutation({
-    mutationFn: ({ draftIds, addToList }: { draftIds: string[]; addToList?: string }) => 
-      syncBatchDrafts(draftIds, addToList),
-    onSuccess: () => {
-      // 刷新列表
-      queryClient.invalidateQueries({ queryKey: draftKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: draftStatsKey });
-    },
-  });
+  return usePost<{
+    total: number;
+    success: number;
+    failed: number;
+    updated: number;
+    unchanged: number;
+  }, { draftIds: string[]; addToList?: string }>(
+    '/api/drafts/sync-batch',
+    {
+      mutationKey: [...queryKeys.drafts.all, 'sync-batch'],
+      onSuccess: () => {
+        invalidate.invalidateDrafts();
+      },
+    }
+  );
 }
 
 // 导出便捷方法

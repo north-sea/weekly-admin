@@ -4,6 +4,10 @@
 
 // API响应格式类型
 export * from './api';
+// 领域模型类型
+export * from './content';
+export * from './category';
+export * from './tag';
 
 // 重新导出常用类型以便快速访问
 export type {

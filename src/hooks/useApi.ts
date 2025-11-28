@@ -74,17 +74,6 @@ export const queryKeys = {
     advanced: (timeRange?: number) => [...queryKeys.analytics.all, 'advanced', timeRange] as const,
     export: () => [...queryKeys.analytics.all, 'export'] as const,
   },
-  // 周刊相关
-  weekly: {
-    all: ['weekly'] as const,
-    lists: () => [...queryKeys.weekly.all, 'list'] as const,
-    list: (params?: Record<string, unknown>) => [...queryKeys.weekly.lists(), params] as const,
-    details: () => [...queryKeys.weekly.all, 'detail'] as const,
-    detail: (id: string | number) => [...queryKeys.weekly.details(), id] as const,
-    contents: (id: string | number) => [...queryKeys.weekly.detail(id), 'contents'] as const,
-    availableContents: () => [...queryKeys.weekly.all, 'available-contents'] as const,
-    stats: (id: string | number) => [...queryKeys.weekly.detail(id), 'stats'] as const,
-  },
   // 操作日志相关
   operationLogs: {
     all: ['operation-logs'] as const,
@@ -104,6 +93,15 @@ export const queryKeys = {
   user: {
     all: ['user'] as const,
     profile: () => [...queryKeys.user.all, 'profile'] as const,
+  },
+  // 草稿相关
+  drafts: {
+    all: ['drafts'] as const,
+    lists: () => [...queryKeys.drafts.all, 'list'] as const,
+    list: (params?: Record<string, unknown>) => [...queryKeys.drafts.lists(), params] as const,
+    details: () => [...queryKeys.drafts.all, 'detail'] as const,
+    detail: (id: string | number) => [...queryKeys.drafts.details(), id] as const,
+    stats: () => [...queryKeys.drafts.all, 'stats'] as const,
   },
 } as const;
 
@@ -169,6 +167,24 @@ export function usePut<TData = unknown, TVariables = unknown, TError = Error>(
     mutationFn: (variables: TVariables) => {
       const resolvedUrl = typeof url === 'function' ? url(variables) : url;
       return apiClient.put<TData>(resolvedUrl, variables, apiOptions);
+    },
+    ...mutationOptions,
+  });
+}
+
+// PATCH 突变钩子
+export function usePatch<TData = unknown, TVariables = unknown, TError = Error>(
+  url: string | ((variables: TVariables) => string),
+  options?: UseMutationOptions<TData, TError, TVariables> & {
+    apiOptions?: ApiOptions;
+  }
+) {
+  const { apiOptions, ...mutationOptions } = options || {};
+
+  return useMutation<TData, TError, TVariables>({
+    mutationFn: (variables: TVariables) => {
+      const resolvedUrl = typeof url === 'function' ? url(variables) : url;
+      return apiClient.patch<TData>(resolvedUrl, variables, apiOptions);
     },
     ...mutationOptions,
   });
@@ -455,27 +471,17 @@ export function useInvalidateQueries() {
     },
     
     // 无效化分析相关查询
-    invalidateAnalytics: () => 
+    invalidateAnalytics: () =>
       queryClient.invalidateQueries({ queryKey: queryKeys.analytics.all }),
-    
-    // 无效化周刊相关查询
-    invalidateWeekly: (id?: string | number) => {
-      if (id) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.weekly.detail(id) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.weekly.contents(id) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.weekly.stats(id) });
-      }
-      queryClient.invalidateQueries({ queryKey: queryKeys.weekly.all });
-    },
-    
+
     // 无效化搜索相关查询
-    invalidateSearch: () => 
+    invalidateSearch: () =>
       queryClient.invalidateQueries({ queryKey: queryKeys.search.all }),
     
     // 移除查询
-    remove: (queryKey: readonly unknown[]) => 
+    remove: (queryKey: readonly unknown[]) =>
       queryClient.removeQueries({ queryKey }),
-    
+
     // 设置查询数据
     setQueryData: <T>(queryKey: readonly unknown[], data: T) => 
       queryClient.setQueryData(queryKey, data),
@@ -483,6 +489,15 @@ export function useInvalidateQueries() {
     // 获取查询数据
     getQueryData: <T>(queryKey: readonly unknown[]): T | undefined =>
       queryClient.getQueryData<T>(queryKey),
+
+    // 无效化草稿相关查询
+    invalidateDrafts: (id?: string | number) => {
+      if (id) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.drafts.detail(id) });
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.drafts.lists() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.drafts.stats() });
+    },
   };
 }
 

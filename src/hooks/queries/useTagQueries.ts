@@ -11,7 +11,7 @@ import {
   queryKeys,
   PaginationParams
 } from '@/hooks/useApi';
-import { TagWithStats } from '@/lib/services/tag-api';
+import { TagWithStats } from '@/types/tag';
 
 export interface TagInput {
   name: string;
