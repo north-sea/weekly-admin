@@ -11,7 +11,7 @@ import {
   queryKeys,
   PaginationParams
 } from '@/hooks/useApi';
-import { CategoryWithStats } from '@/lib/services/category-api';
+import { CategoryWithStats } from '@/types/category';
 import { CategoryMerge } from '@/lib/validations/category';
 
 export interface CategoryInput {

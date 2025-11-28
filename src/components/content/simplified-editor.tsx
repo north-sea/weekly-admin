@@ -30,7 +30,7 @@ import {
   ListOrdered,
   Heading2
 } from 'lucide-react';
-import { ContentWithRelations } from '@/lib/services/content-api';
+import { ContentWithRelations } from '@/types/content';
 import MDEditor from '@uiw/react-md-editor';
 import MarkdownPreview from './MarkdownPreview';
 import StructuredPreview from './StructuredPreview';

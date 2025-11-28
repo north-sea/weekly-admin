@@ -5,7 +5,6 @@ export * from './useContentQueries';
 export * from './useCategoryQueries';
 export * from './useTagQueries';
 export * from './useAnalyticsQueries';
-export * from './useWeeklyQueries';
 export * from './useDraftQueries';
 export * from './useSearchQueries';
 export * from './useOperationLogsQueries';
@@ -19,6 +18,7 @@ export {
   useGet,
   usePost,
   usePut,
+  usePatch,
   useDelete,
   usePaginatedQuery,
   useInfiniteScrollQuery,

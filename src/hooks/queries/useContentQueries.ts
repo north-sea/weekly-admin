@@ -12,7 +12,7 @@ import {
   queryKeys,
   PaginationParams
 } from '@/hooks/useApi';
-import { ContentWithRelations, ContentListResponse } from '@/lib/services/content-api';
+import { ContentWithRelations, ContentListResponse } from '@/types/content';
 import { ContentInput, ContentUpdate, BatchOperation } from '@/lib/validations/content';
 
 // 内容列表查询
