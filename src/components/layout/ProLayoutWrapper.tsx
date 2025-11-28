@@ -26,7 +26,6 @@ const ProLayoutWrapper: React.FC<ProLayoutWrapperProps> = ({ children }) => {
     
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-console.log(pathname,menuConfig);
   return (
     <ProLayout
       title="Weekly内容管理系统"
