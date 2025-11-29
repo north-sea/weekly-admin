@@ -28,7 +28,7 @@ const nextConfig: NextConfig = {
   // Experimental features for Turbopack
   experimental: {
     // Enable modern bundling optimizations for commonly used packages
-    optimizePackageImports: ['antd', '@ant-design/icons', 'lucide-react'],
+    optimizePackageImports: ['lucide-react'],
   },
   
   // Server external packages (moved from experimental in Next.js 15)

@@ -46,6 +46,7 @@ import {
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import dayjs from 'dayjs';
+import HoverImagePreview from '@/components/weekly/HoverImagePreview';
 
 const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: '草稿', variant: 'outline' },
@@ -261,6 +262,7 @@ export default function ContentListPage() {
                       contents.map((content: any) => {
                         const status = statusMap[content.status] || statusMap.draft;
                         const contentType = contentTypeMap[content.content_type?.slug] || contentTypeMap.blog;
+                        const previewImage = content.image_url || content.cover_image || content.screenshot_api;
                         return (
                           <TableRow key={content.id}>
                             <TableCell>
@@ -271,7 +273,11 @@ export default function ContentListPage() {
                             </TableCell>
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
-                                {content.title}
+                                <HoverImagePreview imageUrl={previewImage} title={content.title}>
+                                  <span className="block max-w-[260px] truncate">
+                                    {content.title}
+                                  </span>
+                                </HoverImagePreview>
                                 {content.featured && (
                                   <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
                                 )}

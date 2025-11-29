@@ -13,7 +13,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
-import { Checkbox } from '@/components/ui/checkbox';
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/components/ui/use-toast';
 import { 
   Save, 
@@ -28,7 +29,8 @@ import {
   Image as ImageIcon,
   List,
   ListOrdered,
-  Heading2
+  Heading2,
+  ChevronDown
 } from 'lucide-react';
 import { ContentWithRelations } from '@/types/content';
 import MDEditor from '@uiw/react-md-editor';
@@ -571,16 +573,7 @@ export default function SimplifiedEditor({
                   </div>
 
                   <div className="space-y-2 col-span-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <Label htmlFor="tag_search">标签</Label>
-                      <Input
-                        id="tag_search"
-                        placeholder="搜索标签"
-                        className="max-w-xs"
-                        value={tagSearch}
-                        onChange={(e) => setTagSearch(e.target.value)}
-                      />
-                    </div>
+                    <Label htmlFor="tag_ids">标签</Label>
                     <Controller
                       name="tag_ids"
                       control={control}
@@ -598,7 +591,51 @@ export default function SimplifiedEditor({
                         };
 
                         return (
-                          <div className="space-y-3">
+                          <div className="space-y-2">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="outline" className="w-full justify-between">
+                                  <span className="truncate">
+                                    {selected.length ? `已选 ${selected.length} 个标签` : '选择标签'}
+                                  </span>
+                                  <ChevronDown className="h-4 w-4 opacity-60" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent
+                                className="w-[300px] max-h-[320px] overflow-hidden p-0"
+                                align="start"
+                                sideOffset={6}
+                              >
+                                <ScrollArea className="max-h-[320px]">
+                                  <div className="p-2">
+                                    <Input
+                                      autoFocus
+                                      placeholder="搜索标签"
+                                      value={tagSearch}
+                                      onChange={(e) => setTagSearch(e.target.value)}
+                                    />
+                                  </div>
+                                  <div className="pb-2">
+                                    {filteredTags.length > 0 ? (
+                                      filteredTags.map((tag) => (
+                                        <DropdownMenuCheckboxItem
+                                          key={tag.id}
+                                          checked={selected.includes(tag.id)}
+                                          onCheckedChange={() => toggleTag(tag.id)}
+                                          className="cursor-pointer"
+                                        >
+                                          {tag.name}
+                                        </DropdownMenuCheckboxItem>
+                                      ))
+                                    ) : (
+                                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                                        暂无标签
+                                      </div>
+                                    )}
+                                  </div>
+                                </ScrollArea>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                             {selected.length > 0 && (
                               <div className="flex flex-wrap gap-2">
                                 {selected.map((id) => {
@@ -617,26 +654,6 @@ export default function SimplifiedEditor({
                                 })}
                               </div>
                             )}
-                            <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto rounded border p-2">
-                              {filteredTags.length > 0 ? (
-                                filteredTags.map((tag) => (
-                                  <label
-                                    key={tag.id}
-                                    className="flex items-center gap-2 text-sm cursor-pointer"
-                                  >
-                                    <Checkbox
-                                      checked={selected.includes(tag.id)}
-                                      onCheckedChange={() => toggleTag(tag.id)}
-                                    />
-                                    <span>{tag.name}</span>
-                                  </label>
-                                ))
-                              ) : (
-                                <p className="col-span-2 text-center text-sm text-muted-foreground">
-                                  暂无标签
-                                </p>
-                              )}
-                            </div>
                           </div>
                         );
                       }}

@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Trash2, GripVertical, Link2, Star } from 'lucide-react';
 import { MoveUp, MoveDown } from 'lucide-react';
+import HoverImagePreview from './HoverImagePreview';
 
 interface Content {
   id: number;
@@ -66,11 +67,11 @@ const SelectedContentsList: React.FC<SelectedContentsListProps> = ({
         {contents.map((content, index) => (
           <Card key={content.id} className="relative p-4">
             <div className="absolute left-3 top-3">
-              <Badge variant="secondary" className="text-xs">
-                {index + 1}
-              </Badge>
-            </div>
-            <div className="flex items-start gap-3 pl-8">
+          <Badge variant="secondary" className="text-xs">
+            {index + 1}
+          </Badge>
+        </div>
+        <div className="flex items-start gap-3 pl-8">
               <div className="flex flex-col gap-1">
                 <Button
                   size="icon"
@@ -86,21 +87,23 @@ const SelectedContentsList: React.FC<SelectedContentsListProps> = ({
                   size="icon"
                   variant="ghost"
                   className="h-7 w-7"
-                  onClick={() => moveItem(index, 'down')}
-                  disabled={index === contents.length - 1}
-                  title="下移"
-                >
-                  <MoveDown className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="flex-1 min-w-0 space-y-2">
-                <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-medium truncate">{content.title}</h4>
-                  {content.source && (
-                    <Badge variant="outline" className="flex items-center gap-1 text-xs">
-                      <Link2 className="h-3 w-3" />
-                      {content.source}
-                    </Badge>
+              onClick={() => moveItem(index, 'down')}
+              disabled={index === contents.length - 1}
+              title="下移"
+            >
+              <MoveDown className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex-1 min-w-0 space-y-2">
+            <div className="flex items-center gap-2">
+              <HoverImagePreview imageUrl={content.image_url} title={content.title}>
+                <h4 className="text-sm font-medium truncate">{content.title}</h4>
+              </HoverImagePreview>
+              {content.source && (
+                <Badge variant="outline" className="flex items-center gap-1 text-xs">
+                  <Link2 className="h-3 w-3" />
+                  {content.source}
+                </Badge>
                   )}
                   {content.featured && (
                     <Badge variant="destructive" className="flex items-center gap-1 text-xs">

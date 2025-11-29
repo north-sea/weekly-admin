@@ -1,74 +1,83 @@
-import { MenuDataItem } from '@ant-design/pro-components';
+import type { LucideIcon } from 'lucide-react';
 import {
-  DashboardOutlined,
-  FileTextOutlined,
-  CalendarOutlined,
-  SearchOutlined,
-  BarChartOutlined,
-  AuditOutlined,
-  SettingOutlined,
-  UserOutlined,
-  TagsOutlined,
-  AppstoreOutlined,
-} from '@ant-design/icons';
+  AppWindow,
+  BarChart3,
+  CalendarClock,
+  ClipboardList,
+  FileText,
+  LayoutDashboard,
+  Search,
+  Settings,
+  Tags,
+  Users
+} from 'lucide-react';
 
-export const menuConfig: MenuDataItem[] = [
+export type NavItem = {
+  name: string;
+  path?: string;
+  icon: LucideIcon;
+  children?: NavItem[];
+};
+
+export const menuConfig: NavItem[] = [
   {
     path: '/dashboard',
     name: '仪表板',
-    icon: <DashboardOutlined />,
+    icon: LayoutDashboard,
   },
   {
     path: '/content/drafts',
     name: '草稿管理',
-    icon: <FileTextOutlined />,
+    icon: FileText,
   },
   {
     path: '/content/list',
     name: '内容库',
-    icon: <AppstoreOutlined />,
+    icon: AppWindow,
   },
   {
     path: '/weekly',
     name: '周刊管理',
-    icon: <CalendarOutlined />,
+    icon: CalendarClock,
   },
   {
     path: '/search',
     name: '搜索',
-    icon: <SearchOutlined />,
+    icon: Search,
   },
   {
     path: '/analytics',
     name: '内容洞察',
-    icon: <BarChartOutlined />,
+    icon: BarChart3,
   },
   {
     path: '/operation-logs',
     name: '操作日志',
-    icon: <AuditOutlined />,
+    icon: ClipboardList,
   },
   {
-    // 父级使用占位路径，避免与子项重复
-    path: '/_menu/settings',
     name: '系统设置',
-    icon: <SettingOutlined />,
+    icon: Settings,
     children: [
       {
         path: '/settings/users',
         name: '用户管理',
+        icon: Users,
       },
       {
         path: '/settings/categories',
         name: '分类管理',
+        icon: ClipboardList,
       },
       {
         path: '/settings/tags',
         name: '标签管理',
+        icon: Tags,
       },
       {
         path: '/settings/ai',
         name: 'AI 设置',
+        icon: Settings,
       },
     ],
   },

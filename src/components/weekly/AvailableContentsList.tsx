@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
 import { Plus, Link2 } from 'lucide-react';
 import { EllipsisTooltip } from '@/components/ui/ellipsis-tooltip';
+import HoverImagePreview from './HoverImagePreview';
 
 interface Content {
   id: number;
@@ -59,9 +60,11 @@ const ContentCard: React.FC<{ content: Content; isSelected: boolean; onAddConten
             </Badge>
           )}
         </div>
-        <div className="text-sm font-semibold leading-tight line-clamp-1">
-          {content.title}
-        </div>
+        <HoverImagePreview imageUrl={content.image_url} title={content.title}>
+          <div className="text-sm font-semibold leading-tight line-clamp-1">
+            {content.title}
+          </div>
+        </HoverImagePreview>
         <EllipsisTooltip
           value={content.summary || content.description || '/'}
           line={2}
