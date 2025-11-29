@@ -57,7 +57,7 @@ export function DraftFilters({ value = {}, onChange, className }: DraftFiltersPr
   return (
     <div className={className}>
       {/* 主筛选行 */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex gap-3">
         {/* 搜索框 */}
         <form onSubmit={handleSearchSubmit} className="flex-1">
           <div className="relative">
@@ -77,7 +77,7 @@ export function DraftFilters({ value = {}, onChange, className }: DraftFiltersPr
           value={filters.stage || 'all'}
           onValueChange={(val) => handleChange('stage', val === 'all' ? undefined : val)}
         >
-          <SelectTrigger className="w-full sm:w-[160px]">
+          <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="全部草稿" />
           </SelectTrigger>
           <SelectContent>
@@ -92,7 +92,7 @@ export function DraftFilters({ value = {}, onChange, className }: DraftFiltersPr
           value={filters.status || 'all'}
           onValueChange={(val) => handleChange('status', val === 'all' ? undefined : val)}
         >
-          <SelectTrigger className="w-full sm:w-[140px]">
+          <SelectTrigger className="w-[140px]">
             <SelectValue placeholder="全部状态" />
           </SelectTrigger>
           <SelectContent>
@@ -108,7 +108,7 @@ export function DraftFilters({ value = {}, onChange, className }: DraftFiltersPr
           value={filters.sortBy || 'created_at'}
           onValueChange={(val) => handleChange('sortBy', val)}
         >
-          <SelectTrigger className="w-full sm:w-[140px]">
+          <SelectTrigger className="w-[140px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -125,7 +125,7 @@ export function DraftFilters({ value = {}, onChange, className }: DraftFiltersPr
           value={filters.sortOrder || 'desc'}
           onValueChange={(val) => handleChange('sortOrder', val)}
         >
-          <SelectTrigger className="w-full sm:w-[100px]">
+          <SelectTrigger className="w-[100px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

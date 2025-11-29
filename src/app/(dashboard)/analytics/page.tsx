@@ -34,16 +34,16 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:space-y-6 md:p-8 md:pt-6">
+    <div className="flex-1 space-y-6 p-8 pt-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight md:text-3xl">内容洞察</h2>
-          <p className="text-sm text-muted-foreground md:text-base">
+          <h2 className="text-3xl font-bold tracking-tight">内容洞察</h2>
+          <p className="text-base text-muted-foreground">
             内容发布趋势、来源分布和质量统计
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2">
           <Select
             value={timeRange.toString()}
             onValueChange={(value) => setTimeRange(Number(value))}
@@ -74,7 +74,7 @@ export default function AnalyticsPage() {
       )}
 
       {/* Key Metrics */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-4 gap-4">
         <StatCard
           title="总内容数"
           value={analytics?.overview.totalContents || 0}
@@ -103,7 +103,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Charts - First Row */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-2 gap-4">
         <PublishTrendChart
           data={analytics?.trends.publishTrend || []}
           loading={loading}
@@ -116,7 +116,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Charts - Second Row */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-2 gap-4">
         <SourceDistributionChart
           data={analytics?.sources?.stats || []}
           loading={loading}

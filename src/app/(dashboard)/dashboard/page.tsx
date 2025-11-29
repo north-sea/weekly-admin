@@ -45,12 +45,12 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:space-y-6 md:p-8 md:pt-6">
+    <div className="flex-1 space-y-6 p-8 pt-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight md:text-3xl">数据仪表板</h2>
-          <p className="text-sm text-muted-foreground md:text-base">
+          <h2 className="text-3xl font-bold tracking-tight">数据仪表板</h2>
+          <p className="text-base text-muted-foreground">
             欢迎回来，{user.displayName || user.username}！
           </p>
         </div>

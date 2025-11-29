@@ -52,7 +52,7 @@ export function QuickActions() {
         <CardDescription>常用功能快捷入口</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {actions.map((action) => {
             const Icon = action.icon;
             return (

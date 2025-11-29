@@ -4,7 +4,7 @@
 
 ## Phase 1: 基础架构 (Infrastructure)
 
-* [ ] **1.1 初始化**:
+* [x] **1.1 初始化**:
     * 运行: `npx shadcn@latest init`
     * **配置选择**:
         * Style: **Default**
@@ -39,11 +39,11 @@
     * Grid: 强制 `grid-cols-4` (不再需要 `grid-cols-1` 适配)。
 
 ## Phase 3: 内容管理系统
-* [ ] **3.1 草稿箱 (/content/drafts)**:
+* [x] **3.1 草稿箱 (/content/drafts)**:
     * 表格: 使用 Shadcn `Table` 组件。
     * **交互**: 鼠标悬停行时，背景变色 (`hover:bg-slate-50`)。
     * 弹窗: `DraftPreviewDialog` 固定最大宽度，移除全屏适配代码。
-* [ ] **3.2 编辑页 (/content/[id])**:
+* [x] **3.2 编辑页 (/content/[id])**:
     * 布局: Flex Row。
         * Left: `w-[300px]` border-r.
         * Center: `flex-1`.
@@ -54,15 +54,15 @@
 * [x] **4.1 周刊编辑器**:
     * 三列布局: 使用 `grid grid-cols-12 gap-6`。
     * 每一列都包裹在 `<div className="rounded border bg-card text-card-foreground shadow-sm h-full">` 中。
-* [ ] **4.2 拖拽排序**:
+* [x] **4.2 拖拽排序**:
     * 确保拖拽时的 item 样式有明显的 `shadow-md` 浮起效果，以区分静止状态的 `shadow-sm`。
 
 ## Phase 5: 数据与设置
-* [ ] **5.1 搜索页**: 结果卡片统一使用 `rounded shadow-sm`。
-* [ ] **5.2 设置页**:
+* [x] **5.1 搜索页**: 结果卡片统一使用 `rounded shadow-sm`。
+* [x] **5.2 设置页**:
     * 侧边栏: 简单的垂直导航列表。
     * 右侧内容: 包裹在 Card 中。
 
 ## Phase 6: 清理与优化
-* [ ] **6.1 代码清理**: 搜索并删除代码中所有 `lg:hidden`, `md:block` 等响应式前缀，简化 class 逻辑。
-* [ ] **6.2 滚动条美化**: 为 `ScrollArea` 和全局滚动条添加 Slate 风格的细滚动条样式。
+* [x] **6.1 代码清理**: 搜索并删除代码中所有 `lg:hidden`, `md:block` 等响应式前缀，简化 class 逻辑。
+* [x] **6.2 滚动条美化**: 为 `ScrollArea` 和全局滚动条添加 Slate 风格的细滚动条样式。

@@ -224,7 +224,7 @@ export default function AiSettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>提供商</Label>
               <Select value={provider} onValueChange={setProvider}>
@@ -251,7 +251,7 @@ export default function AiSettingsPage() {
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>文本模型</Label>
               <Input
@@ -292,7 +292,7 @@ export default function AiSettingsPage() {
             />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>API Key</Label>
               <Input

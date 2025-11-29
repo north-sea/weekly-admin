@@ -136,12 +136,12 @@ export default function ContentListPage() {
   };
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:space-y-6 md:p-8 md:pt-6">
+    <div className="flex-1 space-y-6 p-8 pt-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight md:text-3xl">内容库</h2>
-          <p className="text-sm text-muted-foreground md:text-base">
+          <h2 className="text-3xl font-bold tracking-tight">内容库</h2>
+          <p className="text-base text-muted-foreground">
             管理 Blog 和 Weekly 内容
           </p>
         </div>
@@ -159,8 +159,8 @@ export default function ContentListPage() {
           <CardTitle>筛选条件</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-4">
-            <div className="relative md:col-span-2">
+          <div className="grid grid-cols-4 gap-4">
+            <div className="relative col-span-2">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="搜索标题或内容..."
