@@ -8,7 +8,6 @@ import ReactCrop, {
   type PixelCrop,
 } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -247,38 +246,39 @@ export default function ScreenshotPasteUploader({
   const currentPreview = source || value || '';
 
   return (
-    <Card className="border-dashed" onPaste={handlePaste}>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-base">{label}</CardTitle>
-            <CardDescription>{helperText}</CardDescription>
-          </div>
-          <Button variant="outline" size="sm" onClick={handleFileInput}>
-            <ClipboardPaste className="h-4 w-4 mr-2" />
-            选择/粘贴
-          </Button>
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                handleFile(file);
-              }
-            }}
-          />
+    <div
+      className="rounded-lg border-2 border-dashed border-slate-200 bg-white p-4 shadow-sm"
+      onPaste={handlePaste}
+    >
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-base font-semibold text-slate-900">{label}</p>
+          <p className="text-sm text-muted-foreground">{helperText}</p>
         </div>
-        {value && !source && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Badge variant="secondary">已填入 URL</Badge>
-            <span className="truncate">{value}</span>
-          </div>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-4">
+        <Button variant="outline" size="sm" onClick={handleFileInput}>
+          <ClipboardPaste className="h-4 w-4 mr-2" />
+          选择/粘贴
+        </Button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              handleFile(file);
+            }
+          }}
+        />
+      </div>
+      {value && !source && (
+        <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+          <Badge variant="secondary">已填入 URL</Badge>
+          <span className="truncate">{value}</span>
+        </div>
+      )}
+      <div className="mt-4 space-y-4">
         {source ? (
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -388,7 +388,7 @@ export default function ScreenshotPasteUploader({
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

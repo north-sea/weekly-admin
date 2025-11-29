@@ -62,17 +62,17 @@ export default function DraftsPageNew() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="space-y-6">
       {/* 页头 */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">草稿管理</h1>
+          <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground">Drafts</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">草稿管理</h1>
           <p className="text-muted-foreground mt-1">管理从 Karakeep 同步的书签草稿</p>
         </div>
         <Button
           onClick={handleSync}
           disabled={syncMutation.isPending}
-          size="lg"
         >
           {syncMutation.isPending ? (
             <>
@@ -89,7 +89,7 @@ export default function DraftsPageNew() {
       </div>
 
       {/* 统计卡片 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>编辑草稿总数</CardDescription>

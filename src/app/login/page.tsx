@@ -109,68 +109,44 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 px-6 py-12">
-      <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-purple-600 to-slate-900" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.18),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(56,189,248,0.16),transparent_30%),radial-gradient(circle_at_50%_90%,rgba(79,70,229,0.2),transparent_35%)]" />
-      <div className="absolute inset-0 opacity-25 mix-blend-soft-light [background-image:linear-gradient(120deg,rgba(255,255,255,0.12)_1px,transparent_1px),linear-gradient(0deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:28px_28px]" />
-
-      <div className="relative z-10 grid w-full max-w-6xl grid-cols-1 items-center gap-8 lg:grid-cols-[1.05fr,_0.95fr]">
-        <div className="rounded border border-white/15 bg-white/5 p-8 text-white shadow-2xl backdrop-blur-md">
-          <div className="flex items-center gap-2 rounded bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
+    <div className="grid min-h-screen grid-cols-2 bg-slate-100">
+      <div className="relative flex flex-col justify-between bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-12 py-14 text-white shadow-inner">
+        <div className="space-y-3">
+          <div className="inline-flex items-center gap-2 rounded-md bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
             <Lock className="h-3.5 w-3.5" />
             Weekly CMS
           </div>
-          <div className="mt-4 space-y-3">
-            <h1 className="text-3xl font-semibold leading-tight md:text-4xl">
-              欢迎回来，开启更高效的内容管理
-            </h1>
-            <p className="text-sm text-white/80">
-              支持多角色协同、草稿同步与周刊发布，保持创作流程顺滑安全。
-            </p>
-          </div>
-          <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="flex items-center gap-3 rounded border border-white/10 bg-white/5 p-4">
-              <div className="rounded bg-white/10 p-2">
-                <LogIn className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="font-medium">快捷登录</p>
-                <p className="text-xs text-white/70">记住状态，减少频繁输入</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 rounded border border-white/10 bg-white/5 p-4">
-              <div className="rounded bg-white/10 p-2">
-                <ShieldCheck className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="font-medium">安全托管</p>
-                <p className="text-xs text-white/70">加密传输与会话有效期控制</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 rounded border border-white/10 bg-white/5 p-4">
-              <div className="rounded bg-white/10 p-2">
-                <UserRound className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="font-medium">角色分工</p>
-                <p className="text-xs text-white/70">管理员 / 编辑独立权限</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 rounded border border-white/10 bg-white/5 p-4">
-              <div className="rounded bg-white/10 p-2">
-                <Loader2 className="h-4 w-4 animate-spin text-white/80" />
-              </div>
-              <div>
-                <p className="font-medium">实时反馈</p>
-                <p className="text-xs text-white/70">操作状态与出错信息可视</p>
-              </div>
-            </div>
-          </div>
+          <h1 className="text-3xl font-semibold leading-tight">欢迎回来</h1>
+          <p className="max-w-xl text-sm text-white/80">
+            桌面端 Slate 风格管理台，支持草稿同步、周刊发布与协同编辑，保持创作流程顺滑可靠。
+          </p>
         </div>
 
-        <Card className="border border-white/20 bg-white/95 text-foreground shadow-2xl backdrop-blur">
+        <div className="grid grid-cols-2 gap-3 pt-8">
+          {[
+            { icon: <LogIn className="h-4 w-4" />, title: '快捷登录', desc: '记住状态，减少频繁输入' },
+            { icon: <ShieldCheck className="h-4 w-4" />, title: '安全托管', desc: '加密传输与会话控制' },
+            { icon: <UserRound className="h-4 w-4" />, title: '角色分工', desc: '管理员 / 编辑独立权限' },
+            { icon: <Loader2 className="h-4 w-4 animate-spin" />, title: '实时反馈', desc: '操作状态与错误即刻提示' },
+          ].map((item) => (
+            <div
+              key={item.title}
+              className="flex items-start gap-3 rounded-md border border-white/10 bg-white/5 p-4 shadow-sm"
+            >
+              <div className="rounded-md bg-white/10 p-2 text-white">{item.icon}</div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{item.title}</p>
+                <p className="text-xs text-white/70">{item.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-center px-12">
+        <Card className="w-full max-w-lg border-slate-200 bg-white text-foreground shadow-lg">
           <CardHeader className="space-y-2 text-center">
-            <CardTitle className="text-2xl font-semibold tracking-tight text-primary">
+            <CardTitle className="text-2xl font-semibold tracking-tight text-slate-900">
               Weekly 内容管理系统
             </CardTitle>
             <CardDescription className="text-sm text-muted-foreground">
@@ -180,7 +156,7 @@ export default function LoginPage() {
           <CardContent className="space-y-6">
             {feedback && (
               <div
-                className={`flex items-center justify-center rounded border px-3 py-2 text-sm ${
+                className={`flex items-center justify-center rounded-md border px-3 py-2 text-sm ${
                   feedback.type === 'success'
                     ? 'border-green-200 bg-green-50 text-green-700'
                     : 'border-destructive/30 bg-destructive/10 text-destructive'
@@ -247,36 +223,35 @@ export default function LoginPage() {
                   control={control}
                   name="remember"
                   render={({ field }) => (
-                    <label className="flex items-center space-x-2 text-sm text-muted-foreground">
+                    <label className="flex items-center space-x-2 text-sm">
                       <Checkbox
                         checked={field.value}
-                        onCheckedChange={(checked) => field.onChange(checked === true)}
+                        onCheckedChange={field.onChange}
                         id="remember"
                       />
                       <span>记住我</span>
                     </label>
                   )}
                 />
+                <button type="button" className="text-sm text-primary hover:underline">
+                  忘记密码？
+                </button>
               </div>
 
-              <Button className="w-full font-semibold shadow-lg transition-all hover:-translate-y-[1px]" type="submit" disabled={loading}>
+              <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? (
-                  <span className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     登录中...
-                  </span>
+                  </>
                 ) : (
-                  <span className="flex items-center justify-center gap-2">
-                    <LogIn className="h-4 w-4" />
+                  <>
+                    <LogIn className="mr-2 h-4 w-4" />
                     登录
-                  </span>
+                  </>
                 )}
               </Button>
             </form>
-
-            <p className="text-center text-xs text-muted-foreground">
-              测试账号：admin / admin123 或 editor / editor123
-            </p>
           </CardContent>
         </Card>
       </div>

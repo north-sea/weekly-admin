@@ -190,11 +190,12 @@ export default function AiSettingsPage() {
   };
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:space-y-6 md:p-8 md:pt-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight md:text-3xl">AI 设置</h2>
-          <p className="text-sm text-muted-foreground md:text-base">
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">AI</p>
+          <h2 className="text-3xl font-semibold tracking-tight text-slate-900">AI 设置</h2>
+          <p className="text-sm text-muted-foreground">
             配置文本/图片模型、Base URL 与 API Key，保存在本地浏览器，不经后端
           </p>
         </div>

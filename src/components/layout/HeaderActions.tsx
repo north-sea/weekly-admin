@@ -84,19 +84,19 @@ const HeaderActions: React.FC = () => {
 
   return (
     <div className="flex items-center gap-2">
-      <Badge variant="secondary" className="hidden sm:inline-flex items-center gap-1">
+      <Badge variant="secondary" className="inline-flex items-center gap-1">
         <Sparkles className="h-3.5 w-3.5 text-primary" />
         <span className="text-xs font-medium">体验优化中</span>
       </Badge>
 
-      <div className="hidden md:flex items-center gap-2">
+      <div className="flex items-center gap-2">
         {quickLinks.map((item) => (
           <Button
             asChild
             key={item.href}
             size="sm"
             variant="ghost"
-            className="rounded-full px-3 text-sm text-muted-foreground hover:text-foreground"
+            className="rounded-md px-3 text-sm text-muted-foreground hover:text-foreground"
             aria-label={`跳转到${item.label}`}
           >
             <Link href={item.href} prefetch>
@@ -107,12 +107,7 @@ const HeaderActions: React.FC = () => {
         ))}
       </div>
 
-      <Button
-        size="icon"
-        variant="ghost"
-        className="hidden sm:inline-flex"
-        aria-label="查看消息提醒"
-      >
+      <Button size="icon" variant="ghost" className="h-9 w-9" aria-label="查看消息提醒">
         <span className="relative inline-flex">
           <Bell className="h-4 w-4" />
           <span className="absolute -right-0.5 -top-0.5 inline-flex h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-background" />
@@ -123,14 +118,14 @@ const HeaderActions: React.FC = () => {
         <DropdownMenuTrigger asChild>
           <Button
             variant="outline"
-            className="flex items-center gap-2 rounded-full border border-border/80 bg-background/60 px-2 py-1 shadow-sm"
+            className="flex items-center gap-2 rounded-md border border-border/80 bg-background/60 px-2 py-1 shadow-sm"
           >
             <Avatar className="h-9 w-9">
               <AvatarFallback className="text-sm font-semibold text-foreground">
                 {initials}
               </AvatarFallback>
             </Avatar>
-            <div className="hidden sm:flex flex-col items-start text-left leading-tight">
+            <div className="flex flex-col items-start text-left leading-tight">
               <span className="text-sm font-semibold text-foreground line-clamp-1">
                 {user?.displayName || user?.username || '访客'}
               </span>

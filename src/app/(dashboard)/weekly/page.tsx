@@ -156,38 +156,38 @@ export default function WeeklyManagePage() {
   };
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:space-y-6 md:p-8 md:pt-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div className="flex-1 space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight md:text-3xl">周刊管理</h2>
-          <p className="text-sm text-muted-foreground md:text-base">
-            管理周刊期号和内容
-          </p>
+          <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Weekly Issues</p>
+          <h2 className="text-3xl font-semibold text-slate-900">周刊管理</h2>
+          <p className="text-sm text-muted-foreground">管理周刊期号和内容</p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => router.push('/weekly/editor/new')}>
-            <Plus className="h-4 w-4 mr-2" />
-            创建周刊
-          </Button>
-        </div>
+        <Button size="lg" onClick={() => router.push('/weekly/editor/new')}>
+          <Plus className="mr-2 h-4 w-4" />
+          创建周刊
+        </Button>
       </div>
 
-      {/* Filters */}
       <Card>
-        <CardHeader>
-          <CardTitle>筛选条件</CardTitle>
+        <CardHeader className="space-y-2">
+          <CardTitle className="text-lg">筛选条件</CardTitle>
+          <CardDescription className="text-sm text-muted-foreground">
+            搜索或按状态筛选期号以快速定位
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="relative md:col-span-2">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="搜索标题..."
-                className={`pl-10 ${focusRingClass}`}
-                value={filters.search}
-                onChange={(e) => handleSearch(e.target.value)}
-              />
+          <div className="grid grid-cols-3 gap-4">
+            <div className="col-span-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="搜索标题..."
+                  className={`pl-10 ${focusRingClass}`}
+                  value={filters.search}
+                  onChange={(e) => handleSearch(e.target.value)}
+                />
+              </div>
             </div>
             <Select
               value={filters.status || 'all'}
@@ -207,27 +207,34 @@ export default function WeeklyManagePage() {
         </CardContent>
       </Card>
 
-      {/* Weekly Issues Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>周刊列表</CardTitle>
-          <CardDescription>
-            共 {pagination.total} 条记录，第 {pagination.page} / {pagination.totalPages} 页
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-lg">周刊列表</CardTitle>
+            <CardDescription>
+              共 {pagination.total} 条记录，第 {pagination.page} / {pagination.totalPages} 页
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm">
+              <Calendar className="mr-2 h-4 w-4" />
+              导出
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           {loading ? (
-            <div className="space-y-3">
-              {[...Array(10)].map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
+            <div className="space-y-2">
+              {[...Array(8)].map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full rounded-md" />
               ))}
             </div>
           ) : (
             <>
-              <div className="rounded border">
+              <div className="rounded-lg border border-slate-200">
                 <Table>
-                  <TableHeader>
-                    <TableRow>
+                  <TableHeader className="bg-slate-50">
+                    <TableRow className="border-slate-200">
                       <TableHead className="w-24">期号</TableHead>
                       <TableHead>标题</TableHead>
                       <TableHead>状态</TableHead>
@@ -240,16 +247,16 @@ export default function WeeklyManagePage() {
                   <TableBody>
                     {issues.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center text-muted-foreground">
-                          暂无周刊
+                        <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                          暂无周刊，请先创建
                         </TableCell>
                       </TableRow>
                     ) : (
                       issues.map((issue) => {
                         const status = statusMap[issue.status] || statusMap.draft;
                         return (
-                          <TableRow key={issue.id}>
-                            <TableCell className="font-medium">
+                          <TableRow key={issue.id} className="border-slate-100 hover:bg-slate-50">
+                            <TableCell className="font-medium text-slate-900">
                               第 {issue.issue_number} 期
                             </TableCell>
                             <TableCell className="font-medium">
@@ -262,8 +269,8 @@ export default function WeeklyManagePage() {
                               {issue.total_items || 0} 篇
                             </TableCell>
                             <TableCell>
-                              <div className="flex items-center gap-1 text-sm">
-                                <Calendar className="h-3 w-3" />
+                              <div className="flex items-center gap-1 text-sm text-slate-700">
+                                <Calendar className="h-3 w-3 text-slate-400" />
                                 <span>{formatDate(issue.start_date)}</span>
                                 <span className="text-muted-foreground">至</span>
                                 <span>{formatDate(issue.end_date)}</span>
@@ -277,28 +284,28 @@ export default function WeeklyManagePage() {
                             <TableCell className="text-right">
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
+                                  <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-900">
                                     <MoreVertical className="h-4 w-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
+                                <DropdownMenuContent align="end" className="w-40">
                                   <DropdownMenuItem
                                     onClick={() => router.push(`/weekly/preview/${issue.id}`)}
                                   >
-                                    <Eye className="h-4 w-4 mr-2" />
+                                    <Eye className="mr-2 h-4 w-4" />
                                     预览
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     onClick={() => router.push(`/weekly/editor/${issue.id}`)}
                                   >
-                                    <Edit className="h-4 w-4 mr-2" />
+                                    <Edit className="mr-2 h-4 w-4" />
                                     编辑
                                   </DropdownMenuItem>
                                   {issue.status === 'published' && (
                                     <>
                                       <DropdownMenuSeparator />
                                       <DropdownMenuItem onClick={() => handleShare(issue)}>
-                                        <Share2 className="h-4 w-4 mr-2" />
+                                        <Share2 className="mr-2 h-4 w-4" />
                                         分享
                                       </DropdownMenuItem>
                                     </>
@@ -314,13 +321,11 @@ export default function WeeklyManagePage() {
                 </Table>
               </div>
 
-              {/* Pagination */}
               {pagination.totalPages > 1 && (
-                <div className="flex items-center justify-between mt-4">
+                <div className="flex items-center justify-between pt-2">
                   <div className="text-sm text-muted-foreground">
-                    显示 {(pagination.page - 1) * pagination.pageSize + 1} 到{' '}
-                    {Math.min(pagination.page * pagination.pageSize, pagination.total)} 条，
-                    共 {pagination.total} 条
+                    显示 {(pagination.page - 1) * pagination.pageSize + 1} -{' '}
+                    {Math.min(pagination.page * pagination.pageSize, pagination.total)} 条，共 {pagination.total} 条
                   </div>
                   <div className="flex gap-2">
                     <Button
@@ -329,7 +334,7 @@ export default function WeeklyManagePage() {
                       onClick={() => handlePageChange(pagination.page - 1)}
                       disabled={pagination.page === 1}
                     >
-                      <ChevronLeft className="h-4 w-4" />
+                      <ChevronLeft className="mr-1 h-4 w-4" />
                       上一页
                     </Button>
                     <Button
@@ -339,7 +344,7 @@ export default function WeeklyManagePage() {
                       disabled={pagination.page === pagination.totalPages}
                     >
                       下一页
-                      <ChevronRight className="h-4 w-4" />
+                      <ChevronRight className="ml-1 h-4 w-4" />
                     </Button>
                   </div>
                 </div>

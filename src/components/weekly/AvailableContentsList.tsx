@@ -42,7 +42,7 @@ const ContentCard: React.FC<{ content: Content; isSelected: boolean; onAddConten
   isSelected,
   onAddContent,
 }) => (
-  <Card className="mb-3 p-3 transition-all hover:shadow-md">
+  <Card className="mb-3 p-3 shadow-sm transition-shadow hover:shadow-md">
     <div className="flex items-start gap-3">
       <div className="flex-1 min-w-0 space-y-1">
         <div className="flex items-center flex-wrap gap-2">

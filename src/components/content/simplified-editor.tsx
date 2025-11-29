@@ -400,10 +400,9 @@ export default function SimplifiedEditor({
   };
 
   return (
-    <div className="h-full flex flex-col">
-      {/* 顶部工具栏 */}
-      <div className="sticky top-0 z-10 bg-background border-b">
-        <div className="flex items-center justify-between p-4">
+    <div className="flex h-full flex-col">
+      <div className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur">
+        <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
@@ -467,11 +466,11 @@ export default function SimplifiedEditor({
 
       {/* 主内容区 - 左右分屏 */}
       <div className="flex-1 overflow-hidden">
-        <div className="h-full flex gap-6 p-6">
-          {/* 左侧编辑区 - 占 60% */}
-          <div className="flex-1 flex flex-col space-y-4 overflow-auto pr-3">
-            {/* 基本信息 */}
-            <Card>
+        <div className="flex h-full gap-6 p-6">
+          <div className="flex flex-1 gap-6 pr-4">
+            <div className="w-[300px] shrink-0 border-r border-slate-200 pr-4">
+              <div className="flex flex-col space-y-4 overflow-y-auto">
+                <Card className="shadow-sm">
               <CardHeader>
                 <CardTitle>基本信息</CardTitle>
                 <CardDescription>填写内容的基本信息</CardDescription>
@@ -683,9 +682,10 @@ export default function SimplifiedEditor({
                 </div>
               </CardContent>
             </Card>
-
-            {/* 内容编辑器 - 根据编辑模式显示不同界面 */}
-            <Card>
+              </div>
+            </div>
+            <div className="flex-1 space-y-4 overflow-y-auto pr-4">
+              <Card className="shadow-sm">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
@@ -790,9 +790,8 @@ export default function SimplifiedEditor({
               </CardContent>
             </Card>
 
-            {/* Weekly 结构化数据 */}
             {contentTypeId === 3 && (
-              <Card>
+              <Card className="shadow-sm">
                 <CardHeader>
                   <CardTitle>结构化数据</CardTitle>
                   <CardDescription>供周刊卡片渲染的核心字段</CardDescription>
@@ -881,9 +880,8 @@ export default function SimplifiedEditor({
               </Card>
             )}
 
-            {/* Blog 专用设置 */}
             {contentTypeId === 4 && (
-              <Card>
+              <Card className="shadow-sm">
                 <CardHeader>
                   <CardTitle>Blog 专用设置</CardTitle>
                   <CardDescription>SEO 和封面图设置</CardDescription>
@@ -962,9 +960,8 @@ export default function SimplifiedEditor({
               </Card>
             )}
 
-            {/* Weekly 专用设置 */}
             {contentTypeId === 3 && (
-              <Card>
+              <Card className="shadow-sm">
                 <CardHeader>
                   <CardTitle>Weekly 专用设置</CardTitle>
                   <CardDescription>来源和推荐信息</CardDescription>
@@ -1013,9 +1010,8 @@ export default function SimplifiedEditor({
               </Card>
             )}
 
-            {/* Karakeep 同步与轮询状态 */}
             {contentTypeId === 3 && (
-              <Card>
+              <Card className="shadow-sm">
                 <CardHeader>
                   <CardTitle>Karakeep 重跑</CardTitle>
                   <CardDescription>修改 URL 后可通知 Karakeep 重新总结 / 重新截图</CardDescription>
@@ -1110,12 +1106,12 @@ export default function SimplifiedEditor({
                 </CardContent>
               </Card>
             )}
+            </div>
           </div>
 
-          {/* 右侧预览区 - 占 40% */}
-          <div className="w-2/5 flex flex-col">
-            <Card className="flex-1 flex flex-col">
-              <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="h-full w-[350px] shrink-0 border-l border-slate-200 pl-4">
+            <Card className="flex h-full flex-col shadow-sm">
+              <CardHeader className="gap-3">
                 <CardTitle>实时预览</CardTitle>
               </CardHeader>
               <CardContent className="flex-1 overflow-auto">

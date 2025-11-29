@@ -197,12 +197,12 @@ export default function TagsSettingsPage() {
   };
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:space-y-6 md:p-8 md:pt-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight md:text-3xl">标签管理</h2>
-          <p className="text-sm text-muted-foreground md:text-base">管理内容标签</p>
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Tags</p>
+          <h2 className="text-3xl font-semibold tracking-tight text-slate-900">标签管理</h2>
+          <p className="text-sm text-muted-foreground">管理内容标签</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setIsMergeDialogOpen(true)}>
@@ -216,8 +216,7 @@ export default function TagsSettingsPage() {
         </div>
       </div>
 
-      {/* Search */}
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>搜索标签</CardTitle>
         </CardHeader>
@@ -238,7 +237,7 @@ export default function TagsSettingsPage() {
       </Card>
 
       {/* Tags List */}
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>标签列表</CardTitle>
           <CardDescription>
@@ -257,7 +256,7 @@ export default function TagsSettingsPage() {
               {tags.length === 0 ? (
                 <div className="text-center text-muted-foreground py-12">暂无标签</div>
               ) : (
-                <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid grid-cols-2 gap-3">
                   {tags.map((tag: any) => (
                     <div
                       key={tag.id}

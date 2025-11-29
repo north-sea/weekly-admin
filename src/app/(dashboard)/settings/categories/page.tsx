@@ -190,12 +190,12 @@ export default function CategoriesSettingsPage() {
   );
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:space-y-6 md:p-8 md:pt-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight md:text-3xl">分类管理</h2>
-          <p className="text-sm text-muted-foreground md:text-base">管理内容分类</p>
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Categories</p>
+          <h2 className="text-3xl font-semibold tracking-tight text-slate-900">分类管理</h2>
+          <p className="text-sm text-muted-foreground">管理内容分类</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setIsMergeDialogOpen(true)}>
@@ -209,8 +209,7 @@ export default function CategoriesSettingsPage() {
         </div>
       </div>
 
-      {/* Categories List */}
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>分类列表</CardTitle>
           <CardDescription>
@@ -225,7 +224,7 @@ export default function CategoriesSettingsPage() {
               ))}
             </div>
           ) : (
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid grid-cols-2 gap-3">
               {categories.map((category: any) => (
                 <div
                   key={category.id}
@@ -412,7 +411,7 @@ export default function CategoriesSettingsPage() {
             <DialogDescription>选择源分类并指定合并到的目标分类。源分类会被删除，关联内容迁移到目标分类。</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>目标分类</Label>
                 <Select

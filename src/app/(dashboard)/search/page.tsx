@@ -41,19 +41,15 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:space-y-6 md:p-8 md:pt-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight md:text-3xl">内容搜索</h2>
-          <p className="text-sm text-muted-foreground md:text-base">
-            搜索内容、草稿和周刊
-          </p>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Search</p>
+        <h2 className="text-3xl font-semibold tracking-tight text-slate-900">内容搜索</h2>
+        <p className="text-sm text-muted-foreground">搜索内容、草稿和周刊</p>
       </div>
 
       {/* Search Bar */}
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>搜索</CardTitle>
           <CardDescription>输入关键词搜索内容</CardDescription>
@@ -84,7 +80,7 @@ export default function SearchPage() {
             </div>
 
             {/* Filters */}
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid grid-cols-3 gap-4">
               <Select value={contentType} onValueChange={setContentType}>
                 <SelectTrigger>
                   <SelectValue placeholder="内容类型" />
@@ -112,7 +108,7 @@ export default function SearchPage() {
       </Card>
 
       {/* Results */}
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>搜索结果</CardTitle>
           <CardDescription>
@@ -143,7 +139,7 @@ export default function SearchPage() {
               {results.map((result: any) => (
                 <div
                   key={result.id}
-                  className="p-4 border rounded hover:bg-accent/50 transition-colors cursor-pointer"
+                  className="cursor-pointer rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                   onClick={() => router.push(`/content/${result.id}`)}
                 >
                   <div className="flex items-start justify-between gap-4">

@@ -442,8 +442,8 @@ const WeeklyEditorPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <Card>
+    <div className="space-y-6">
+      <Card className="shadow-sm">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">

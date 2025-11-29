@@ -65,7 +65,7 @@ const SelectedContentsList: React.FC<SelectedContentsListProps> = ({
     <ScrollArea className="h-full">
       <div className="space-y-2">
         {contents.map((content, index) => (
-          <Card key={content.id} className="relative p-4">
+          <Card key={content.id} className="relative p-4 shadow-sm transition-shadow hover:shadow-md">
             <div className="absolute left-3 top-3">
           <Badge variant="secondary" className="text-xs">
             {index + 1}

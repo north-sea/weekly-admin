@@ -253,9 +253,9 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId, onContentsChange }
   return (
     <DndContext>
       <div className="h-[70vh]">
-        <div className="grid grid-cols-12 gap-4 h-full">
-          <div className="col-span-4 h-full min-h-0">
-            <Card className="h-full flex flex-col overflow-hidden">
+        <div className="grid h-full grid-cols-12 gap-6">
+          <div className="col-span-3 h-full min-h-0">
+            <Card className="h-full flex flex-col overflow-hidden shadow-sm">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base">可选内容</CardTitle>
@@ -310,8 +310,8 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId, onContentsChange }
             </Card>
           </div>
 
-          <div className="col-span-4 h-full min-h-0">
-            <Card className="h-full flex flex-col overflow-hidden">
+          <div className="col-span-5 h-full min-h-0">
+            <Card className="h-full flex flex-col overflow-hidden shadow-sm">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base">已选内容</CardTitle>
@@ -331,7 +331,7 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId, onContentsChange }
           </div>
 
           <div className="col-span-4 h-full min-h-0">
-            <Card className="h-full flex flex-col overflow-hidden">
+            <Card className="h-full flex flex-col overflow-hidden shadow-sm">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">实时预览</CardTitle>
               </CardHeader>

@@ -1,13 +1,7 @@
 'use client';
 
 import React from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -64,61 +58,87 @@ export function DraftPreviewDialog({ draft, open, onOpenChange }: DraftPreviewDi
   }
 
   const previewData = buildPreviewData(draft);
+  const aiTags: Array<{ id?: number | string; name: string; attachedBy?: string }> = (() => {
+    try {
+      return draft.tags_suggestion ? JSON.parse(draft.tags_suggestion) : [];
+    } catch {
+      return [];
+    }
+  })();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden shadow-2xl">
-        <DialogHeader className="p-6 pb-3">
-          <DialogTitle className="text-xl font-semibold">{draft.title}</DialogTitle>
-          <DialogDescription className="text-sm text-muted-foreground">
-            添加于 {draft.karakeep_created_at ? dayjs(draft.karakeep_created_at).format('YYYY-MM-DD HH:mm') : '未知时间'}
-          </DialogDescription>
-        </DialogHeader>
-
-        <Separator />
-
-        <ScrollArea className="h-[65vh]">
-          <div className="px-6 py-4 space-y-4">
-            {draft.category_suggestion && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">AI 分类建议：</span>
-                <Badge variant="outline">{draft.category_suggestion}</Badge>
+      <DialogContent className="max-w-4xl overflow-hidden border border-slate-200 bg-white p-0 shadow-2xl">
+        <div className="flex flex-col">
+          <div className="px-6 py-4">
+            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+              {draft.source || 'Karakeep Draft'}
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold leading-snug text-slate-900">
+              {draft.title}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              添加于 {draft.karakeep_created_at ? dayjs(draft.karakeep_created_at).format('YYYY-MM-DD HH:mm') : '未知时间'}
+            </p>
+          </div>
+          <Separator />
+          <div className="grid grid-cols-[3fr_2fr] divide-x divide-slate-200">
+            <ScrollArea className="h-[70vh]">
+              <div className="space-y-4 p-6">
+                <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                  <StructuredPreview
+                    data={previewData}
+                    mode="desktop"
+                    showMeta
+                  />
+                </div>
+                {draft.content && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-700 shadow-sm">
+                    <p className="font-semibold text-slate-900 mb-2">原始备注</p>
+                    <p className="whitespace-pre-line leading-relaxed">{draft.content}</p>
+                  </div>
+                )}
               </div>
-            )}
-
-            {draft.tags_suggestion && (
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm text-muted-foreground">标签建议：</span>
-                {(() => {
-                  try {
-                    const tags = JSON.parse(draft.tags_suggestion || '[]');
-                    return tags.map((tag: { id?: number; name: string; attachedBy?: string }, idx: number) => (
-                      <Badge
-                        key={tag.id || idx}
-                        variant="secondary"
-                        className="text-xs"
-                      >
-                        {tag.attachedBy === 'ai' ? '🤖' : '🏷️'} {tag.name}
-                      </Badge>
-                    ));
-                  } catch {
-                    return null;
-                  }
-                })()}
+            </ScrollArea>
+            <div className="h-[70vh] space-y-4 overflow-y-auto bg-slate-50/70 p-6">
+              <div className="space-y-2">
+                <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">AI 分类</p>
+                <Badge variant="outline" className="text-sm">
+                  {draft.category_suggestion || '未提供'}
+                </Badge>
               </div>
-            )}
-
-            <Separator />
-
-            <div className="bg-muted/30 rounded p-4">
-              <StructuredPreview
-                data={previewData}
-                mode="desktop"
-                showMeta
-              />
+              <div className="space-y-2">
+                <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">标签建议</p>
+                <div className="flex flex-wrap gap-2">
+                  {aiTags.length === 0 && (
+                    <span className="text-sm text-muted-foreground">暂无建议</span>
+                  )}
+                  {aiTags.map((tag, idx) => (
+                    <Badge key={tag.id || idx} variant="secondary" className="text-xs">
+                      {tag.attachedBy === 'ai' ? '🤖' : '🏷️'} {tag.name}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+              {draft.summary && (
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">AI 摘要</p>
+                  <p className="rounded-md border border-slate-200 bg-white p-3 text-sm leading-relaxed text-slate-700 shadow-sm">
+                    {draft.summary}
+                  </p>
+                </div>
+              )}
+              {draft.note && (
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Karakeep 备注</p>
+                  <p className="rounded-md border border-slate-200 bg-white p-3 text-sm leading-relaxed text-slate-700 shadow-sm">
+                    {draft.note}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
-        </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   );

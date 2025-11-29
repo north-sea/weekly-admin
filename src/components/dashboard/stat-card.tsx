@@ -44,7 +44,7 @@ export function StatCard({
   }
 
   return (
-    <Card className={cn("shadow-stat hover:shadow-stat-hover group", className)}>
+    <Card className={cn('shadow-sm hover:shadow-md transition-shadow group', className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">
           {title}

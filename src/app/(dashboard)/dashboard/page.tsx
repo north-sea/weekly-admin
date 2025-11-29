@@ -85,7 +85,7 @@ export default function DashboardPage() {
       )}
 
       {/* Overview Statistics - First Row */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-4 gap-4">
         <StatCard
           title="总内容数"
           value={analytics?.overview.totalContents || 0}
@@ -115,7 +115,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Key Stats - Second Row */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-4 gap-4">
         <StatCard
           title="发布率"
           value={`${analytics?.overview.publishRate || 0}%`}
@@ -144,11 +144,11 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick Actions and Recent Activities */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <div className="lg:col-span-3">
+      <div className="grid grid-cols-7 gap-4">
+        <div className="col-span-3">
           <QuickActions />
         </div>
-        <div className="lg:col-span-4">
+        <div className="col-span-4">
           <RecentActivities
             activities={analytics?.activities}
             loading={analyticsLoading}
