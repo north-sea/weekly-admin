@@ -6,7 +6,6 @@ import { serializeSpecialTypes } from '@/lib/utils/serialization';
 
 const CreateWeeklyIssueSchema = z.object({
   title: z.string().min(1, '标题不能为空').max(500, '标题长度不能超过500字符'),
-  description: z.string().optional(),
   start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '开始日期格式不正确'),
   end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '结束日期格式不正确'),
   status: z.enum(['draft', 'published', 'archived']).default('draft'),
@@ -42,7 +41,7 @@ export async function GET(request: NextRequest) {
     if (params.search) {
       where.OR = [
         { title: { contains: params.search } },
-        { description: { contains: params.search } },
+        { desc: { contains: params.search } },
       ];
     }
 
@@ -111,7 +110,6 @@ export async function POST(request: NextRequest) {
         issue_number: nextIssueNumber,
         title: data.title,
         slug,
-        description: data.description,
         start_date: new Date(data.start_date),
         end_date: new Date(data.end_date),
         status: data.status as any,

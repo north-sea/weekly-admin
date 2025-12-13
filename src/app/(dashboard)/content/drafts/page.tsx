@@ -21,7 +21,7 @@ import {
 export default function DraftsPageNew() {
   const { toast } = useToast();
   const [filters, setFilters] = useState<DraftListParams>({
-    sortBy: 'created_at',
+    sortBy: 'karakeep_created_at',
     sortOrder: 'desc',
     page: 1,
     pageSize: 20,

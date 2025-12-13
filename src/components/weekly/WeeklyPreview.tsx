@@ -204,9 +204,9 @@ const WeeklyPreview: React.FC<WeeklyPreviewProps> = ({ issueId, contents }) => {
           <p className="text-sm text-muted-foreground">
             第 {issue.issue_number} 期 • {formatDate(issue.start_date)} 至 {formatDate(issue.end_date)}
           </p>
-          {(issue.desc || issue.description) && (
+          {issue.desc && (
             <p className="text-sm text-muted-foreground leading-relaxed">
-              {issue.desc || issue.description}
+              {issue.desc}
             </p>
           )}
         </div>

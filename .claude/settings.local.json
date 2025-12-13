@@ -8,7 +8,21 @@
       "Bash(pnpm add:*)",
       "Bash(npx shadcn@latest add table)",
       "Bash(pnpm store prune:*)",
-      "Bash(pnpm type-check)"
+      "Bash(pnpm type-check)",
+      "Bash(pnpm tsc:*)",
+      "Bash(npx prisma db execute:*)",
+      "Bash(pnpm db:pull:*)",
+      "Bash(pnpm db:generate:*)",
+      "mcp__nowledge-mem__memory_search",
+      "WebSearch",
+      "WebFetch(domain:docs.quail.ink)",
+      "WebFetch(domain:quail.ink)",
+      "WebFetch(domain:github.com)",
+      "mcp__context7__resolve-library-id",
+      "WebFetch(domain:docs.quaily.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(pnpm prisma db pull:*)"
     ],
     "deny": [],
     "ask": []

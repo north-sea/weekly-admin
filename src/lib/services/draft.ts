@@ -19,7 +19,7 @@ export interface DraftQuery {
   dateFrom?: string;
   dateTo?: string;
   showDuplicates?: 'all' | 'original' | 'duplicate';
-  sortBy?: 'created_at' | 'updated_at' | 'priority' | 'title' | 'synced_at';
+  sortBy?: 'created_at' | 'updated_at' | 'priority' | 'title' | 'synced_at' | 'karakeep_created_at';
   sortOrder?: 'asc' | 'desc';
   stage?: 'inbox' | 'editor';
 }
@@ -237,6 +237,17 @@ function normalizeUrl(url: string): string {
   } catch {
     return url;
   }
+}
+
+/**
+ * 截断 URL 到指定长度
+ * 用于防止超长 URL 导致数据库字段溢出
+ */
+function truncateUrl(url: string | null | undefined, maxLength: number): string | null {
+  if (!url) return null;
+  if (url.length <= maxLength) return url;
+  // 截断并添加省略标记（保留一些空间给省略号）
+  return url.substring(0, maxLength - 3) + '...';
 }
 
 /**
@@ -852,8 +863,8 @@ export class DraftService {
       content,
       source,
       word_count,
-      favicon_url: bookmark.content?.favicon || null,
-      image_url: bookmark.content?.imageUrl || bookmark.content?.screenshotAssetId || null,
+      favicon_url: truncateUrl(bookmark.content?.favicon, 500),
+      image_url: truncateUrl(bookmark.content?.imageUrl || bookmark.content?.screenshotAssetId, 500),
       karakeep_created_at: bookmark.createdAt ? new Date(bookmark.createdAt) : null,
       karakeep_updated_at: bookmark.modifiedAt ? new Date(bookmark.modifiedAt) : null,
       tagging_status: taggingStatus,

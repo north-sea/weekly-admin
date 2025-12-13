@@ -153,8 +153,17 @@ export function DraftGrid({ drafts, isLoading, onPreview }: DraftGridProps) {
   };
 
   const handleDelete = async (draft: Draft) => {
+    if (!draft.id) {
+      toast({
+        title: '删除失败',
+        description: '草稿 ID 无效',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
-      await deleteDraft.mutateAsync(draft.id);
+      await deleteDraft.mutateAsync({ id: draft.id });
       toast({
         title: '删除成功',
         description: '草稿已删除',

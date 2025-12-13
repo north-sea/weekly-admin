@@ -1,20 +1,27 @@
-# Weekly内容管理系统
+# Weekly 内容管理系统
 
-本项目是基于Next.js的周刊内容管理系统，支持内容创建、编辑、搜索和周刊发布等功能。
+基于 Next.js 15 的周刊内容管理系统，支持内容创建、编辑、搜索、周刊发布和 Newsletter 邮件订阅等功能。
 
-## 📢 重要通知
+## 主要功能
 
-**本项目正在进行大规模重构!** 我们正在将 UI 库从 Ant Design 迁移到 shadcn/ui,并简化工作流程。
+- **内容管理**: 创建、编辑、分类、标签管理
+- **草稿箱**: 支持 Karakeep 同步
+- **周刊编辑器**: 三栏式拖拽编辑器
+- **全文搜索**: Meilisearch 集成
+- **Newsletter 发布**: Quail 平台集成，支持邮件订阅
 
-重构相关的文档目前精简为三份:
+## 技术栈
 
-- 📋 **产品需求与整体规划**: `docs/MAIN_PRD.md`
-- ✅ **任务清单与进度追踪**: `docs/TASKS.md`
-- 🧩 **功能概要(汇总)**: `docs/FEATURES_OVERVIEW.md`
+- **框架**: Next.js 15 (App Router)
+- **UI**: shadcn/ui + Tailwind CSS 4
+- **数据库**: MySQL + Prisma ORM
+- **搜索**: Meilisearch
+- **状态管理**: Zustand + TanStack Query v5
+- **Newsletter**: Quail API
 
 ---
 
-## 🚀 快速开始
+## 快速开始
 
 ### 本地开发环境
 
@@ -53,53 +60,63 @@ pnpm dev
 
 **📋 详细开发指南：[本地开发指南.md](本地开发指南.md)**
 
-### 架构与规范(简要)
+### Quail Newsletter 配置
 
-- **API 响应格式**: 所有接口统一返回 `{ success, data | error, meta }` 结构, 前端通过类型守卫安全解析; 详细约定见 `docs/archive/API_RESPONSE_FORMAT.md`。
-- **数据库脚本**: 常用命令 `pnpm db:pull`(同步 schema)、`pnpm db:generate`(生成 Prisma 客户端)、`pnpm db:migrate`(执行迁移), 说明见 `docs/archive/DATABASE.md`。
+要启用 Newsletter 功能，需要配置以下环境变量：
+
+```bash
+# Quail Newsletter 配置
+QUAIL_API_HOST="https://api.quail.ink"    # API 基础地址
+QUAIL_API_KEY="your-quail-api-key"        # API 密钥
+QUAIL_CHANNEL_SLUG="your-channel-slug"    # 频道 slug
+QUAIL_LIST_ID="your-list-id"              # 列表 ID（用于订阅者管理）
+```
+
+获取配置值：
+1. **API Key**: [Quail Dashboard](https://quail.ink) → Profile → API Keys
+2. **Channel Slug**: 频道 URL 中的 slug，如 `https://quail.ink/your-channel` 中的 `your-channel`
+3. **List ID**: 在频道设置中获取
+
+详细 API 文档：[docs/quail-api.md](docs/quail-api.md)
 
 ### 生产环境部署
 
-**使用Docker容器化部署到NAS服务器。** 详细部署说明请查看：
+使用 Docker 容器化部署。详细说明：
 
-📋 **[Docker部署文档](docker/README.md)**
-📋 **[快速部署指南](docker/快速部署指南.md)**
+- [Docker 部署文档](docker/README.md)
+- [快速部署指南](docker/快速部署指南.md)
 
 ---
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
-
-## Getting Started
-
-First, run the development server:
+## 常用命令
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm dev              # 开发服务器
+pnpm build            # 生产构建
+pnpm lint             # ESLint 检查
+pnpm type-check       # 类型检查
+pnpm db:generate      # 生成 Prisma 客户端
+pnpm db:pull          # 同步数据库 schema
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 项目结构
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+src/
+├── app/                    # Next.js App Router
+│   ├── (dashboard)/        # 仪表板路由组
+│   │   ├── content/        # 内容管理
+│   │   ├── weekly/         # 周刊管理
+│   │   ├── publish/        # Newsletter 发布
+│   │   └── settings/       # 系统设置
+│   └── api/                # API 路由
+│       └── quail/          # Quail Newsletter API
+├── components/             # React 组件
+├── hooks/queries/          # React Query Hooks
+├── lib/services/           # 业务服务层
+└── stores/                 # Zustand 状态
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 文档
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [Quail API 集成文档](docs/quail-api.md) - Newsletter 功能开发指南

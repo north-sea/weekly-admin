@@ -274,7 +274,7 @@ export const WeeklyIssueLayout: React.FC<WeeklyIssueLayoutProps> = ({ issue, foo
     };
   }, [enrichedContents, groupedContents, issue.reading_time, issue.total_items, issue.total_word_count]);
 
-  const description = issue.desc || issue.description;
+  const description = issue.desc;
 
   return (
     <div className="space-y-8">

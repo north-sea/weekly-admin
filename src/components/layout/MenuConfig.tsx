@@ -7,6 +7,7 @@ import {
   FileText,
   LayoutDashboard,
   Search,
+  Send,
   Settings,
   Tags,
   Users
@@ -39,6 +40,11 @@ export const menuConfig: NavItem[] = [
     path: '/weekly',
     name: '周刊管理',
     icon: CalendarClock,
+  },
+  {
+    path: '/publish',
+    name: 'Newsletter',
+    icon: Send,
   },
   {
     path: '/search',

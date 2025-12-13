@@ -61,6 +61,12 @@ src/
 - Meilisearch 全文搜索
 - 高级筛选
 
+### Newsletter 发布 (`/publish`)
+- Quail 平台集成
+- 周刊发布到 Newsletter
+- 邮件发送给订阅者
+- 订阅者管理
+
 ## 数据模型
 
 主要表:
@@ -104,4 +110,7 @@ pnpm db:pull          # 同步数据库 schema
 - `src/lib/db.ts` - Prisma 客户端
 - `src/lib/auth-middleware.ts` - 认证中间件
 - `src/lib/search.ts` - Meilisearch 集成
+- `src/lib/services/quail-api.ts` - Quail API 客户端
+- `src/lib/services/quail.ts` - Quail 发布服务
 - `prisma/schema.prisma` - 数据库模型
+- `docs/quail-api.md` - Quail API 集成文档

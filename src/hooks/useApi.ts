@@ -198,7 +198,7 @@ export function useDelete<TData = unknown, TVariables = unknown, TError = Error>
   }
 ) {
   const { apiOptions, ...mutationOptions } = options || {};
-  
+
   return useMutation<TData, TError, TVariables>({
     mutationFn: (variables: TVariables) => {
       const resolvedUrl = typeof url === 'function' ? url(variables) : url;

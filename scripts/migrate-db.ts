@@ -82,12 +82,29 @@ async function migrateDatabase() {
     const weeklyIssuesColumns = await prisma.$queryRaw`
       SHOW COLUMNS FROM weekly_issues LIKE 'created_by'
     `;
-    
+
     if (Array.isArray(weeklyIssuesColumns) && weeklyIssuesColumns.length === 0) {
       await prisma.$executeRaw`
         ALTER TABLE weekly_issues ADD COLUMN created_by INT DEFAULT 1
       `;
       console.log('✅ weekly_issues 表添加 created_by 字段');
+    }
+
+    // 检查 weekly_issues 表是否有 Quail 相关字段
+    const quailPostIdColumn = await prisma.$queryRaw`
+      SHOW COLUMNS FROM weekly_issues LIKE 'quail_post_id'
+    `;
+
+    if (Array.isArray(quailPostIdColumn) && quailPostIdColumn.length === 0) {
+      await prisma.$executeRaw`
+        ALTER TABLE weekly_issues
+        ADD COLUMN quail_post_id VARCHAR(100) NULL,
+        ADD COLUMN quail_post_slug VARCHAR(200) NULL,
+        ADD COLUMN quail_published_at TIMESTAMP NULL,
+        ADD COLUMN quail_delivered_at TIMESTAMP NULL,
+        ADD COLUMN quail_publish_error TEXT NULL
+      `;
+      console.log('✅ weekly_issues 表添加 Quail 相关字段');
     }
 
     // 创建默认用户

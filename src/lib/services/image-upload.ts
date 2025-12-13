@@ -1,4 +1,5 @@
 import ky from 'ky';
+import imageCompression from 'browser-image-compression';
 
 export interface ImageUploadResponse {
   success: boolean;
@@ -44,6 +45,7 @@ export class ImageUploadService {
 
   /**
    * 上传图片到远程服务
+   * 超过 5MB 的图片会自动压缩
    */
   static async uploadImage({ file, onProgress }: ImageUploadOptions): Promise<ImageUploadResponse> {
     try {
@@ -55,13 +57,27 @@ export class ImageUploadService {
         throw new Error('不支持的图片格式，请上传 JPG、PNG、GIF 或 WebP 格式的图片');
       }
 
-      // 验证文件大小 (5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        throw new Error('图片大小不能超过 5MB');
+      let fileToUpload = file;
+      const maxSize = 5 * 1024 * 1024; // 5MB
+
+      // 超过 5MB 自动压缩
+      if (file.size > maxSize) {
+        console.log(`图片 ${file.name} 大小 ${this.formatFileSize(file.size)}，开始压缩...`);
+        fileToUpload = await this.compressImage(file, {
+          maxWidthOrHeight: 1200,  // 封面展示宽度约 400px，3 倍图 = 1200px
+          maxSizeMB: 4, // 目标 4MB 以内，留点余量
+          quality: 0.85,
+        });
+        console.log(`压缩后大小: ${this.formatFileSize(fileToUpload.size)}`);
+
+        // 压缩后仍然超过限制
+        if (fileToUpload.size > maxSize) {
+          throw new Error(`图片压缩后仍超过 5MB (${this.formatFileSize(fileToUpload.size)})，请手动裁剪后重试`);
+        }
       }
 
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', fileToUpload);
 
       const uploadUrl = this.getUploadUrl()!;
 
@@ -125,52 +141,49 @@ export class ImageUploadService {
   }
 
   /**
-   * 压缩图片
+   * 压缩图片（使用 browser-image-compression 库）
+   * @param file 原始文件
+   * @param options 压缩选项
+   * @param options.maxWidthOrHeight 最大宽度或高度，默认 1200（适合封面展示，约 3 倍图）
+   * @param options.maxSizeMB 目标最大文件大小（MB），默认 4MB
+   * @param options.quality 压缩质量 0-1，默认 0.85
    */
-  static async compressImage(file: File, quality: number = 0.8): Promise<File> {
-    return new Promise((resolve, reject) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const img = new Image();
+  static async compressImage(
+    file: File,
+    options: {
+      maxWidthOrHeight?: number;
+      maxSizeMB?: number;
+      quality?: number;
+    } = {}
+  ): Promise<File> {
+    const { maxWidthOrHeight = 1200, maxSizeMB = 4, quality = 0.85 } = options;
 
-      img.onload = () => {
-        // 计算压缩后的尺寸
-        const maxWidth = 1920;
-        const maxHeight = 1080;
-        let { width, height } = img;
+    try {
+      const compressedFile = await imageCompression(file, {
+        maxSizeMB,
+        maxWidthOrHeight,
+        initialQuality: quality,
+        useWebWorker: true,
+        // 保持 EXIF 方向信息
+        preserveExif: false,
+        // 输出格式：PNG 转 JPEG 可以大幅减小体积
+        fileType: file.type === 'image/png' ? 'image/jpeg' : undefined,
+      });
 
-        if (width > maxWidth || height > maxHeight) {
-          const ratio = Math.min(maxWidth / width, maxHeight / height);
-          width *= ratio;
-          height *= ratio;
-        }
+      // 如果是 PNG 转 JPEG，更新文件名
+      if (file.type === 'image/png') {
+        const newName = file.name.replace(/\.png$/i, '.jpg');
+        return new File([compressedFile], newName, {
+          type: 'image/jpeg',
+          lastModified: Date.now(),
+        });
+      }
 
-        canvas.width = width;
-        canvas.height = height;
-
-        // 绘制压缩后的图片
-        ctx?.drawImage(img, 0, 0, width, height);
-
-        canvas.toBlob(
-          (blob) => {
-            if (blob) {
-              const compressedFile = new File([blob], file.name, {
-                type: file.type,
-                lastModified: Date.now(),
-              });
-              resolve(compressedFile);
-            } else {
-              reject(new Error('图片压缩失败'));
-            }
-          },
-          file.type,
-          quality
-        );
-      };
-
-      img.onerror = () => reject(new Error('图片加载失败'));
-      img.src = URL.createObjectURL(file);
-    });
+      return compressedFile;
+    } catch (error) {
+      console.error('图片压缩失败:', error);
+      throw new Error('图片压缩失败，请重试');
+    }
   }
 
   /**

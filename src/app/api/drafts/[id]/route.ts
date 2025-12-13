@@ -115,6 +115,11 @@ export async function DELETE(
       return createNextErrorResponse('UNAUTHORIZED', '未授权访问', 401);
     }
     const { id } = await params;
+
+    if (!id) {
+      return createNextErrorResponse('INVALID_ID', '草稿 ID 不能为空', 400);
+    }
+
     await deleteDraft(BigInt(id));
 
     return createNextSuccessResponse(null, 200, { message: '删除成功' });

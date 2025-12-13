@@ -37,7 +37,7 @@ export function DraftFilters({ value = {}, onChange, className }: DraftFiltersPr
 
   const handleReset = () => {
     const emptyFilters = {
-      sortBy: 'created_at',
+      sortBy: 'karakeep_created_at',
       sortOrder: 'desc',
     };
     setFilters(emptyFilters);
@@ -105,13 +105,14 @@ export function DraftFilters({ value = {}, onChange, className }: DraftFiltersPr
 
         {/* 排序 */}
         <Select
-          value={filters.sortBy || 'created_at'}
+          value={filters.sortBy || 'karakeep_created_at'}
           onValueChange={(val) => handleChange('sortBy', val)}
         >
           <SelectTrigger className="w-[140px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="karakeep_created_at">录入时间</SelectItem>
             <SelectItem value="created_at">创建时间</SelectItem>
             <SelectItem value="updated_at">更新时间</SelectItem>
             <SelectItem value="synced_at">同步时间</SelectItem>

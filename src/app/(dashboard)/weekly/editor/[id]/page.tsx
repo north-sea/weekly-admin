@@ -11,7 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { useRouter, useParams } from 'next/navigation';
-import { Save, Eye, Send, Loader2, ArrowLeft, Sparkles, Wand2 } from 'lucide-react';
+import { Save, Eye, Send, Loader2, ArrowLeft, Sparkles, Wand2, Check, X, Copy, Upload } from 'lucide-react';
 import dayjs from 'dayjs';
 import WeeklyEditor, { WeeklyEditorContent } from '@/components/weekly/WeeklyEditor';
 import { callImageModel, callTextModel } from '@/lib/ai/client';
@@ -24,7 +24,6 @@ interface WeeklyIssue {
   id: number;
   issue_number: number;
   title: string;
-  description?: string;
   desc?: string;
   cover?: string;
   status: 'draft' | 'published' | 'archived';
@@ -47,13 +46,15 @@ const WeeklyEditorPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [generatingDesc, setGeneratingDesc] = useState(false);
   const [generatingCover, setGeneratingCover] = useState(false);
+  // 封面预览状态
+  const [previewCover, setPreviewCover] = useState<{ url: string; file: File } | null>(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const [issue, setIssue] = useState<WeeklyIssue | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // 表单字段
   const [title, setTitle] = useState('');
   const [desc, setDesc] = useState('');
-  const [description, setDescription] = useState('');
   const [cover, setCover] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -162,9 +163,7 @@ const WeeklyEditorPage: React.FC = () => {
       });
       setTitle(result.data.title);
       setTitleTouched(true);
-      const descValue = result.data.desc || result.data.description || '';
-      setDesc(descValue);
-      setDescription(descValue);
+      setDesc(result.data.desc || '');
       setCover(result.data.cover || '');
       setWeekYear(year);
       setWeekNumber(week);
@@ -222,7 +221,6 @@ const WeeklyEditorPage: React.FC = () => {
             id: 0,
             issue_number: nextNumber,
             title: '',
-            description: '',
             desc: '',
             cover: '',
             status: 'draft',
@@ -248,7 +246,6 @@ const WeeklyEditorPage: React.FC = () => {
             id: 0,
             issue_number: fallbackNumber,
             title: '',
-            description: '',
             desc: '',
             cover: '',
             status: 'draft',
@@ -312,11 +309,10 @@ const WeeklyEditorPage: React.FC = () => {
     setSaving(true);
     try {
       const inferredIssueNumber = nextIssueNumber || issue?.issue_number || 0;
-      const descValue = desc.trim() || description.trim();
+      const descValue = desc.trim();
       const coverValue = cover.trim();
       const data = {
         title: title.trim() || `我不知道的周刊第 ${inferredIssueNumber} 期`,
-        description: descValue || undefined,
         desc: descValue || undefined,
         cover: coverValue || undefined,
         start_date: startDate,
@@ -593,7 +589,7 @@ const WeeklyEditorPage: React.FC = () => {
                     setGeneratingDesc(true);
                     try {
                       const config = getAiConfig();
-                      const template = config?.weeklyDescPrompt || '你是一个周刊编辑，请基于本期标题、时间范围和收录的内容，生成 25-40 字的中文简介，语气简洁有吸引力，不要使用 Markdown。标题：{{title}}；时间：{{date_range}}；收录：{{contents_summary}}';
+                      const template = config?.weeklyDescPrompt || '你是一个技术周刊编辑。请为本期周刊撰写一段 50-80 字的中文简介，概述本期收录内容的主题和亮点，让读者了解本期周刊的核心价值。要求：语言简洁专业，突出技术价值，不使用 Markdown 格式。\n\n周刊标题：{{title}}\n时间范围：{{date_range}}\n收录内容：{{contents_summary}}';
                       const prompt = applyTemplate(template, {
                         title: title.trim(),
                         date_range: startDate && endDate ? `${startDate} - ${endDate}` : '',
@@ -601,13 +597,12 @@ const WeeklyEditorPage: React.FC = () => {
                       });
                       const result = await callTextModel({
                         prompt,
-                        maxTokens: 120,
+                        maxTokens: 256,
                         temperature: 0.6,
                       });
                       const generated = result?.choices?.[0]?.message?.content?.trim();
                       if (generated) {
                         setDesc(generated);
-                        setDescription(generated);
                         toast({ title: '生成完成', description: '已填入周刊描述' });
                       } else {
                         throw new Error('未生成有效描述');
@@ -640,112 +635,160 @@ const WeeklyEditorPage: React.FC = () => {
                 rows={3}
                 value={desc}
                 className={focusRingClass}
-                onChange={(e) => {
-                  setDesc(e.target.value);
-                  setDescription(e.target.value);
-                }}
+                onChange={(e) => setDesc(e.target.value)}
               />
             </div>
           )}
 
           {(!isNew && selectedContents.length > 0) && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="cover">封面图 URL（内容确定后再生成）</Label>
+                  <Label htmlFor="cover">封面图</Label>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     className="h-8"
-                    disabled={generatingCover || selectedContents.length === 0}
-                    onClick={async () => {
-                      if (!title.trim()) {
-                        toast({ title: '请先填写标题', variant: 'destructive' });
-                        return;
-                      }
-                      if (!selectedContents.length) {
-                        toast({ title: '请先添加周刊内容', description: '添加并保存几条内容后再生成封面', variant: 'destructive' });
-                        return;
-                      }
-                      setGeneratingCover(true);
-                      try {
-                        const config = getAiConfig();
-                        const topics = buildContentsSummary();
-                        const template = config?.weeklyCoverPrompt || 'Design a sleek, modern cover image for a Chinese tech/design weekly digest. Title: "{{title}}". Topics: {{contents_summary}}. Tone: dark elegant, subtle gradient, clean typography.';
-                        const prompt = applyTemplate(template, {
-                          title: title.trim(),
-                          contents_summary: topics,
-                        });
-                        const result = await callImageModel({
-                          prompt,
-                          size: '1024x1024',
-                        });
-                        const imagePayload = result?.data?.[0];
-                        const imageUrl = imagePayload?.url || '';
-                        const b64 = imagePayload?.b64_json;
-
-                        if (!imageUrl && !b64) {
-                          throw new Error('模型未返回图片地址');
-                        }
-
-                        let file: File | null = null;
-                        if (b64) {
-                          const byteString = atob(b64);
-                          const ab = new ArrayBuffer(byteString.length);
-                          const ia = new Uint8Array(ab);
-                          for (let i = 0; i < byteString.length; i++) {
-                            ia[i] = byteString.charCodeAt(i);
-                          }
-                          const blob = new Blob([ab], { type: 'image/png' });
-                          file = new File([blob], 'weekly-cover.png', { type: 'image/png' });
-                        } else {
-                          const resp = await fetch(imageUrl);
-                          const blob = await resp.blob();
-                          file = new File([blob], 'weekly-cover.png', { type: blob.type || 'image/png' });
-                        }
-
-                        const uploaded = await ImageUploadService.uploadImage({ file });
-                        if (!uploaded?.success || !uploaded.data?.url) {
-                          throw new Error(uploaded?.message || '上传失败');
-                        }
-
-                        setCover(uploaded.data.url);
-                        toast({ title: '封面生成完成', description: '已自动上传到图床' });
-                      } catch (err: any) {
-                        toast({
-                          title: '生成封面失败',
-                          description: err?.message || '请检查 AI 配置或图床服务',
-                          variant: 'destructive',
-                        });
-                      } finally {
-                        setGeneratingCover(false);
-                      }
+                    disabled={!title.trim() || selectedContents.length === 0}
+                    onClick={() => {
+                      const topics = buildContentsSummary();
+                      const prompt = `Generate a cover image for a tech weekly newsletter.\n\nTitle: "${title.trim()}"\nTopics: ${topics}\n\nRequirements:\n- Size: 1200x400 pixels (3:1 ratio, wide banner style)\n- Style: modern, clean, dark gradient background\n- Include subtle tech elements and professional typography\n- The title should be prominently displayed`;
+                      navigator.clipboard.writeText(prompt);
+                      toast({ title: '已复制 Prompt', description: '可粘贴到 AI 绘图工具中生成封面' });
                     }}
                   >
-                    {generatingCover ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-1 animate-spin" /> 生成中
-                      </>
-                    ) : (
-                      <>
-                        <Wand2 className="h-4 w-4 mr-1" /> AI 生成封面
-                      </>
-                    )}
+                    <Copy className="h-4 w-4 mr-1" /> 复制 Prompt
                   </Button>
                 </div>
+                {/* 预览区域 */}
+                {previewCover && (
+                  <div className="space-y-2">
+                    <div className="overflow-hidden rounded border">
+                      <img src={previewCover.url} alt="封面预览" className="w-full object-contain" />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={uploadingCover}
+                        onClick={async () => {
+                          setUploadingCover(true);
+                          try {
+                            const uploaded = await ImageUploadService.uploadImage({ file: previewCover.file });
+                            if (!uploaded?.success || !uploaded.data?.url) {
+                              throw new Error(uploaded?.message || '上传失败');
+                            }
+                            setCover(uploaded.data.url);
+                            if (previewCover.url.startsWith('blob:')) {
+                              URL.revokeObjectURL(previewCover.url);
+                            }
+                            setPreviewCover(null);
+                            toast({ title: '封面已上传', description: '已设置为周刊封面' });
+                          } catch (err: any) {
+                            toast({
+                              title: '上传失败',
+                              description: err?.message || '请稍后重试',
+                              variant: 'destructive',
+                            });
+                          } finally {
+                            setUploadingCover(false);
+                          }
+                        }}
+                      >
+                        {uploadingCover ? (
+                          <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> 上传中</>
+                        ) : (
+                          <><Check className="h-4 w-4 mr-1" /> 上传并使用</>
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (previewCover.url.startsWith('blob:')) {
+                            URL.revokeObjectURL(previewCover.url);
+                          }
+                          setPreviewCover(null);
+                        }}
+                      >
+                        <X className="h-4 w-4 mr-1" /> 取消
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {/* 上传/粘贴区域 */}
+                {!previewCover && (
+                  <div
+                    className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                    onPaste={async (e) => {
+                      const items = e.clipboardData?.items;
+                      if (!items) return;
+                      for (const item of items) {
+                        if (item.type.startsWith('image/')) {
+                          const file = item.getAsFile();
+                          if (file) {
+                            const previewUrl = URL.createObjectURL(file);
+                            setPreviewCover({ url: previewUrl, file });
+                            toast({ title: '图片已粘贴', description: '确认后点击"上传并使用"' });
+                          }
+                          break;
+                        }
+                      }
+                    }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={async (e) => {
+                      e.preventDefault();
+                      const file = e.dataTransfer?.files?.[0];
+                      if (file && file.type.startsWith('image/')) {
+                        const previewUrl = URL.createObjectURL(file);
+                        setPreviewCover({ url: previewUrl, file });
+                        toast({ title: '图片已添加', description: '确认后点击"上传并使用"' });
+                      }
+                    }}
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = 'image/*';
+                      input.onchange = (e) => {
+                        const file = (e.target as HTMLInputElement).files?.[0];
+                        if (file) {
+                          const previewUrl = URL.createObjectURL(file);
+                          setPreviewCover({ url: previewUrl, file });
+                        }
+                      };
+                      input.click();
+                    }}
+                  >
+                    <Upload className="h-8 w-8 mx-auto text-slate-400 mb-2" />
+                    <p className="text-sm text-slate-600">点击上传、拖拽或粘贴图片</p>
+                    <p className="text-xs text-muted-foreground mt-1">支持 PNG、JPG、WebP 格式</p>
+                  </div>
+                )}
+                {/* 已上传的封面 */}
+                {cover && !previewCover && (
+                  <div className="relative group">
+                    <img src={cover} alt="当前封面" className="w-full object-contain rounded border" />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => setCover('')}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+                {/* URL 输入（备用） */}
                 <Input
                   id="cover"
-                  placeholder="https://example.com/cover.png"
+                  placeholder="或直接输入图片 URL"
                   value={cover}
                   className={focusRingClass}
                   onChange={(e) => setCover(e.target.value)}
                 />
-                {cover && (
-                  <div className="mt-2 overflow-hidden rounded border bg-muted/30">
-                    <img src={cover} alt="封面预览" className="h-32 w-full object-cover" />
-                  </div>
-                )}
               </div>
             </div>
           )}

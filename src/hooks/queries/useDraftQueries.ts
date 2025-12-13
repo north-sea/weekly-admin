@@ -59,7 +59,7 @@ export interface DraftListParams {
   priority?: number;
   keyword?: string;
   showDuplicates?: 'all' | 'original' | 'duplicate';
-  sortBy?: 'created_at' | 'updated_at' | 'priority' | 'title' | 'synced_at';
+  sortBy?: 'created_at' | 'updated_at' | 'priority' | 'title' | 'synced_at' | 'karakeep_created_at';
   sortOrder?: 'asc' | 'desc';
   stage?: 'inbox' | 'editor' | 'all';
 }

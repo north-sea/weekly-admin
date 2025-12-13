@@ -3,10 +3,11 @@ import { prisma } from '@/lib/db';
 import { authMiddleware } from '@/lib/auth-middleware';
 import { z } from 'zod';
 import { serializeSpecialTypes } from '@/lib/utils/serialization';
+import { quailService } from '@/lib/services/quail';
+import { isQuailConfigured } from '@/lib/services/quail-api';
 
 const UpdateWeeklyIssueSchema = z.object({
   title: z.string().min(1, '标题不能为空').max(500, '标题长度不能超过500字符').optional(),
-  description: z.string().optional(),
   start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '开始日期格式不正确').optional(),
   end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '结束日期格式不正确').optional(),
   status: z.enum(['draft', 'published', 'archived']).optional(),
@@ -138,7 +139,6 @@ export async function PUT(
 
   const updateData: any = {};
   if (data.title) updateData.title = data.title;
-  if (data.description !== undefined) updateData.description = data.description;
   if (data.start_date) updateData.start_date = new Date(data.start_date);
   if (data.end_date) updateData.end_date = new Date(data.end_date);
   if (data.status) updateData.status = data.status;
@@ -154,6 +154,13 @@ export async function PUT(
       where: { id },
       data: updateData,
     });
+
+    // 如果发布周刊，异步触发 Quail 发布（不阻塞主流程）
+    if (data.status === 'published' && isQuailConfigured()) {
+      quailService.publishWeekly(id).catch((error) => {
+        console.error('Quail 自动发布失败:', error);
+      });
+    }
 
     return NextResponse.json({
       success: true,

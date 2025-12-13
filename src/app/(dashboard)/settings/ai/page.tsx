@@ -30,7 +30,7 @@ const providerOptions = [
 
 export default function AiSettingsPage() {
   const { toast } = useToast();
-  const { status, meta, config, loading, error, init, unlock, save, clear } = useAiConfigStore();
+  const { status, meta, config, loading, error, init, unlock, save, saveWithCachedPassword, hasCachedPassword, clear } = useAiConfigStore();
 
   const [provider, setProvider] = useState('openai');
   const [textModel, setTextModel] = useState('gpt-4o-mini');
@@ -38,10 +38,10 @@ export default function AiSettingsPage() {
   const [baseUrl, setBaseUrl] = useState('https://api.openai.com');
   const [apiKey, setApiKey] = useState('');
   const [weeklyDescPrompt, setWeeklyDescPrompt] = useState(
-    '你是一个周刊编辑，请基于本期标题、时间范围和收录的内容，生成 25-40 字的中文简介，语气简洁有吸引力，不要使用 Markdown。标题：{{title}}；时间：{{date_range}}；收录：{{contents_summary}}'
+    '你是一个技术周刊编辑。请为本期周刊撰写一段 50-80 字的中文简介，概述本期收录内容的主题和亮点，让读者了解本期周刊的核心价值。要求：语言简洁专业，突出技术价值，不使用 Markdown 格式。\n\n周刊标题：{{title}}\n时间范围：{{date_range}}\n收录内容：{{contents_summary}}'
   );
   const [weeklyCoverPrompt, setWeeklyCoverPrompt] = useState(
-    'Design a sleek, modern cover image for a Chinese tech/design weekly digest. Title: "{{title}}". Topics: {{contents_summary}}. Tone: dark elegant, subtle gradient, clean typography.'
+    'Generate a cover image for a tech weekly newsletter. Requirements: 1024x576 pixels (16:9 ratio), landscape orientation. Title: "{{title}}". Topics: {{contents_summary}}. Style: modern, clean, dark gradient background, subtle tech elements, professional typography.'
   );
   const [password, setPassword] = useState('');
   const [testing, setTesting] = useState(false);
@@ -93,8 +93,10 @@ export default function AiSettingsPage() {
   const handleSave = async () => {
     const trimmedPassword = password.trim();
     const keyToUse = apiKey.trim() || config?.apiKey;
+    const canUseCachedPassword = hasCachedPassword() && isUnlocked;
 
-    if (!trimmedPassword) {
+    // 如果没有输入密码，且没有缓存密码，则提示
+    if (!trimmedPassword && !canUseCachedPassword) {
       toast({ title: '请输入解锁密码', description: '用于加密保存本地配置', variant: 'destructive' });
       return;
     }
@@ -113,16 +115,23 @@ export default function AiSettingsPage() {
       return;
     }
 
+    const configToSave = {
+      provider: provider.trim(),
+      textModel: textModel.trim(),
+      imageModel: imageModel.trim(),
+      baseUrl: baseUrl.trim(),
+      apiKey: keyToUse.trim(),
+      weeklyDescPrompt: weeklyDescPrompt.trim(),
+      weeklyCoverPrompt: weeklyCoverPrompt.trim(),
+    };
+
     try {
-      await save(trimmedPassword, {
-        provider: provider.trim(),
-        textModel: textModel.trim(),
-        imageModel: imageModel.trim(),
-        baseUrl: baseUrl.trim(),
-        apiKey: keyToUse.trim(),
-        weeklyDescPrompt: weeklyDescPrompt.trim(),
-        weeklyCoverPrompt: weeklyCoverPrompt.trim(),
-      });
+      // 优先使用输入的密码，否则使用缓存密码
+      if (trimmedPassword) {
+        await save(trimmedPassword, configToSave);
+      } else {
+        await saveWithCachedPassword(configToSave);
+      }
       toast({ title: '保存成功', description: '已更新本地 AI 配置' });
       setPassword('');
       setApiKey('');
@@ -312,11 +321,13 @@ export default function AiSettingsPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="用于本地加密/解锁"
+                placeholder={isUnlocked ? '已解锁，修改配置无需再次输入' : '用于本地加密/解锁'}
                 className={focusRingClass}
               />
               <p className="text-xs text-muted-foreground">
-                不会上传到服务器。忘记密码需清除配置后重新输入 Key。
+                {isUnlocked
+                  ? '已解锁状态下修改配置无需重新输入密码。'
+                  : '不会上传到服务器。忘记密码需清除配置后重新输入 Key。'}
               </p>
             </div>
           </div>

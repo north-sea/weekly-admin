@@ -40,20 +40,26 @@ export async function GET(request: NextRequest) {
     const result = await getDraftList(query);
 
     // 转换 BigInt 为字符串
-    const serializedData = result.data.map(draft => ({
-      ...draft,
-      id: (draft as any).id?.toString?.() || draft.id,
-      duplicate_of_draft_id: (draft as any).duplicate_of_draft_id?.toString?.() || draft.duplicate_of_draft_id || null,
-      content_id: (draft as any).content_id?.toString?.() || draft.content_id || null,
-      linked_content: (draft as any).linked_content ? {
-        ...(draft as any).linked_content,
-        id: (draft as any).linked_content.id?.toString?.() || (draft as any).linked_content.id,
-      } : null,
-      duplicate_of: (draft as any).duplicate_of ? {
-        ...(draft as any).duplicate_of,
-        id: (draft as any).duplicate_of.id?.toString?.() || (draft as any).duplicate_of.id,
-      } : null,
-    }));
+    const serializedData = result.data.map(draft => {
+      const d = draft as any;
+      // 确保 id 被正确转换为字符串
+      const id = d.id !== undefined && d.id !== null ? String(d.id) : null;
+
+      return {
+        ...draft,
+        id,
+        duplicate_of_draft_id: d.duplicate_of_draft_id != null ? String(d.duplicate_of_draft_id) : null,
+        content_id: d.content_id != null ? String(d.content_id) : null,
+        linked_content: d.linked_content ? {
+          ...d.linked_content,
+          id: d.linked_content.id != null ? String(d.linked_content.id) : null,
+        } : null,
+        duplicate_of: d.duplicate_of ? {
+          ...d.duplicate_of,
+          id: d.duplicate_of.id != null ? String(d.duplicate_of.id) : null,
+        } : null,
+      };
+    });
 
     return createNextSuccessResponse({
       ...result,
