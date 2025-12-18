@@ -22,7 +22,13 @@
       "WebFetch(domain:docs.quaily.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:api.github.com)",
-      "Bash(pnpm prisma db pull:*)"
+      "Bash(pnpm prisma db pull:*)",
+      "mcp__better-auth__search",
+      "mcp__context7__get-library-docs",
+      "Bash(node:*)",
+      "Bash(npx tsx:*)",
+      "WebFetch(domain:docs.karakeep.app)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

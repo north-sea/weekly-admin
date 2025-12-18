@@ -58,6 +58,7 @@ export interface DraftListParams {
   status?: 'pending' | 'adopted' | 'rejected';
   priority?: number;
   keyword?: string;
+  source?: string;
   showDuplicates?: 'all' | 'original' | 'duplicate';
   sortBy?: 'created_at' | 'updated_at' | 'priority' | 'title' | 'synced_at' | 'karakeep_created_at';
   sortOrder?: 'asc' | 'desc';
@@ -79,6 +80,7 @@ export interface SyncStats {
 export interface DraftStatsResponse {
   inbox: { all: number; pending: number; adopted: number };
   editor: { all: number };
+  sources?: { domain: string; count: number }[];
 }
 
 export interface UpdateDraftParams {
@@ -113,6 +115,7 @@ function buildDraftListQuery(params: DraftListParams = {}) {
     status: params.status,
     priority: params.priority,
     keyword: params.keyword,
+    source: params.source,
     show_duplicates: params.showDuplicates,
     sortBy: params.sortBy,
     sortOrder: params.sortOrder,

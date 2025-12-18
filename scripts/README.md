@@ -1,0 +1,307 @@
+# Scripts 脚本说明
+
+本目录包含项目的各类脚本，用于数据库管理、部署、测试和数据迁移等任务。
+
+## 运行方式
+
+```bash
+# TypeScript 脚本
+pnpm tsx scripts/<script-name>.ts
+
+# Shell 脚本
+./scripts/<script-name>.sh
+
+# JavaScript 脚本
+node scripts/<script-name>.js
+```
+
+---
+
+## 数据库相关
+
+### `check-db.ts`
+检查数据库结构和连接状态。
+
+```bash
+pnpm tsx scripts/check-db.ts
+```
+
+**功能**：
+- 验证所有必需表是否存在
+- 统计各表记录数
+- 检查关键字段是否正确配置
+
+---
+
+### `migrate-db.ts`
+执行数据库迁移，创建必要的表和字段。
+
+```bash
+pnpm tsx scripts/migrate-db.ts
+```
+
+**功能**：
+- 创建 `users`、`operation_logs`、`content_versions` 表
+- 为 `contents` 表添加 `user_id` 字段
+- 为 `weekly_issues` 表添加 Quail 相关字段
+- 创建默认用户（admin/editor）
+
+---
+
+### `apply-schema-changes.ts`
+为 `contents` 表添加 `image_url` 和 `summary` 字段。
+
+```bash
+pnpm tsx scripts/apply-schema-changes.ts
+```
+
+---
+
+### `run-sql-migration.sh`
+执行 SQL 迁移文件。
+
+```bash
+./scripts/run-sql-migration.sh database/add_content_preview_fields.sql
+```
+
+**参数**：SQL 文件路径（默认 `database/add_content_preview_fields.sql`）
+
+---
+
+### `migrate-content-to-structured.ts`
+将 `contents` 表的 Markdown 内容解析为结构化字段。
+
+```bash
+# 预览模式（不修改数据）
+pnpm tsx scripts/migrate-content-to-structured.ts --dry-run
+
+# 执行模式
+pnpm tsx scripts/migrate-content-to-structured.ts
+```
+
+**功能**：
+- 从 `content` 字段提取 `image_url`（`![img](url)` 格式）
+- 从 `content` 字段提取 `summary`（去除标题和图片后的文本）
+- 跳过 Blog 类型内容（`content_type_id = 4`）
+
+---
+
+## 搜索相关
+
+### `init-search.ts`
+初始化 Meilisearch 搜索索引。
+
+```bash
+pnpm tsx scripts/init-search.ts
+```
+
+**功能**：
+- 配置搜索索引
+- 同步数据库内容到搜索引擎
+
+---
+
+### `test-search.ts`
+测试搜索功能。
+
+```bash
+pnpm tsx scripts/test-search.ts
+```
+
+---
+
+## Karakeep 相关
+
+### `karakeep-cleanup-draft-list.ts`
+清理 Karakeep Draft 列表中已归档的书签。
+
+```bash
+# 预览模式
+pnpm tsx scripts/karakeep-cleanup-draft-list.ts --dry-run
+
+# 执行模式
+pnpm tsx scripts/karakeep-cleanup-draft-list.ts
+```
+
+**功能**：将 `archived = true` 的书签从 Draft 列表移除
+
+---
+
+### `karakeep-refill-draft-list.ts`
+将 Karakeep 中未归档的书签补回 Draft 列表。
+
+```bash
+# 预览模式
+pnpm tsx scripts/karakeep-refill-draft-list.ts --dry-run
+
+# 执行模式
+pnpm tsx scripts/karakeep-refill-draft-list.ts
+```
+
+**功能**：获取所有 `archived = false` 的书签，添加到 `KARAKEEP_DRAFT_LIST_ID` 列表
+
+---
+
+## 部署相关
+
+### `build-and-push.sh`
+构建并推送 Docker 镜像。
+
+```bash
+# 本地构建（不推送）
+./scripts/build-and-push.sh v1.0.0
+
+# 推送到私有 Registry
+DOCKER_REGISTRY="registry.nas.local:5000" ./scripts/build-and-push.sh v1.0.0
+
+# 推送到 Docker Hub
+DOCKER_REGISTRY="your-username" ./scripts/build-and-push.sh v1.0.0
+```
+
+**参数**：版本号（默认使用时间戳）
+
+---
+
+### `deploy-update.sh`
+在 NAS 服务器上更新应用程序。
+
+```bash
+./scripts/deploy-update.sh
+```
+
+**功能**：
+- 拉取最新镜像
+- 重启应用程序
+- 清理旧镜像
+
+---
+
+### `validate-startup.js`
+Docker 容器启动前的环境变量验证。
+
+```bash
+node scripts/validate-startup.js
+```
+
+**验证项**：
+- 必需变量：`DATABASE_URL`、`JWT_SECRET`、`MEILISEARCH_HOST`
+- 格式验证：数据库 URL、Meilisearch URL、端口号
+- 安全检查：JWT_SECRET 长度
+
+---
+
+### `switch-to-mysql.sh`
+切换数据库到 MySQL（已废弃，仅供参考）。
+
+---
+
+## 测试相关
+
+### `test-content-api.ts`
+测试内容 API。
+
+```bash
+pnpm tsx scripts/test-content-api.ts
+```
+
+---
+
+### `test-image-upload-config.ts`
+测试图片上传配置。
+
+```bash
+pnpm tsx scripts/test-image-upload-config.ts
+```
+
+---
+
+### `test-image-upload-integration.ts`
+测试图片上传集成。
+
+```bash
+pnpm tsx scripts/test-image-upload-integration.ts
+```
+
+---
+
+## 迁移子目录 (`迁移/`)
+
+历史数据迁移脚本，用于将已有周刊内容与 Karakeep 同步。
+
+### `extract-weekly-source-urls.ts`
+从周刊 Markdown 内容中提取 `source_url`。
+
+```bash
+# 预览模式
+pnpm tsx scripts/迁移/extract-weekly-source-urls.ts --dry-run
+
+# 执行模式
+pnpm tsx scripts/迁移/extract-weekly-source-urls.ts
+```
+
+**输出**：报表保存在 `scripts/迁移/reports/` 目录
+
+---
+
+### `push-weekly-to-karakeep.ts`
+将已发布周刊内容推送到 Karakeep。
+
+```bash
+# 预览模式
+pnpm tsx scripts/迁移/push-weekly-to-karakeep.ts --dry-run
+
+# 执行模式
+pnpm tsx scripts/迁移/push-weekly-to-karakeep.ts
+
+# 指定 ID
+pnpm tsx scripts/迁移/push-weekly-to-karakeep.ts --ids=1,2,3
+
+# 调整并发和延迟
+pnpm tsx scripts/迁移/push-weekly-to-karakeep.ts --concurrency=5 --delay=100
+```
+
+**功能**：
+- 创建 Karakeep 书签
+- 添加到迁移列表
+- 保存 `karakeep_id` 到 `content_attributes`
+
+---
+
+### `sync-weekly-from-karakeep.ts`
+从 Karakeep 回写周刊数据（summary、图片）。
+
+```bash
+# 预览模式
+pnpm tsx scripts/迁移/sync-weekly-from-karakeep.ts --dry-run
+
+# 执行模式
+pnpm tsx scripts/迁移/sync-weekly-from-karakeep.ts
+
+# 不归档书签
+pnpm tsx scripts/迁移/sync-weekly-from-karakeep.ts --no-archive
+```
+
+**功能**：
+- 获取 Karakeep 的 summary
+- 下载图片并上传到图床
+- 更新 `contents` 表的 `summary`、`image_url`
+- 可选归档 Karakeep 书签
+
+---
+
+## 环境变量
+
+部分脚本依赖以下环境变量：
+
+| 变量名 | 说明 |
+|--------|------|
+| `DATABASE_URL` | 数据库连接字符串 |
+| `KARAKEEP_HOST` | Karakeep API 地址 |
+| `KARAKEEP_KEY` | Karakeep API 密钥 |
+| `KARAKEEP_DRAFT_LIST_ID` | Karakeep Draft 列表 ID |
+| `KARAKEEP_WEEKLY_LIST_ID` | Karakeep Weekly 列表 ID |
+| `KARAKEEP_MIGRATION_LIST_ID` | Karakeep 迁移列表 ID |
+| `IMAGE_UPLOAD_URL` | 图床上传 API 地址 |
+| `IMAGE_UPLOAD_TOKEN` | 图床 API Token |
+| `MEILISEARCH_HOST` | Meilisearch 地址 |
+| `JWT_SECRET` | JWT 密钥 |

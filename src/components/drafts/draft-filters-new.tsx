@@ -18,9 +18,10 @@ interface DraftFiltersProps {
   value?: DraftListParams;
   onChange?: (filters: DraftListParams) => void;
   className?: string;
+  sources?: { domain: string; count: number }[];
 }
 
-export function DraftFilters({ value = {}, onChange, className }: DraftFiltersProps) {
+export function DraftFilters({ value = {}, onChange, className, sources = [] }: DraftFiltersProps) {
   const [filters, setFilters] = useState<DraftListParams>(value);
   const [searchInput, setSearchInput] = useState(value.keyword || '');
 
@@ -36,19 +37,19 @@ export function DraftFilters({ value = {}, onChange, className }: DraftFiltersPr
   };
 
   const handleReset = () => {
-    const emptyFilters = {
+    const emptyFilters: DraftListParams = {
       sortBy: 'karakeep_created_at',
       sortOrder: 'desc',
     };
     setFilters(emptyFilters);
     setSearchInput('');
-    onChange?.(emptyFilters as DraftListParams);
+    onChange?.(emptyFilters);
   };
 
   // 计算当前活跃筛选项数量
   const activeFiltersCount = [
     filters.status,
-    filters.priority,
+    filters.source,
     filters.stage,
     filters.showDuplicates,
     filters.keyword,
@@ -148,21 +149,21 @@ export function DraftFilters({ value = {}, onChange, className }: DraftFiltersPr
 
       {/* 高级筛选（可折叠） */}
       <div className="flex flex-wrap gap-2 mt-3">
-        {/* 优先级筛选 */}
+        {/* 来源筛选 */}
         <Select
-          value={filters.priority?.toString() || 'all'}
-          onValueChange={(val) => handleChange('priority', val === 'all' ? undefined : parseInt(val))}
+          value={filters.source || 'all'}
+          onValueChange={(val) => handleChange('source', val === 'all' ? undefined : val)}
         >
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="优先级" />
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="来源" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">全部优先级</SelectItem>
-            <SelectItem value="1">⭐ (1)</SelectItem>
-            <SelectItem value="2">⭐⭐ (2)</SelectItem>
-            <SelectItem value="3">⭐⭐⭐ (3)</SelectItem>
-            <SelectItem value="4">⭐⭐⭐⭐ (4)</SelectItem>
-            <SelectItem value="5">⭐⭐⭐⭐⭐ (5)</SelectItem>
+            <SelectItem value="all">全部来源</SelectItem>
+            {sources.map((s) => (
+              <SelectItem key={s.domain} value={s.domain}>
+                {s.domain} ({s.count})
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
 

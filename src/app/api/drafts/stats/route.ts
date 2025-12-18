@@ -25,6 +25,29 @@ export async function GET(request: NextRequest) {
     // 编辑草稿（内容库，status=draft）统计
     const editorAll = await prisma.contents.count({ where: { status: 'draft' } });
 
+    // 获取所有来源域名（从 URL 中提取）
+    const draftsWithUrls = await prisma.drafts.findMany({
+      select: { url: true },
+      where: { url: { not: '' } },
+    });
+
+    // 提取并统计域名
+    const sourceCountMap = new Map<string, number>();
+    for (const draft of draftsWithUrls) {
+      try {
+        const hostname = new URL(draft.url).hostname.replace(/^www\./, '');
+        sourceCountMap.set(hostname, (sourceCountMap.get(hostname) || 0) + 1);
+      } catch {
+        // 忽略无效 URL
+      }
+    }
+
+    // 转换为数组并按数量排序，取前 20 个
+    const sources = Array.from(sourceCountMap.entries())
+      .map(([domain, count]) => ({ domain, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 20);
+
     return createNextSuccessResponse({
       inbox: {
         all: inboxAll,
@@ -34,6 +57,7 @@ export async function GET(request: NextRequest) {
       editor: {
         all: editorAll,
       },
+      sources,
     });
   } catch (error) {
     console.error('获取草稿统计失败:', error);

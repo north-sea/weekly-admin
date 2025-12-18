@@ -23,8 +23,16 @@ export async function POST(request: NextRequest) {
     
     const stats = await syncFromKarakeep();
 
+    const messageParts = [`新增 ${stats.created} 条`, `更新 ${stats.updated} 条`];
+    if (stats.deleted > 0) {
+      messageParts.push(`删除 ${stats.deleted} 条`);
+    }
+    if (stats.duplicatesDetected > 0) {
+      messageParts.push(`检测到 ${stats.duplicatesDetected} 条重复`);
+    }
+
     return createNextSuccessResponse(stats, 200, {
-      message: `同步完成：新增 ${stats.created} 条，更新 ${stats.updated} 条${stats.duplicatesDetected > 0 ? `，检测到 ${stats.duplicatesDetected} 条重复` : ''}`
+      message: `同步完成：${messageParts.join('，')}`
     });
   } catch (error) {
     console.error('同步失败:', error);

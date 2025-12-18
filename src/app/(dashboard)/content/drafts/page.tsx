@@ -149,7 +149,7 @@ export default function DraftsPageNew() {
           <CardTitle className="text-lg">筛选和排序</CardTitle>
         </CardHeader>
         <CardContent>
-          <DraftFilters value={filters} onChange={setFilters} />
+          <DraftFilters value={filters} onChange={setFilters} sources={stats?.sources} />
         </CardContent>
       </Card>
 

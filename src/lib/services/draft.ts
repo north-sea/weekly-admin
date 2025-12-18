@@ -14,6 +14,7 @@ export interface DraftQuery {
   status?: 'pending' | 'adopted' | 'rejected';
   priority?: number;
   keyword?: string;
+  source?: string;
   categoryFrom?: string;
   categoryTo?: string;
   dateFrom?: string;
@@ -78,6 +79,7 @@ export interface SyncStats {
   errors: number;
   duplicatesDetected: number;
   categoriesSuggested: number;
+  deleted: number; // 因 Karakeep 删除而删除的草稿数
 }
 
 /**
@@ -297,6 +299,7 @@ export class DraftService {
       status,
       priority,
       keyword,
+      source,
       showDuplicates = 'all',
       sortBy = 'created_at',
       sortOrder = 'desc',
@@ -414,6 +417,11 @@ export class DraftService {
         ];
       }
 
+      // 来源筛选（基于 URL 域名）
+      if (source) {
+        where.url = { contains: source };
+      }
+
       // 去重筛选
       if (showDuplicates === 'original') {
         where.duplicate_of_draft_id = null;
@@ -477,6 +485,9 @@ export class DraftService {
         { url: { contains: keyword } },
       ];
     }
+    if (source) {
+      inboxWhere.url = { contains: source };
+    }
     if (showDuplicates === 'original') {
       inboxWhere.duplicate_of_draft_id = null;
     } else if (showDuplicates === 'duplicate') {
@@ -490,6 +501,9 @@ export class DraftService {
         { description: { contains: keyword } },
         { source_url: { contains: keyword } },
       ];
+    }
+    if (source) {
+      contentsWhere.source_url = { contains: source };
     }
 
     // 2) 分别统计总数
@@ -734,7 +748,8 @@ export class DraftService {
 
   /**
    * 从 Karakeep 同步书签
-   * 只同步本地数据库中不存在的新书签（未入库的内容）
+   * 1. 同步本地数据库中不存在的新书签
+   * 2. 删除 Karakeep 中已删除的书签对应的本地草稿（仅限 pending 状态）
    */
   static async syncFromKarakeep(): Promise<SyncStats> {
     const stats: SyncStats = {
@@ -745,6 +760,7 @@ export class DraftService {
       errors: 0,
       duplicatesDetected: 0,
       categoriesSuggested: 0,
+      deleted: 0,
     };
 
     try {
@@ -753,28 +769,55 @@ export class DraftService {
         archived: false, // 只获取未归档的书签
         limit: 100, // 每页 100 条
       });
-      
+
       console.log(`从 Karakeep 获取了 ${bookmarks.length} 条书签`);
 
-      // 2. 获取本地已有的 karakeep_id 列表
-      const existingKarakeepIds = await prisma.drafts.findMany({
-        select: { karakeep_id: true },
-      }).then(drafts => new Set(drafts.map(d => d.karakeep_id)));
+      // 构建 Karakeep 书签 ID 集合
+      const karakeepBookmarkIds = new Set(bookmarks.map(b => b.id));
+
+      // 2. 获取本地已有的草稿（包含 karakeep_id 和 status）
+      const existingDrafts = await prisma.drafts.findMany({
+        select: { id: true, karakeep_id: true, status: true },
+      });
+      const existingKarakeepIds = new Set(existingDrafts.map(d => d.karakeep_id));
 
       console.log(`本地数据库已有 ${existingKarakeepIds.size} 条草稿`);
 
-      // 3. 过滤出本地不存在的书签（真正未入库的）
+      // 3. 检测并删除 Karakeep 中已删除的书签对应的本地草稿
+      // 只删除 pending 状态的草稿，已采用（adopted）的草稿不删除
+      const draftsToDelete = existingDrafts.filter(
+        draft => draft.status === 'pending' && !karakeepBookmarkIds.has(draft.karakeep_id)
+      );
+
+      if (draftsToDelete.length > 0) {
+        console.log(`发现 ${draftsToDelete.length} 条草稿在 Karakeep 中已删除，准备删除本地草稿`);
+
+        for (const draft of draftsToDelete) {
+          try {
+            await prisma.drafts.delete({
+              where: { id: draft.id },
+            });
+            stats.deleted++;
+            console.log(`已删除草稿 (karakeep_id: ${draft.karakeep_id})`);
+          } catch (error) {
+            console.error(`删除草稿失败 (id: ${draft.id}):`, error);
+            stats.errors++;
+          }
+        }
+      }
+
+      // 4. 过滤出本地不存在的书签（真正未入库的）
       const newBookmarks = bookmarks.filter(bookmark => !existingKarakeepIds.has(bookmark.id));
-      
+
       console.log(`发现 ${newBookmarks.length} 条新书签需要同步`);
       stats.total = newBookmarks.length;
 
-      if (newBookmarks.length === 0) {
-        console.log('没有新书签需要同步');
+      if (newBookmarks.length === 0 && stats.deleted === 0) {
+        console.log('没有新书签需要同步，也没有需要删除的草稿');
         return stats;
       }
 
-      // 4. 只处理新书签（创建新草稿）
+      // 5. 只处理新书签（创建新草稿）
       for (const bookmark of newBookmarks) {
         try {
           await this.processSingleBookmark(bookmark, stats);
@@ -784,12 +827,12 @@ export class DraftService {
         }
       }
 
-      // 5. 执行全局去重检测
+      // 6. 执行全局去重检测
       await this.performGlobalDuplicateDetection();
 
       console.log('同步完成:', stats);
       return stats;
-      
+
     } catch (error) {
       console.error('同步失败:', error);
       throw error;
@@ -873,73 +916,69 @@ export class DraftService {
       synced_at: new Date(),
     };
 
+    // 建议分类（用于新增记录）
+    const category_suggestion = suggestCategory(url, title);
+
+    // 使用 upsert 原子操作，避免竞态条件导致的唯一约束冲突
+    const result = await prisma.drafts.upsert({
+      where: { karakeep_id },
+      create: {
+        ...draftData,
+        category_suggestion: category_suggestion || undefined,
+      },
+      update: {
+        // Karakeep 原始数据
+        title: draftData.title,
+        url: draftData.url,
+        description: draftData.description,
+        summary: draftData.summary,
+        note: draftData.note,
+        favicon_url: draftData.favicon_url,
+        image_url: draftData.image_url,
+
+        // Karakeep 元数据
+        karakeep_created_at: draftData.karakeep_created_at,
+        karakeep_updated_at: draftData.karakeep_updated_at,
+        tagging_status: draftData.tagging_status,
+        summarization_status: draftData.summarization_status,
+        tags_suggestion: draftData.tags_suggestion,
+
+        // 内容字段（可能需要重新生成）
+        slug: draftData.slug,
+        content: draftData.content,
+        source: draftData.source,
+        word_count: draftData.word_count,
+
+        // 同步时间
+        synced_at: draftData.synced_at,
+
+        // 保留字段：status, priority, category_suggestion, content_id, duplicate_of_draft_id
+        // 这些字段不会被更新，保持原值
+      },
+    });
+
     if (existing) {
-      // 更新现有记录（以 Karakeep 数据为准）
-      // 但保留本地扩展字段（status, priority, category_suggestion）
-      
       // 检查是否有实质性更新
-      const hasChanges = 
+      const hasChanges =
         existing.title !== draftData.title ||
         existing.summary !== draftData.summary ||
         existing.description !== draftData.description ||
         existing.note !== draftData.note ||
         existing.tagging_status !== draftData.tagging_status ||
         existing.summarization_status !== draftData.summarization_status;
-      
+
       if (hasChanges || existing.status === 'pending') {
-        // 只更新 Karakeep 相关字段，保留本地字段
-        await prisma.drafts.update({
-          where: { karakeep_id },
-          data: {
-            // Karakeep 原始数据
-            title: draftData.title,
-            url: draftData.url,
-            description: draftData.description,
-            summary: draftData.summary,
-            note: draftData.note,
-            favicon_url: draftData.favicon_url,
-            image_url: draftData.image_url,
-            
-            // Karakeep 元数据
-            karakeep_created_at: draftData.karakeep_created_at,
-            karakeep_updated_at: draftData.karakeep_updated_at,
-            tagging_status: draftData.tagging_status,
-            summarization_status: draftData.summarization_status,
-            tags_suggestion: draftData.tags_suggestion,
-            
-            // 内容字段（可能需要重新生成）
-            slug: draftData.slug,
-            content: draftData.content,
-            source: draftData.source,
-            word_count: draftData.word_count,
-            
-            // 同步时间
-            synced_at: draftData.synced_at,
-            
-            // 保留字段：status, priority, category_suggestion, content_id, duplicate_of_draft_id
-            // 这些字段不会被更新，保持原值
-          },
-        });
         stats.updated++;
-        
         console.log(`更新草稿 ${karakeep_id}: ${existing.title} -> ${draftData.title}`);
       } else {
         stats.unchanged++;
       }
     } else {
       // 新增记录
-      // 建议分类
-      const category_suggestion = suggestCategory(url, title);
       if (category_suggestion) {
-        draftData.category_suggestion = category_suggestion;
         stats.categoriesSuggested++;
       }
-
-      await prisma.drafts.create({
-        data: draftData,
-      });
       stats.created++;
-      
       console.log(`新增草稿: ${draftData.title}`);
     }
   }
@@ -1006,6 +1045,7 @@ export class DraftService {
         errors: 0,
         duplicatesDetected: 0,
         categoriesSuggested: 0,
+        deleted: 0,
       };
 
       await this.processSingleBookmark(bookmark, stats);

@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
       status: searchParams.get('status') as any,
       priority: searchParams.get('priority') ? parseInt(searchParams.get('priority')!) : undefined,
       keyword: searchParams.get('keyword') || undefined,
+      source: searchParams.get('source') || undefined,
       showDuplicates: (searchParams.get('showDuplicates') || 'all') as any,
       sortBy: (searchParams.get('sortBy') || 'created_at') as any,
       sortOrder: (searchParams.get('sortOrder') || 'desc') as any,

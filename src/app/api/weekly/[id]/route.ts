@@ -155,6 +155,26 @@ export async function PUT(
       data: updateData,
     });
 
+    // 如果发布周刊，同步更新关联内容的状态为 published
+    if (data.status === 'published') {
+      // 获取该周刊关联的所有内容 ID
+      const weeklyItems = await prisma.weekly_content_items.findMany({
+        where: { weekly_issue_id: id },
+        select: { content_id: true },
+      });
+
+      const contentIds = weeklyItems.map((item) => item.content_id);
+
+      if (contentIds.length > 0) {
+        // 批量更新内容状态为 published
+        await prisma.contents.updateMany({
+          where: { id: { in: contentIds } },
+          data: { status: 'published' },
+        });
+        console.log(`周刊 ${id} 发布，已同步更新 ${contentIds.length} 篇内容状态为 published`);
+      }
+    }
+
     // 如果发布周刊，异步触发 Quail 发布（不阻塞主流程）
     if (data.status === 'published' && isQuailConfigured()) {
       quailService.publishWeekly(id).catch((error) => {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
@@ -26,7 +26,6 @@ interface LoginFeedback {
 }
 
 export default function LoginPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get('redirect') || '/dashboard';
   const { login, isAuthenticated, hasHydrated } = useAuthStore();
@@ -52,16 +51,10 @@ export default function LoginPage() {
     if (!hasHydrated) return;
     if (isAuthenticated && !redirectedRef.current) {
       redirectedRef.current = true;
-      const timer = setTimeout(() => {
-        try {
-          router.replace(redirectUrl);
-        } catch {
-          window.location.href = redirectUrl;
-        }
-      }, 120);
-      return () => clearTimeout(timer);
+      // 已登录用户访问登录页，直接跳转
+      window.location.href = redirectUrl;
     }
-  }, [hasHydrated, isAuthenticated, redirectUrl, router]);
+  }, [hasHydrated, isAuthenticated, redirectUrl]);
 
   const onSubmit = async (values: z.infer<typeof loginSchema>) => {
     setLoading(true);
@@ -78,6 +71,8 @@ export default function LoginPage() {
       const data = await response.json();
       if (data.success && data.data) {
         setFeedback({ type: 'success', message: '登录成功，正在跳转...' });
+
+        // 设置 cookie
         try {
           const isHttps =
             typeof window !== 'undefined' && window.location.protocol === 'https:';
@@ -86,17 +81,15 @@ export default function LoginPage() {
           document.cookie = `auth-token=${data.data.token}; Path=/; Max-Age=${maxAge}; SameSite=Lax${secureAttr}`;
         } catch {}
 
+        // 更新状态
         login(data.data.user, data.data.token);
-        if (!redirectedRef.current) {
-          redirectedRef.current = true;
-          setTimeout(() => {
-            try {
-              router.replace(redirectUrl);
-            } catch {
-              window.location.href = redirectUrl;
-            }
-          }, 240);
-        }
+
+        // 标记已重定向，防止重复跳转
+        redirectedRef.current = true;
+
+        // 使用硬跳转确保 middleware 能正确处理认证状态
+        // Next.js client-side router 不会重新触发 middleware
+        window.location.href = redirectUrl;
       } else {
         setFeedback({ type: 'error', message: data.error || '登录失败，请检查账号或密码' });
       }

@@ -298,7 +298,7 @@ export function DraftGrid({ drafts, isLoading, onPreview }: DraftGridProps) {
               <TableHead className="min-w-[120px] px-4 py-3 font-semibold text-foreground">状态</TableHead>
               <TableHead className="min-w-[140px] px-4 py-3 font-semibold text-foreground">来源</TableHead>
               <TableHead className="min-w-[140px] px-4 py-3 font-semibold text-foreground">时间</TableHead>
-              <TableHead className="min-w-[200px] px-4 py-3 font-semibold text-foreground">操作</TableHead>
+              <TableHead className="w-[140px] px-4 py-3 font-semibold text-foreground">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -432,46 +432,47 @@ export function DraftGrid({ drafts, isLoading, onPreview }: DraftGridProps) {
                     </div>
                   </TableCell>
                   <TableCell className="align-top">
-                    <div className="flex flex-wrap gap-2 min-w-[200px]">
+                    <div className="flex items-center gap-1">
                       <Button
-                        variant="outline"
-                        size="sm"
-                        className="transition-transform hover:-translate-y-0.5"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
                         onClick={() => onPreview?.(draft)}
+                        title="预览"
                       >
-                        <Eye className="h-4 w-4 mr-1" />
-                        预览
-                      </Button>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="transition-transform hover:-translate-y-0.5"
-                        onClick={() => handleAdopt(draft)}
-                        disabled={convertDraft.isPending || draft.status !== 'pending'}
-                      >
-                        {convertDraft.isPending ? (
-                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                        ) : (
-                          <Check className="h-4 w-4 mr-1" />
-                        )}
-                        采用
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-destructive/40 text-destructive transition-transform hover:-translate-y-0.5 hover:bg-destructive/10"
-                        onClick={() => handleReject(draft)}
-                        disabled={updateDraft.isPending || draft.status !== 'pending'}
-                      >
-                        <X className="h-4 w-4 mr-1" />
-                        拒绝
+                        <Eye className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
-                        size="sm"
-                        className="text-destructive transition-transform hover:-translate-y-0.5 hover:bg-destructive/10"
+                        size="icon"
+                        className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                        onClick={() => handleAdopt(draft)}
+                        disabled={convertDraft.isPending || draft.status !== 'pending'}
+                        title="采用"
+                      >
+                        {convertDraft.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Check className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-orange-500 hover:text-orange-600 hover:bg-orange-50"
+                        onClick={() => handleReject(draft)}
+                        disabled={updateDraft.isPending || draft.status !== 'pending'}
+                        title="拒绝"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:bg-destructive/10"
                         onClick={() => handleDelete(draft)}
                         disabled={deleteDraft.isPending}
+                        title="删除"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
