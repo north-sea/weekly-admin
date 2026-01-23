@@ -113,3 +113,4 @@
 ### Phase 4 实施（周刊组织器 - 前端预览）
 - ✅ 生成器页面：`src/app/(dashboard)/weekly/generate/page.tsx`（选择周刊 + maxItems + 结果分组预览/复制）
 - ✅ 周刊列表入口：`src/app/(dashboard)/weekly/page.tsx`
+- ✅ 支持一键应用到周刊：通过 `PUT /api/weekly/:id/contents` 覆盖写入

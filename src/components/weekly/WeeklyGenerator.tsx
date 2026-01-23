@@ -54,6 +54,7 @@ export function WeeklyGenerator() {
   const [weeklyIssueId, setWeeklyIssueId] = useState<string>('');
   const [maxItems, setMaxItems] = useState(12);
   const [generating, setGenerating] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [result, setResult] = useState<OrganizeResult | null>(null);
 
   useEffect(() => {
@@ -111,6 +112,36 @@ export function WeeklyGenerator() {
     }
   };
 
+  const handleApply = async () => {
+    const id = Number(weeklyIssueId);
+    if (!id || !result?.items?.length) return;
+    if (!confirm('将覆盖该周刊现有内容，确定要应用 AI 结果吗？')) return;
+
+    setApplying(true);
+    try {
+      const response = await fetch(`/api/weekly/${id}/contents`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: result.items.map((item, index) => ({
+            content_id: item.content_id,
+            sort_order: index,
+            section: item.section,
+            featured: Boolean(item.featured),
+          })),
+        }),
+      });
+      const json = await response.json();
+      if (!json?.success) throw new Error(json?.error?.message || '应用失败');
+      toast({ title: '已应用', description: '已写入周刊内容列表' });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '应用失败';
+      toast({ title: '应用失败', description: message, variant: 'destructive' });
+    } finally {
+      setApplying(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -164,12 +195,24 @@ export function WeeklyGenerator() {
               )}
             </Button>
             {result && (
-              <Button
-                variant="outline"
-                onClick={() => navigator.clipboard.writeText(JSON.stringify(result, null, 2))}
-              >
-                复制 JSON
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => navigator.clipboard.writeText(JSON.stringify(result, null, 2))}
+                >
+                  复制 JSON
+                </Button>
+                <Button variant="outline" onClick={handleApply} disabled={applying || !weeklyIssueId}>
+                  {applying ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      应用中
+                    </>
+                  ) : (
+                    '应用到周刊'
+                  )}
+                </Button>
+              </>
             )}
           </div>
         </CardContent>
@@ -248,4 +291,3 @@ export function WeeklyGenerator() {
     </div>
   );
 }
-
