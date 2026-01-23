@@ -39,6 +39,8 @@ import StructuredPreview from './StructuredPreview';
 import { debounce } from 'lodash-es';
 import ScreenshotPasteUploader from '@/components/content/ScreenshotPasteUploader';
 import { apiClient } from '@/lib/api-client';
+import { AIScoreDisplay } from '@/components/content/AIScoreDisplay';
+import { AIScoreButton } from '@/components/content/AIScoreButton';
 
 // 表单验证 schema
 const contentSchema = z.object({
@@ -167,6 +169,24 @@ export default function SimplifiedEditor({
     [initialValues?.attributes]
   );
   const isResyncRunning = resyncJob ? ['updating', 'waiting', 'applying'].includes(resyncJob.phase) : false;
+  const [originalScore, setOriginalScore] = useState<number | null>(initialValues?.original_score ?? null);
+  const [summaryScore, setSummaryScore] = useState<number | null>(initialValues?.summary_score ?? null);
+  const [originalScoreDetails, setOriginalScoreDetails] = useState<Record<string, unknown> | null>(() => {
+    const metadata = initialValues?.ai_metadata;
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return null;
+    const scoring = (metadata as any).scoring;
+    const original = scoring?.original;
+    return original && typeof original === 'object' && !Array.isArray(original) ? original : null;
+  });
+  const [summaryScoreDetails, setSummaryScoreDetails] = useState<Record<string, unknown> | null>(() => {
+    const metadata = initialValues?.ai_metadata;
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return null;
+    const scoring = (metadata as any).scoring;
+    const summary = scoring?.summary;
+    return summary && typeof summary === 'object' && !Array.isArray(summary) ? summary : null;
+  });
+  const [scoringOriginal, setScoringOriginal] = useState(false);
+  const [scoringSummary, setScoringSummary] = useState(false);
   const previewTags = useMemo(() => {
     const ids = new Set((selectedTagIds || []).map((id) => Number(id)));
     const matched = tags.filter((tag) => ids.has(tag.id));
@@ -399,6 +419,51 @@ export default function SimplifiedEditor({
     setHasUnsavedChanges(true);
   };
 
+  const contentId = useMemo(() => {
+    const raw = initialValues?.id;
+    if (raw === null || raw === undefined) return null;
+    const id = Number(raw);
+    return Number.isFinite(id) ? id : null;
+  }, [initialValues?.id]);
+
+  const handleScoreOriginal = async () => {
+    if (!contentId) return;
+    setScoringOriginal(true);
+    try {
+      const result = await apiClient.post<any>('/api/ai/score-content', { contentId });
+      if (typeof result?.overall === 'number') setOriginalScore(result.overall);
+      if (result && typeof result === 'object') setOriginalScoreDetails(result);
+      toast({ title: '评分完成', description: '已更新原文评分' });
+    } catch (error: any) {
+      toast({
+        title: '评分失败',
+        description: error?.message || '请检查 AI 环境变量配置',
+        variant: 'destructive',
+      });
+    } finally {
+      setScoringOriginal(false);
+    }
+  };
+
+  const handleScoreSummary = async () => {
+    if (!contentId) return;
+    setScoringSummary(true);
+    try {
+      const result = await apiClient.post<any>('/api/ai/score-summary', { contentId });
+      if (typeof result?.overall === 'number') setSummaryScore(result.overall);
+      if (result && typeof result === 'object') setSummaryScoreDetails(result);
+      toast({ title: '评分完成', description: '已更新摘要评分' });
+    } catch (error: any) {
+      toast({
+        title: '评分失败',
+        description: error?.message || '请检查 AI 环境变量配置',
+        variant: 'destructive',
+      });
+    } finally {
+      setScoringSummary(false);
+    }
+  };
+
   return (
     <div className="flex h-full flex-col">
       <div className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur">
@@ -434,6 +499,22 @@ export default function SimplifiedEditor({
           </div>
           
           <div className="flex items-center gap-2">
+            <div className="flex items-center flex-wrap gap-3 pr-2">
+              <AIScoreDisplay label="原文" score={originalScore} details={originalScoreDetails} />
+              <AIScoreDisplay label="摘要" score={summaryScore} details={summaryScoreDetails} />
+              <AIScoreButton
+                label="原文评分"
+                onClick={handleScoreOriginal}
+                disabled={!contentId}
+                loading={scoringOriginal}
+              />
+              <AIScoreButton
+                label="摘要评分"
+                onClick={handleScoreSummary}
+                disabled={!contentId}
+                loading={scoringSummary}
+              />
+            </div>
             <Button
               variant="outline"
               size="sm"

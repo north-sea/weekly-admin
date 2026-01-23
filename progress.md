@@ -98,3 +98,6 @@
 ### Phase 2 实施（后端已就绪）
 - ✅ 原文评分：`POST /api/ai/score-content`（写入 `contents.original_score` + `ai_metadata.scoring.original`）
 - ✅ 摘要评分：`POST /api/ai/score-summary`（写入 `contents.summary_score` + `ai_metadata.scoring.summary`）
+
+### Phase 2 实施（前端集成）
+- ✅ 内容编辑页头部展示评分与“重新评分”：`src/components/content/simplified-editor.tsx`
