@@ -4,7 +4,13 @@ export interface ContentWithRelations {
   slug: string;
   description?: string;
   summary?: string | null;
+  original_score?: number | null;
+  summary_score?: number | null;
+  ai_metadata?: unknown | null;
   image_url?: string | null;
+  image_source?: string | null;
+  image_width?: number | null;
+  image_height?: number | null;
   cover_image?: string | null;
   content: string;
   content_format?: string | null;

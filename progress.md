@@ -79,3 +79,12 @@
 ### 下一步建议（可选其一）
 - [ ] 先清理工作区（确认这些改动是否需要保留）
 - [ ] 直接启动 Phase 1：先做 DB 字段扩展 + AI client（最小闭环）
+
+### Phase 1 实施（进行中）
+- ✅ 已补充 DB 字段与索引（代码层）：`scripts/migrate-db.ts`
+- ✅ 已同步 Prisma schema：`prisma/schema.prisma`（`contents` 新增 `original_score/summary_score/ai_metadata/image_source/image_width/image_height`）
+- ✅ 已补充前端类型：`src/types/content.ts`
+- ✅ 已新增 server-only Anthropic client：`src/lib/ai/server/client.ts`（依赖 `ANTHROPIC_API_KEY` / 可选 `ANTHROPIC_MODEL` / `ANTHROPIC_BASE_URL`）
+
+### 校验
+- ⚠️ `pnpm type-check` 当前在主分支已有多处 TS 报错（与本次变更无直接关联），因此未作为本阶段的通过门槛。

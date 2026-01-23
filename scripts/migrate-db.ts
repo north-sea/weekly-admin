@@ -78,6 +78,88 @@ async function migrateDatabase() {
       console.log('✅ contents 表添加 user_id 字段');
     }
 
+    // AI 字段（contents）
+    const originalScoreColumn = await prisma.$queryRaw`
+      SHOW COLUMNS FROM contents LIKE 'original_score'
+    `;
+    if (Array.isArray(originalScoreColumn) && originalScoreColumn.length === 0) {
+      await prisma.$executeRaw`
+        ALTER TABLE contents ADD COLUMN original_score FLOAT NULL
+      `;
+      console.log('✅ contents 表添加 original_score 字段');
+    }
+
+    const summaryScoreColumn = await prisma.$queryRaw`
+      SHOW COLUMNS FROM contents LIKE 'summary_score'
+    `;
+    if (Array.isArray(summaryScoreColumn) && summaryScoreColumn.length === 0) {
+      await prisma.$executeRaw`
+        ALTER TABLE contents ADD COLUMN summary_score FLOAT NULL
+      `;
+      console.log('✅ contents 表添加 summary_score 字段');
+    }
+
+    const aiMetadataColumn = await prisma.$queryRaw`
+      SHOW COLUMNS FROM contents LIKE 'ai_metadata'
+    `;
+    if (Array.isArray(aiMetadataColumn) && aiMetadataColumn.length === 0) {
+      await prisma.$executeRaw`
+        ALTER TABLE contents ADD COLUMN ai_metadata JSON NULL
+      `;
+      console.log('✅ contents 表添加 ai_metadata 字段');
+    }
+
+    const imageSourceColumn = await prisma.$queryRaw`
+      SHOW COLUMNS FROM contents LIKE 'image_source'
+    `;
+    if (Array.isArray(imageSourceColumn) && imageSourceColumn.length === 0) {
+      await prisma.$executeRaw`
+        ALTER TABLE contents ADD COLUMN image_source VARCHAR(50) NULL
+      `;
+      console.log('✅ contents 表添加 image_source 字段');
+    }
+
+    const imageWidthColumn = await prisma.$queryRaw`
+      SHOW COLUMNS FROM contents LIKE 'image_width'
+    `;
+    if (Array.isArray(imageWidthColumn) && imageWidthColumn.length === 0) {
+      await prisma.$executeRaw`
+        ALTER TABLE contents ADD COLUMN image_width INT NULL
+      `;
+      console.log('✅ contents 表添加 image_width 字段');
+    }
+
+    const imageHeightColumn = await prisma.$queryRaw`
+      SHOW COLUMNS FROM contents LIKE 'image_height'
+    `;
+    if (Array.isArray(imageHeightColumn) && imageHeightColumn.length === 0) {
+      await prisma.$executeRaw`
+        ALTER TABLE contents ADD COLUMN image_height INT NULL
+      `;
+      console.log('✅ contents 表添加 image_height 字段');
+    }
+
+    // AI 字段索引（可选，但推荐）
+    const originalScoreIndex = await prisma.$queryRaw`
+      SHOW INDEX FROM contents WHERE Key_name = 'idx_original_score'
+    `;
+    if (Array.isArray(originalScoreIndex) && originalScoreIndex.length === 0) {
+      await prisma.$executeRaw`
+        CREATE INDEX idx_original_score ON contents(original_score)
+      `;
+      console.log('✅ contents 表创建 idx_original_score 索引');
+    }
+
+    const summaryScoreIndex = await prisma.$queryRaw`
+      SHOW INDEX FROM contents WHERE Key_name = 'idx_summary_score'
+    `;
+    if (Array.isArray(summaryScoreIndex) && summaryScoreIndex.length === 0) {
+      await prisma.$executeRaw`
+        CREATE INDEX idx_summary_score ON contents(summary_score)
+      `;
+      console.log('✅ contents 表创建 idx_summary_score 索引');
+    }
+
     // 检查 weekly_issues 表是否有 created_by 字段
     const weeklyIssuesColumns = await prisma.$queryRaw`
       SHOW COLUMNS FROM weekly_issues LIKE 'created_by'

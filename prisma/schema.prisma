@@ -102,6 +102,9 @@ model contents {
   slug                 String                   @db.VarChar(500)
   description          String?                  @db.Text
   summary              String?                  @db.Text
+  original_score       Float?
+  summary_score        Float?
+  ai_metadata          Json?
   content              String                   @db.LongText
   content_format       contents_content_format? @default(mdx)
   status               contents_status?         @default(draft)
@@ -114,6 +117,9 @@ model contents {
   source               String?                  @db.VarChar(200)
   source_url           String?                  @db.VarChar(1000)
   image_url            String?                  @db.VarChar(500)
+  image_source         String?                  @db.VarChar(50)
+  image_width          Int?
+  image_height         Int?
   screenshot_api       contents_screenshot_api? @default(manual)
   sort_order           Int?                     @default(0)
   featured             Boolean?                 @default(false)
@@ -126,6 +132,8 @@ model contents {
   weekly_content_items weekly_content_items[]
 
   @@index([category_id], map: "contents_category_id_fkey")
+  @@index([original_score], map: "idx_original_score")
+  @@index([summary_score], map: "idx_summary_score")
 }
 
 model operation_logs {
