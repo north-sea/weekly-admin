@@ -57,7 +57,9 @@ export const ContentQuerySchema = z.object({
     return val.split(',').map(id => parseInt(id, 10)).filter(id => !isNaN(id));
   }).optional(),
   keyword: z.string().max(200).optional(),
-  sortBy: z.enum(['created_at', 'updated_at', 'published_at', 'title', 'view_count']).default('created_at'),
+  original_score_min: z.coerce.number().min(0).max(10).optional(),
+  summary_score_min: z.coerce.number().min(0).max(10).optional(),
+  sortBy: z.enum(['created_at', 'updated_at', 'published_at', 'title', 'view_count', 'original_score', 'summary_score']).default('created_at'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
   featured: z.coerce.boolean().optional(),
 });

@@ -64,7 +64,7 @@ export interface ContentListResponse {
 export class ContentService {
   // 获取内容列表
   static async getContentList(query: ContentQuery): Promise<ContentListResponse> {
-    const { page, pageSize, contentType, status, category_id, tag_ids, keyword, sortBy, sortOrder, featured } = query;
+    const { page, pageSize, contentType, status, category_id, tag_ids, keyword, original_score_min, summary_score_min, sortBy, sortOrder, featured } = query;
     
     // 构建查询条件
     const where: Record<string, unknown> = {};
@@ -107,6 +107,14 @@ export class ContentService {
     // 精选筛选
     if (featured !== undefined) {
       where.featured = featured;
+    }
+
+    // AI 评分筛选
+    if (original_score_min !== undefined) {
+      where.original_score = { gte: original_score_min };
+    }
+    if (summary_score_min !== undefined) {
+      where.summary_score = { gte: summary_score_min };
     }
     
     // 计算分页

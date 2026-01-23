@@ -101,3 +101,4 @@
 
 ### Phase 2 实施（前端集成）
 - ✅ 内容编辑页头部展示评分与“重新评分”：`src/components/content/simplified-editor.tsx`
+- ✅ 内容列表页支持按评分阈值筛选：`src/app/(dashboard)/content/list/page.tsx`

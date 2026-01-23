@@ -23,6 +23,8 @@ export function useContentList(params?: PaginationParams & {
   search?: string;
   featured?: boolean;
   tag_ids?: number[];
+  original_score_min?: number;
+  summary_score_min?: number;
 }) {
   const queryParams: Record<string, unknown> = {
     page: params?.page,
@@ -31,6 +33,8 @@ export function useContentList(params?: PaginationParams & {
     category_id: params?.category_id,
     keyword: params?.search,
     featured: params?.featured,
+    original_score_min: params?.original_score_min,
+    summary_score_min: params?.summary_score_min,
   };
 
   // 后端使用 contentType，而UI状态为 content_type

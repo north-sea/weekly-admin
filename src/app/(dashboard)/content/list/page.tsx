@@ -69,6 +69,8 @@ export default function ContentListPage() {
     search: '',
     status: undefined as string | undefined,
     content_type: undefined as string | undefined,
+    original_score_min: undefined as number | undefined,
+    summary_score_min: undefined as number | undefined,
   });
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
@@ -99,6 +101,22 @@ export default function ContentListPage() {
     setFilters({
       ...filters,
       content_type: contentType === 'all' ? undefined : contentType,
+      page: 1,
+    });
+  };
+
+  const handleOriginalScoreMinChange = (value: string) => {
+    setFilters({
+      ...filters,
+      original_score_min: value === 'all' ? undefined : Number(value),
+      page: 1,
+    });
+  };
+
+  const handleSummaryScoreMinChange = (value: string) => {
+    setFilters({
+      ...filters,
+      summary_score_min: value === 'all' ? undefined : Number(value),
       page: 1,
     });
   };
@@ -159,7 +177,7 @@ export default function ContentListPage() {
           <CardTitle>筛选条件</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-6 gap-4">
             <div className="relative col-span-2">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
@@ -195,6 +213,32 @@ export default function ContentListPage() {
                 <SelectItem value="published">已发布</SelectItem>
                 <SelectItem value="archived">已归档</SelectItem>
                 <SelectItem value="hidden">已隐藏</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filters.original_score_min === undefined ? 'all' : String(filters.original_score_min)} onValueChange={handleOriginalScoreMinChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="原文评分≥" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">原文评分≥ 全部</SelectItem>
+                {[...Array(11)].map((_, i) => (
+                  <SelectItem key={i} value={String(i)}>
+                    原文评分 ≥ {i}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filters.summary_score_min === undefined ? 'all' : String(filters.summary_score_min)} onValueChange={handleSummaryScoreMinChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="摘要评分≥" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">摘要评分≥ 全部</SelectItem>
+                {[...Array(11)].map((_, i) => (
+                  <SelectItem key={i} value={String(i)}>
+                    摘要评分 ≥ {i}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -246,6 +290,8 @@ export default function ContentListPage() {
                       <TableHead>类型</TableHead>
                       <TableHead>分类</TableHead>
                       <TableHead>状态</TableHead>
+                      <TableHead>原文分</TableHead>
+                      <TableHead>摘要分</TableHead>
                       <TableHead>标签</TableHead>
                       <TableHead>创建时间</TableHead>
                       <TableHead className="text-right">操作</TableHead>
@@ -254,7 +300,7 @@ export default function ContentListPage() {
                   <TableBody>
                     {contents.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center text-muted-foreground">
+                        <TableCell colSpan={10} className="text-center text-muted-foreground">
                           暂无内容
                         </TableCell>
                       </TableRow>
@@ -291,6 +337,12 @@ export default function ContentListPage() {
                             <TableCell>{content.category?.name || '-'}</TableCell>
                             <TableCell>
                               <Badge variant={status.variant}>{status.label}</Badge>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {content.original_score === null || content.original_score === undefined ? '-' : content.original_score}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {content.summary_score === null || content.summary_score === undefined ? '-' : content.summary_score}
                             </TableCell>
                             <TableCell>
                               <div className="flex flex-wrap gap-1">
