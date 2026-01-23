@@ -16,7 +16,6 @@ import dayjs from 'dayjs';
 import WeeklyEditor, { WeeklyEditorContent } from '@/components/weekly/WeeklyEditor';
 import { callImageModel, callTextModel } from '@/lib/ai/client';
 import { ImageUploadService } from '@/lib/services/image-upload';
-import { getAiConfig } from '@/stores/aiConfig';
 import isoWeek from 'dayjs/plugin/isoWeek';
 dayjs.extend(isoWeek);
 
@@ -588,8 +587,15 @@ const WeeklyEditorPage: React.FC = () => {
                     }
                     setGeneratingDesc(true);
                     try {
-                      const config = getAiConfig();
-                      const template = config?.weeklyDescPrompt || '你是一个技术周刊编辑。请为本期周刊撰写一段 50-80 字的中文简介，概述本期收录内容的主题和亮点，让读者了解本期周刊的核心价值。要求：语言简洁专业，突出技术价值，不使用 Markdown 格式。\n\n周刊标题：{{title}}\n时间范围：{{date_range}}\n收录内容：{{contents_summary}}';
+                      const fallbackTemplate =
+                        '你是一个技术周刊编辑。请为本期周刊撰写一段 50-80 字的中文简介，概述本期收录内容的主题和亮点，让读者了解本期周刊的核心价值。要求：语言简洁专业，突出技术价值，不使用 Markdown 格式。\n\n周刊标题：{{title}}\n时间范围：{{date_range}}\n收录内容：{{contents_summary}}';
+                      const configResponse = await fetch('/api/ai/config', { method: 'GET' })
+                        .then((res) => res.json())
+                        .catch(() => null);
+                      const template =
+                        configResponse?.success && typeof configResponse?.data?.weeklyDescPrompt === 'string'
+                          ? configResponse.data.weeklyDescPrompt
+                          : fallbackTemplate;
                       const prompt = applyTemplate(template, {
                         title: title.trim(),
                         date_range: startDate && endDate ? `${startDate} - ${endDate}` : '',
