@@ -5,6 +5,7 @@
 - 本仓库目前的“迁移”主要通过 `scripts/migrate-db.ts` 使用 `prisma.$executeRaw/$queryRaw` 做幂等建表/加列，而不是 Prisma Migrate 的 `prisma/migrations/*`。
 - `prisma/schema.prisma` 来自 `db pull` 风格，表模型使用 snake_case（例如 `contents`），且 `image_url` 字段已存在；计划中新增字段需按该命名体系补充（例如 `original_score`, `ai_metadata`, `image_source`）。
 - 工作区存在较多未提交的改动与新增文件（目前集中在 tags/categories 相关），开始 AI 实施前建议先分支/提交/暂存，避免混入同一次改动。
+- `deduplication-and-aggregator.md` 的代码片段以 `prisma.draft/prisma.content`（camelCase）为例；本仓库实际模型为 `drafts/contents`（snake_case），后续实现去重/聚合需按实际 schema 调整。
 
 ## 项目对比分析
 

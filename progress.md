@@ -71,6 +71,7 @@
 - ✅ 已更新规划文件：
   - `task_plan.md`：Phase 1 的迁移/字段/文件清单对齐现状；配置部分避免硬编码模型名。
   - `findings.md`：补充“现状校验”要点。
+  - `task_plan.md`：吸收 `deduplication-and-aggregator.md` 的补充（去重报告、聚合预览 API、可选聚合关系）。
 
 ### 风险提示
 - 当前工作区存在较多未提交改动与新增文件（tags/categories 相关），建议在开始 AI 实施前先分支/提交/暂存，避免混入同一次改动。
