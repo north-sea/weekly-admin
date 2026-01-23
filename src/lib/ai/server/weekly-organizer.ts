@@ -28,7 +28,19 @@ const OrganizeResultSchema = z.object({
 
 export type OrganizeResult = z.infer<typeof OrganizeResultSchema>;
 
-export async function organizeWeekly(request: OrganizeRequest): Promise<OrganizeResult> {
+export type OrganizeResultEnriched = {
+  intro?: string;
+  items: Array<
+    OrganizeResult['items'][number] & {
+      title?: string;
+      source_url?: string | null;
+      original_score?: number | null;
+      summary_score?: number | null;
+    }
+  >;
+};
+
+export async function organizeWeekly(request: OrganizeRequest): Promise<OrganizeResultEnriched> {
   const parsed = OrganizeRequestSchema.parse(request);
   const issue = await prisma.weekly_issues.findUnique({
     where: { id: parsed.weeklyIssueId },
@@ -117,6 +129,18 @@ export async function organizeWeekly(request: OrganizeRequest): Promise<Organize
     throw new Error('AI 返回不符合预期的周刊组织结构');
   }
 
-  return parsedResult.data;
+  const byId = new Map(scored.map((c) => [c.id, c]));
+  return {
+    intro: parsedResult.data.intro,
+    items: parsedResult.data.items.map((item) => {
+      const candidate = byId.get(item.content_id);
+      return {
+        ...item,
+        title: candidate?.title,
+        source_url: candidate?.source_url ?? null,
+        original_score: candidate?.original_score ?? null,
+        summary_score: candidate?.summary_score ?? null,
+      };
+    }),
+  };
 }
-

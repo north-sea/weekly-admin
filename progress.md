@@ -109,3 +109,7 @@
 
 ### Phase 4 实施（周刊组织器 - 后端）
 - ✅ 组织周刊接口：`POST /api/ai/organize-weekly`（返回 sections/items 建议，不自动落库）
+
+### Phase 4 实施（周刊组织器 - 前端预览）
+- ✅ 生成器页面：`src/app/(dashboard)/weekly/generate/page.tsx`（选择周刊 + maxItems + 结果分组预览/复制）
+- ✅ 周刊列表入口：`src/app/(dashboard)/weekly/page.tsx`

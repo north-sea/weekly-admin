@@ -163,10 +163,15 @@ export default function WeeklyManagePage() {
           <h2 className="text-3xl font-semibold text-slate-900">周刊管理</h2>
           <p className="text-sm text-muted-foreground">管理周刊期号和内容</p>
         </div>
-        <Button size="lg" onClick={() => router.push('/weekly/editor/new')}>
-          <Plus className="mr-2 h-4 w-4" />
-          创建周刊
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="lg" onClick={() => router.push('/weekly/generate')}>
+            AI 组织
+          </Button>
+          <Button size="lg" onClick={() => router.push('/weekly/editor/new')}>
+            <Plus className="mr-2 h-4 w-4" />
+            创建周刊
+          </Button>
+        </div>
       </div>
 
       <Card>
