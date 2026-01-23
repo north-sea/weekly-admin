@@ -106,3 +106,6 @@
 ### Phase 3 实施（摘要）
 - ✅ 生成/优化摘要接口：`POST /api/ai/generate-summary`、`POST /api/ai/optimize-summary`
 - ✅ 内容编辑页摘要区支持 AI 生成/优化：`src/components/content/simplified-editor.tsx`
+
+### Phase 4 实施（周刊组织器 - 后端）
+- ✅ 组织周刊接口：`POST /api/ai/organize-weekly`（返回 sections/items 建议，不自动落库）
