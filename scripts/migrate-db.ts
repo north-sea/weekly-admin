@@ -160,6 +160,62 @@ async function migrateDatabase() {
       console.log('✅ contents 表创建 idx_summary_score 索引');
     }
 
+    // RSS 源表
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS rss_sources (
+          id INT PRIMARY KEY AUTO_INCREMENT,
+          name VARCHAR(200) NOT NULL,
+          feed_url VARCHAR(768) NOT NULL,
+          type ENUM('normal', 'aggregator') DEFAULT 'normal',
+          enabled BOOLEAN DEFAULT true,
+          content_type_id INT DEFAULT 4,
+          category_id INT NULL,
+          config JSON NULL,
+          last_fetched_at TIMESTAMP NULL,
+          fetch_count INT DEFAULT 0,
+          error_count INT DEFAULT 0,
+          last_error TEXT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY unique_feed_url (feed_url),
+          INDEX idx_rss_sources_enabled (enabled),
+          INDEX idx_rss_sources_type (type),
+          INDEX idx_rss_sources_category_id (category_id)
+      )
+    `;
+    console.log('✅ RSS 源表创建完成');
+
+    // RSS 源表索引（兼容旧表结构）
+    const rssEnabledIndex = await prisma.$queryRaw`
+      SHOW INDEX FROM rss_sources WHERE Key_name = 'idx_rss_sources_enabled'
+    `;
+    if (Array.isArray(rssEnabledIndex) && rssEnabledIndex.length === 0) {
+      await prisma.$executeRaw`
+        CREATE INDEX idx_rss_sources_enabled ON rss_sources(enabled)
+      `;
+      console.log('✅ rss_sources 表创建 idx_rss_sources_enabled 索引');
+    }
+
+    const rssTypeIndex = await prisma.$queryRaw`
+      SHOW INDEX FROM rss_sources WHERE Key_name = 'idx_rss_sources_type'
+    `;
+    if (Array.isArray(rssTypeIndex) && rssTypeIndex.length === 0) {
+      await prisma.$executeRaw`
+        CREATE INDEX idx_rss_sources_type ON rss_sources(type)
+      `;
+      console.log('✅ rss_sources 表创建 idx_rss_sources_type 索引');
+    }
+
+    const rssCategoryIndex = await prisma.$queryRaw`
+      SHOW INDEX FROM rss_sources WHERE Key_name = 'idx_rss_sources_category_id'
+    `;
+    if (Array.isArray(rssCategoryIndex) && rssCategoryIndex.length === 0) {
+      await prisma.$executeRaw`
+        CREATE INDEX idx_rss_sources_category_id ON rss_sources(category_id)
+      `;
+      console.log('✅ rss_sources 表创建 idx_rss_sources_category_id 索引');
+    }
+
     // 检查 weekly_issues 表是否有 created_by 字段
     const weeklyIssuesColumns = await prisma.$queryRaw`
       SHOW COLUMNS FROM weekly_issues LIKE 'created_by'

@@ -103,6 +103,13 @@ export const queryKeys = {
     detail: (id: string | number) => [...queryKeys.drafts.details(), id] as const,
     stats: () => [...queryKeys.drafts.all, 'stats'] as const,
   },
+  // RSS 相关
+  rss: {
+    all: ['rss'] as const,
+    sources: () => [...queryKeys.rss.all, 'sources'] as const,
+    fetch: (sourceId?: number) => [...queryKeys.rss.all, 'fetch', sourceId] as const,
+    previewAggregator: (sourceId?: number, itemIndex?: number) => [...queryKeys.rss.all, 'preview-aggregator', sourceId, itemIndex] as const,
+  },
 } as const;
 
 // 通用查询钩子

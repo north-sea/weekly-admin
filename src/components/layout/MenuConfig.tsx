@@ -6,6 +6,7 @@ import {
   ClipboardList,
   FileText,
   LayoutDashboard,
+  Rss,
   Search,
   Send,
   Settings,
@@ -40,6 +41,11 @@ export const menuConfig: NavItem[] = [
     path: '/weekly',
     name: '周刊管理',
     icon: CalendarClock,
+  },
+  {
+    path: '/rss',
+    name: 'RSS 源',
+    icon: Rss,
   },
   {
     path: '/publish',

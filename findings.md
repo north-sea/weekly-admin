@@ -6,6 +6,8 @@
 - `prisma/schema.prisma` 来自 `db pull` 风格，表模型使用 snake_case（例如 `contents`），且 `image_url` 字段已存在；计划中新增字段需按该命名体系补充（例如 `original_score`, `ai_metadata`, `image_source`）。
 - 工作区存在较多未提交的改动与新增文件（目前集中在 tags/categories 相关），开始 AI 实施前建议先分支/提交/暂存，避免混入同一次改动。
 - `deduplication-and-aggregator.md` 的代码片段以 `prisma.draft/prisma.content`（camelCase）为例；本仓库实际模型为 `drafts/contents`（snake_case），后续实现去重/聚合需按实际 schema 调整。
+- `deduplication-and-aggregator.md` 里提到了 YAML 配置文件；admin 侧更适合落库（`rss_sources.type` + `config` JSON）并在 UI 编辑，避免引入额外配置文件链路。
+- `deduplication-and-aggregator.md` 里建议新增聚合关系类型（如 `"aggregated_from"`）；本仓库已有 `content_relations_relation_type.parent_child`，可优先复用避免改枚举/迁移成本。
 
 ## 项目对比分析
 

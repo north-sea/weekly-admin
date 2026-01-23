@@ -114,3 +114,7 @@
 - ✅ 生成器页面：`src/app/(dashboard)/weekly/generate/page.tsx`（选择周刊 + maxItems + 结果分组预览/复制）
 - ✅ 周刊列表入口：`src/app/(dashboard)/weekly/page.tsx`
 - ✅ 支持一键应用到周刊：通过 `PUT /api/weekly/:id/contents` 覆盖写入
+
+### Phase 5 启动（RSS 去重与聚合）
+- ✅ 复核 `deduplication-and-aggregator.md` 的补充点（去重流程、聚合预览 API、去重报告）
+- ✅ 更新 `task_plan.md`：Phase 5 进入 in_progress，并明确配置优先落库（避免 YAML），聚合关系优先复用 `parent_child`
