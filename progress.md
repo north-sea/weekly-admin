@@ -84,7 +84,7 @@
 - ✅ 已补充 DB 字段与索引（代码层）：`scripts/migrate-db.ts`
 - ✅ 已同步 Prisma schema：`prisma/schema.prisma`（`contents` 新增 `original_score/summary_score/ai_metadata/image_source/image_width/image_height`）
 - ✅ 已补充前端类型：`src/types/content.ts`
-- ✅ 已新增 server-only Anthropic client：`src/lib/ai/server/client.ts`（依赖 `ANTHROPIC_API_KEY` / 可选 `ANTHROPIC_MODEL` / `ANTHROPIC_BASE_URL`）
+- ✅ 已新增 server-side AI client：`src/lib/ai/server/client.ts`（默认 OpenAI/兼容 API；可切换 Anthropic）
 - ✅ 已新增验证路由：`src/app/api/ai/test/route.ts`
 - ✅ 已补充示例环境变量：`.env.example`
 

@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 
 import { authenticateRequest } from '@/lib/auth';
-import { anthropicGenerateText } from '@/lib/ai/server/client';
+import { serverGenerateText } from '@/lib/ai/server/client';
 import { createNextErrorResponse, createNextSuccessResponse } from '@/lib/utils/serialization';
 
 const BodySchema = z.object({
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       return createNextErrorResponse('VALIDATION_ERROR', '参数验证失败', 400);
     }
 
-    const text = await anthropicGenerateText({
+    const text = await serverGenerateText({
       messages: [{ role: 'user', content: parsed.data.prompt ?? 'Ping' }],
       maxTokens: 32,
       temperature: 0,
@@ -33,4 +33,3 @@ export async function POST(request: NextRequest) {
     return createNextErrorResponse('INTERNAL_ERROR', message, 500);
   }
 }
-
