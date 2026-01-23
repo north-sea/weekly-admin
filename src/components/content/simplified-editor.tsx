@@ -187,6 +187,8 @@ export default function SimplifiedEditor({
   });
   const [scoringOriginal, setScoringOriginal] = useState(false);
   const [scoringSummary, setScoringSummary] = useState(false);
+  const [generatingSummary, setGeneratingSummary] = useState(false);
+  const [optimizingSummary, setOptimizingSummary] = useState(false);
   const previewTags = useMemo(() => {
     const ids = new Set((selectedTagIds || []).map((id) => Number(id)));
     const matched = tags.filter((tag) => ids.has(tag.id));
@@ -461,6 +463,52 @@ export default function SimplifiedEditor({
       });
     } finally {
       setScoringSummary(false);
+    }
+  };
+
+  const handleGenerateSummary = async () => {
+    if (!contentId) return;
+    setGeneratingSummary(true);
+    try {
+      const result = await apiClient.post<{ summary: string }>('/api/ai/generate-summary', { contentId });
+      if (result?.summary) {
+        setValue('summary', result.summary, { shouldDirty: true });
+        setHasUnsavedChanges(true);
+        toast({ title: '生成完成', description: '已填入摘要' });
+      } else {
+        throw new Error('未生成有效摘要');
+      }
+    } catch (error: any) {
+      toast({
+        title: '生成失败',
+        description: error?.message || '请检查 AI 环境变量配置',
+        variant: 'destructive',
+      });
+    } finally {
+      setGeneratingSummary(false);
+    }
+  };
+
+  const handleOptimizeSummary = async () => {
+    if (!contentId) return;
+    setOptimizingSummary(true);
+    try {
+      const result = await apiClient.post<{ summary: string }>('/api/ai/optimize-summary', { contentId });
+      if (result?.summary) {
+        setValue('summary', result.summary, { shouldDirty: true });
+        setHasUnsavedChanges(true);
+        toast({ title: '优化完成', description: '已更新摘要' });
+      } else {
+        throw new Error('未生成有效摘要');
+      }
+    } catch (error: any) {
+      toast({
+        title: '优化失败',
+        description: error?.message || '请检查 AI 环境变量配置',
+        variant: 'destructive',
+      });
+    } finally {
+      setOptimizingSummary(false);
     }
   };
 
@@ -879,7 +927,45 @@ export default function SimplifiedEditor({
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="summary">摘要</Label>
+                    <div className="flex items-center justify-between gap-3">
+                      <Label htmlFor="summary">摘要</Label>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8"
+                          onClick={handleGenerateSummary}
+                          disabled={!contentId || generatingSummary}
+                        >
+                          {generatingSummary ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              生成中
+                            </>
+                          ) : (
+                            'AI 生成'
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8"
+                          onClick={handleOptimizeSummary}
+                          disabled={!contentId || !currentSummary?.trim() || optimizingSummary}
+                        >
+                          {optimizingSummary ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              优化中
+                            </>
+                          ) : (
+                            'AI 优化'
+                          )}
+                        </Button>
+                      </div>
+                    </div>
                     <Controller
                       name="summary"
                       control={control}

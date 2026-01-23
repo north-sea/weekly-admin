@@ -102,3 +102,7 @@
 ### Phase 2 实施（前端集成）
 - ✅ 内容编辑页头部展示评分与“重新评分”：`src/components/content/simplified-editor.tsx`
 - ✅ 内容列表页支持按评分阈值筛选：`src/app/(dashboard)/content/list/page.tsx`
+
+### Phase 3 实施（摘要）
+- ✅ 生成/优化摘要接口：`POST /api/ai/generate-summary`、`POST /api/ai/optimize-summary`
+- ✅ 内容编辑页摘要区支持 AI 生成/优化：`src/components/content/simplified-editor.tsx`
