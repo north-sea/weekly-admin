@@ -1,16 +1,9 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -26,12 +19,13 @@ import {
   useCreateCategory,
   useUpdateCategory,
   useDeleteCategory,
-  useMergeCategories,
   useAllCategories,
 } from '@/hooks/queries/useCategoryQueries';
-import { Plus, Edit, Trash2, FolderOpen, GitMerge, Search as SearchIcon } from 'lucide-react';
+import { Plus, Edit, Trash2, FolderOpen, GitMerge, Search as SearchIcon, X, LayoutGrid, List } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Checkbox } from '@/components/ui/checkbox';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { CategoryTree, CategoryMergeWizard } from '@/components/categories';
+import { useMoveCategory } from '@/hooks/queries/useCategoryQueries';
 
 const slugify = (value: string) =>
   value
@@ -48,17 +42,26 @@ export default function CategoriesSettingsPage() {
   const [editingCategory, setEditingCategory] = useState<any>(null);
   const [formData, setFormData] = useState({ name: '', description: '', slug: '', sort_order: 0 });
   const [slugEdited, setSlugEdited] = useState(false);
-  const [mergeFilter, setMergeFilter] = useState('');
-  const [mergeTargetId, setMergeTargetId] = useState<number | null>(null);
-  const [mergeSourceIds, setMergeSourceIds] = useState<number[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'tree'>('grid');
+  const debouncedSearch = useDebouncedValue(searchQuery, 300);
 
-  const { data: categoriesData, isLoading } = useCategoryList();
+  const { data: categoriesData, isLoading } = useCategoryList({ search: debouncedSearch || undefined });
   const { data: allCategories = [] } = useAllCategories();
   const createCategory = useCreateCategory();
   const updateCategory = useUpdateCategory();
   const deleteCategory = useDeleteCategory();
-  const mergeCategories = useMergeCategories();
+  const moveCategory = useMoveCategory();
   const categories = categoriesData || [];
+
+  const handleMove = async (id: number, newParentId: number | null, newIndex: number) => {
+    try {
+      await moveCategory.mutateAsync({ id, parent_id: newParentId || undefined, position: newIndex });
+      toast({ title: '移动成功', description: '分类层级已更新' });
+    } catch (error: any) {
+      toast({ title: '移动失败', description: error.message || '请稍后重试', variant: 'destructive' });
+    }
+  };
 
   const handleCreate = async () => {
     try {
@@ -140,54 +143,6 @@ export default function CategoriesSettingsPage() {
     setIsEditDialogOpen(true);
   };
 
-  const toggleMergeSource = (id: number) => {
-    setMergeSourceIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  };
-
-  const handleMerge = async () => {
-    if (!mergeTargetId || mergeSourceIds.length === 0) {
-      toast({
-        title: '请选择分类',
-        description: '请选择至少一个源分类和一个目标分类',
-        variant: 'destructive',
-      });
-      return;
-    }
-    if (mergeSourceIds.includes(mergeTargetId)) {
-      toast({
-        title: '选择有误',
-        description: '目标分类不能与源分类相同',
-        variant: 'destructive',
-      });
-      return;
-    }
-    try {
-      await mergeCategories.mutateAsync({
-        source_category_ids: mergeSourceIds,
-        target_category_id: mergeTargetId,
-      });
-      toast({ title: '合并成功', description: '分类已成功合并' });
-      setIsMergeDialogOpen(false);
-      setMergeSourceIds([]);
-      setMergeTargetId(null);
-    } catch (error: any) {
-      toast({
-        title: '合并失败',
-        description: error.message || '请稍后重试',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const filteredCategories = useMemo(
-    () =>
-      allCategories.filter((category: any) =>
-        mergeFilter ? category.name.toLowerCase().includes(mergeFilter.toLowerCase()) : true
-      ),
-    [allCategories, mergeFilter]
-  );
 
   return (
     <div className="space-y-6">
@@ -211,10 +166,53 @@ export default function CategoriesSettingsPage() {
 
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle>分类列表</CardTitle>
-          <CardDescription>
-            共 {categories.length} 个分类
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>分类列表</CardTitle>
+              <CardDescription>
+                共 {categories.length} 个分类
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative w-64">
+                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="搜索分类..."
+                  className="pl-10 pr-8"
+                />
+                {searchQuery && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
+                    onClick={() => setSearchQuery('')}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+              <div className="flex border rounded">
+                <Button
+                  variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="rounded-r-none"
+                  onClick={() => setViewMode('grid')}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'tree' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="rounded-l-none"
+                  onClick={() => setViewMode('tree')}
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -223,6 +221,13 @@ export default function CategoriesSettingsPage() {
                 <Skeleton key={i} className="h-16 w-full" />
               ))}
             </div>
+          ) : viewMode === 'tree' ? (
+            <CategoryTree
+              categories={categories}
+              onEdit={openEditDialog}
+              onDelete={handleDelete}
+              onMove={handleMove}
+            />
           ) : (
             <div className="grid grid-cols-2 gap-3">
               {categories.map((category: any) => (
@@ -403,91 +408,8 @@ export default function CategoriesSettingsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Merge Dialog */}
-      <Dialog open={isMergeDialogOpen} onOpenChange={setIsMergeDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>合并分类</DialogTitle>
-            <DialogDescription>选择源分类并指定合并到的目标分类。源分类会被删除，关联内容迁移到目标分类。</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>目标分类</Label>
-                <Select
-                  value={mergeTargetId?.toString() || ''}
-                  onValueChange={(val) => setMergeTargetId(parseInt(val, 10))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="选择目标分类" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allCategories.map((cat: any) => (
-                      <SelectItem key={cat.id} value={cat.id.toString()}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {mergeTargetId && (
-                  <p className="text-xs text-muted-foreground">
-                    内容将迁移到: {allCategories.find((c: any) => c.id === mergeTargetId)?.name}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>筛选源分类</Label>
-                <div className="relative">
-                  <SearchIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    value={mergeFilter}
-                    onChange={(e) => setMergeFilter(e.target.value)}
-                    placeholder="输入关键词过滤..."
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="max-h-80 overflow-auto rounded border">
-              {filteredCategories.length === 0 ? (
-                <div className="p-4 text-sm text-muted-foreground">暂无分类</div>
-              ) : (
-                <div className="divide-y">
-                  {filteredCategories.map((cat: any) => (
-                    <label
-                      key={cat.id}
-                      className="flex items-center justify-between gap-2 p-3 hover:bg-accent/50"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Checkbox
-                          checked={mergeSourceIds.includes(cat.id)}
-                          onCheckedChange={() => toggleMergeSource(cat.id)}
-                          disabled={cat.id === mergeTargetId}
-                        />
-                        <div>
-                          <p className="font-medium">{cat.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            内容数: {cat.content_count || 0} · Slug: {cat.slug}
-                          </p>
-                        </div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsMergeDialogOpen(false)}>
-              取消
-            </Button>
-            <Button onClick={handleMerge} disabled={mergeCategories.isPending}>
-              {mergeCategories.isPending ? '合并中...' : '确认合并'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Merge Wizard */}
+      <CategoryMergeWizard open={isMergeDialogOpen} onOpenChange={setIsMergeDialogOpen} />
     </div>
   );
 }

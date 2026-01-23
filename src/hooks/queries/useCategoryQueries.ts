@@ -26,6 +26,7 @@ export interface CategoryUpdate {
   slug?: string;
   description?: string;
   parent_id?: number;
+  sort_order?: number;
 }
 
 // 分类列表查询

@@ -307,17 +307,24 @@ export function useUpdateTagCounts() {
   });
 }
 
+// 获取未使用标签
+export function useUnusedTags() {
+  return useGet<TagWithStats[]>('/api/tags/unused', {
+    queryKey: [...queryKeys.tags.all, 'unused'],
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
 // 批量删除标签
 export function useBatchDeleteTags() {
   const invalidate = useInvalidateQueries();
-  
-  return usePost<void, { ids: (string | number)[] }>(
+
+  return usePost<{ deleted: number }, { ids: number[] }>(
     '/api/tags/batch-delete',
     {
       onSuccess: () => {
-        // 批量删除后完全重新获取
         invalidate.invalidateTags();
-        invalidate.invalidateContent(); // 可能影响内容
+        invalidate.invalidateContent();
       },
     }
   );

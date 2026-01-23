@@ -22,9 +22,10 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { useTagList, useCreateTag, useUpdateTag, useDeleteTag, useMergeTags, useAllTags } from '@/hooks/queries/useTagQueries';
-import { Plus, Edit, Trash2, Search, GitMerge, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useTagList, useCreateTag, useUpdateTag, useDeleteTag, useAllTags } from '@/hooks/queries/useTagQueries';
+import { Plus, Edit, Trash2, Search, GitMerge, ChevronLeft, ChevronRight, Cloud, LayoutList, Sparkles } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TagCloud, TagStatsCard, UnusedTagsCleanupDialog, TagMergeWizard } from '@/components/tags';
 
 const slugify = (value: string) =>
   value
@@ -39,14 +40,13 @@ export default function TagsSettingsPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isMergeDialogOpen, setIsMergeDialogOpen] = useState(false);
+  const [isCleanupDialogOpen, setIsCleanupDialogOpen] = useState(false);
   const [editingTag, setEditingTag] = useState<any>(null);
   const [formData, setFormData] = useState({ name: '', slug: '' });
   const [slugEdited, setSlugEdited] = useState(false);
-  const [mergeTargetId, setMergeTargetId] = useState<number | null>(null);
-  const [mergeSourceIds, setMergeSourceIds] = useState<number[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [mergeFilter, setMergeFilter] = useState('');
+  const [viewMode, setViewMode] = useState<'list' | 'cloud'>('list');
 
   const { data: tagsData, isLoading } = useTagList({
     search: searchQuery || undefined,
@@ -62,28 +62,37 @@ export default function TagsSettingsPage() {
   const createTag = useCreateTag();
   const updateTag = useUpdateTag();
   const deleteTag = useDeleteTag();
-  const mergeTags = useMergeTags();
-  const tags = tagsData?.data || [];
-  const pagination = tagsData?.pagination || {
-    page,
-    pageSize,
-    total: tags.length,
-    totalPages: Math.max(1, Math.ceil(tags.length / pageSize)),
-  };
+
+  // 处理数据类型
+  const tags = useMemo(() => {
+    if (!tagsData) return [];
+    if (Array.isArray(tagsData)) return tagsData;
+    return (tagsData as any).data || [];
+  }, [tagsData]);
+
+  const pagination = useMemo(() => {
+    if (!tagsData || Array.isArray(tagsData)) {
+      return { page, pageSize, total: tags.length, totalPages: Math.max(1, Math.ceil(tags.length / pageSize)) };
+    }
+    return (tagsData as any).pagination || { page, pageSize, total: tags.length, totalPages: 1 };
+  }, [tagsData, tags.length, page, pageSize]);
+
+  // 计算统计数据
+  const tagStats = useMemo(() => {
+    const total = allTags.length;
+    const used = allTags.filter((t: any) => (t.count || 0) > 0).length;
+    const unused = total - used;
+    const avgCount = total > 0 ? Math.round(allTags.reduce((sum: number, t: any) => sum + (t.count || 0), 0) / total) : 0;
+    const topTag = allTags.length > 0 ? allTags[0] : undefined;
+    return { total, used, unused, avgCount, topTag: topTag ? { name: topTag.name, count: topTag.count || 0 } : undefined };
+  }, [allTags]);
 
   React.useEffect(() => {
-    if (tagsData?.pagination?.page && tagsData.pagination.page !== page) {
-      setPage(tagsData.pagination.page);
+    const paginationPage = !tagsData || Array.isArray(tagsData) ? null : (tagsData as any).pagination?.page;
+    if (paginationPage && paginationPage !== page) {
+      setPage(paginationPage);
     }
-  }, [tagsData?.pagination?.page, page]);
-
-  const filteredTags = useMemo(
-    () =>
-      allTags.filter((tag: any) =>
-        mergeFilter ? tag.name.toLowerCase().includes(mergeFilter.toLowerCase()) : true
-      ),
-    [allTags, mergeFilter]
-  );
+  }, [tagsData, page]);
 
   const handleCreate = async () => {
     try {
@@ -145,47 +154,6 @@ export default function TagsSettingsPage() {
     }
   };
 
-  const toggleMergeSource = (id: number) => {
-    setMergeSourceIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  };
-
-  const handleMerge = async () => {
-    if (!mergeTargetId || mergeSourceIds.length === 0) {
-      toast({
-        title: '请选择标签',
-        description: '请选择至少一个源标签和一个目标标签',
-        variant: 'destructive',
-      });
-      return;
-    }
-    if (mergeSourceIds.includes(mergeTargetId)) {
-      toast({
-        title: '选择有误',
-        description: '目标标签不能与源标签相同',
-        variant: 'destructive',
-      });
-      return;
-    }
-    try {
-      await mergeTags.mutateAsync({
-        source_tag_ids: mergeSourceIds,
-        target_tag_id: mergeTargetId,
-      });
-      toast({ title: '合并成功', description: '标签已成功合并' });
-      setIsMergeDialogOpen(false);
-      setMergeSourceIds([]);
-      setMergeTargetId(null);
-    } catch (error: any) {
-      toast({
-        title: '合并失败',
-        description: error.message || '请稍后重试',
-        variant: 'destructive',
-      });
-    }
-  };
-
   const openEditDialog = (tag: any) => {
     setEditingTag(tag);
     setFormData({
@@ -205,6 +173,10 @@ export default function TagsSettingsPage() {
           <p className="text-sm text-muted-foreground">管理内容标签</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsCleanupDialogOpen(true)}>
+            <Sparkles className="h-4 w-4 mr-2" />
+            清理未使用
+          </Button>
           <Button variant="outline" onClick={() => setIsMergeDialogOpen(true)}>
             <GitMerge className="h-4 w-4 mr-2" />
             合并标签
@@ -216,33 +188,52 @@ export default function TagsSettingsPage() {
         </div>
       </div>
 
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle>搜索标签</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="搜索标签名称..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setPage(1);
-              }}
-              className="pl-10"
-            />
-          </div>
-        </CardContent>
-      </Card>
+      {/* 统计卡片 */}
+      <TagStatsCard stats={tagStats} onCleanupClick={() => setIsCleanupDialogOpen(true)} />
 
       {/* Tags List */}
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle>标签列表</CardTitle>
-          <CardDescription>
-            共 {pagination.total} 个标签
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>标签列表</CardTitle>
+              <CardDescription>
+                共 {pagination.total} 个标签
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="搜索标签..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setPage(1);
+                  }}
+                  className="pl-10"
+                />
+              </div>
+              <div className="flex border rounded">
+                <Button
+                  variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="rounded-r-none"
+                  onClick={() => setViewMode('list')}
+                >
+                  <LayoutList className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'cloud' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="rounded-l-none"
+                  onClick={() => setViewMode('cloud')}
+                >
+                  <Cloud className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {(isLoading && tags.length === 0) ? (
@@ -251,6 +242,11 @@ export default function TagsSettingsPage() {
                 <Skeleton key={i} className="h-16 w-full" />
               ))}
             </div>
+          ) : viewMode === 'cloud' ? (
+            <TagCloud
+              tags={allTags.map((t: any) => ({ id: t.id, name: t.name, count: t.count || 0 }))}
+              onTagClick={(tag) => openEditDialog(allTags.find((t: any) => t.id === tag.id))}
+            />
           ) : (
             <>
               {tags.length === 0 ? (
@@ -407,96 +403,11 @@ export default function TagsSettingsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Merge Dialog */}
-      <Dialog open={isMergeDialogOpen} onOpenChange={setIsMergeDialogOpen}>
-        <DialogContent className="max-w-2xl shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto mt-4">
-          <DialogHeader>
-            <DialogTitle>合并标签</DialogTitle>
-            <DialogDescription>选择要合并的源标签，并指定合并到的目标标签。被合并的标签会删除，其内容关联迁移到目标标签。</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="筛选标签名称..."
-                  className="pl-10"
-                  value={mergeFilter}
-                  onChange={(e) => setMergeFilter(e.target.value)}
-                />
-              </div>
-              <Button variant="outline" size="sm" onClick={() => {
-                setMergeSourceIds([]);
-                setMergeTargetId(null);
-              }}>
-                清空选择
-              </Button>
-            </div>
-            <div>
-              <Label>目标标签</Label>
-              <div className="mt-2 grid grid-cols-2 gap-2 max-h-48 overflow-y-auto border rounded p-3 bg-muted/30">
-                {filteredTags.map((tag: any) => (
-                  <label key={`target-${tag.id}`} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="radio"
-                      name="merge-target"
-                      value={tag.id}
-                      checked={mergeTargetId === tag.id}
-                      onChange={() => setMergeTargetId(tag.id)}
-                    />
-                    <span>{tag.name}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div>
-              <Label>源标签（可多选）</Label>
-              <div className="mt-2 grid grid-cols-2 gap-2 max-h-60 overflow-y-auto border rounded p-3 bg-muted/30">
-                {filteredTags.map((tag: any) => (
-                  <label key={`source-${tag.id}`} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      value={tag.id}
-                      checked={mergeSourceIds.includes(tag.id)}
-                      onChange={() => toggleMergeSource(tag.id)}
-                    />
-                    <span>{tag.name}</span>
-                  </label>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                将源标签的内容全部归并到目标标签，并删除源标签。
-              </p>
-            </div>
-            {(mergeTargetId || mergeSourceIds.length > 0) && (
-              <div className="rounded] border p-3 space-y-2 bg-muted/30">
-                <p className="text-sm font-medium">已选择</p>
-                <div className="flex flex-wrap gap-2">
-                  {mergeTargetId && (
-                    <Badge variant="default">目标: {allTags.find((t: any) => t.id === mergeTargetId)?.name}</Badge>
-                  )}
-                  {mergeSourceIds.map((id) => {
-                    const name = allTags.find((t: any) => t.id === id)?.name || id;
-                    return (
-                      <Badge key={id} variant="secondary" className="flex items-center gap-1">
-                        源: {name}
-                      </Badge>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsMergeDialogOpen(false)}>
-              取消
-            </Button>
-            <Button onClick={handleMerge} disabled={mergeTags.isPending}>
-              {mergeTags.isPending ? '合并中...' : '确认合并'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Merge Wizard */}
+      <TagMergeWizard open={isMergeDialogOpen} onOpenChange={setIsMergeDialogOpen} />
+
+      {/* Cleanup Dialog */}
+      <UnusedTagsCleanupDialog open={isCleanupDialogOpen} onOpenChange={setIsCleanupDialogOpen} />
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
