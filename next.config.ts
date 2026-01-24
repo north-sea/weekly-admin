@@ -95,17 +95,6 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  
-  // Redirects for better SEO
-  async redirects() {
-    return [
-      {
-        source: '/',
-        destination: '/dashboard',
-        permanent: false,
-      },
-    ];
-  },
 };
 
 export default nextConfig;

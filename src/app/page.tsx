@@ -1,20 +1,18 @@
-'use client';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { verifyToken } from '@/lib/jwt-utils';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/stores/auth';
+export default async function Home() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('auth-token')?.value;
+  if (!token) {
+    redirect('/login');
+  }
 
-export default function Home() {
-  const router = useRouter();
-  const { isAuthenticated } = useAuthStore();
-  console.log('Home', isAuthenticated);
-  useEffect(() => {
-    if (isAuthenticated) {
-      router.replace('/dashboard');
-    } else {
-      router.replace('/login');
-    }
-  }, [isAuthenticated, router]);
-
-  return null;
+  try {
+    await verifyToken(token);
+    redirect('/dashboard');
+  } catch {
+    redirect('/login');
+  }
 }

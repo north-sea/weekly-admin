@@ -2,8 +2,27 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth';
 
+function readCookie(name: string) {
+  if (typeof document === 'undefined') return null;
+  const parts = document.cookie.split('; ');
+  for (const part of parts) {
+    if (part.startsWith(`${name}=`)) {
+      return decodeURIComponent(part.slice(name.length + 1));
+    }
+  }
+  return null;
+}
+
+function clearCookie(name: string) {
+  try {
+    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    const secureAttr = isHttps ? '; Secure' : '';
+    document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax${secureAttr}`;
+  } catch {}
+}
+
 export function useAuth(requireAuth: boolean = true) {
-  const { user, token, isAuthenticated, logout, setUser, hasHydrated } = useAuthStore();
+  const { user, token, isAuthenticated, logout, setToken, setUser, hasHydrated } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -14,7 +33,16 @@ export function useAuth(requireAuth: boolean = true) {
         return;
       }
 
-      if (!token || !isAuthenticated) {
+      let activeToken = token;
+      if ((!activeToken || !isAuthenticated) && typeof window !== 'undefined') {
+        const cookieToken = readCookie('auth-token');
+        if (cookieToken) {
+          setToken(cookieToken);
+          activeToken = cookieToken;
+        }
+      }
+
+      if (!activeToken) {
         setLoading(false);
         if (requireAuth) {
           // 添加延迟确保路由准备就绪
@@ -31,7 +59,7 @@ export function useAuth(requireAuth: boolean = true) {
       }
 
       // 如果已经有用户信息且token有效，跳过验证
-      if (user && token && isAuthenticated) {
+      if (user && activeToken) {
         setLoading(false);
         return;
       }
@@ -39,8 +67,9 @@ export function useAuth(requireAuth: boolean = true) {
       try {
         const response = await fetch('/api/auth/me', {
           headers: {
-            'Authorization': `Bearer ${token}`,
+            'Authorization': `Bearer ${activeToken}`,
           },
+          credentials: 'same-origin',
         });
 
         if (response.ok) {
@@ -55,6 +84,7 @@ export function useAuth(requireAuth: boolean = true) {
         }
       } catch (error) {
         console.error('Token validation error:', error);
+        clearCookie('auth-token');
         logout();
         if (requireAuth) {
           setTimeout(() => {
@@ -72,7 +102,7 @@ export function useAuth(requireAuth: boolean = true) {
     };
 
     validateToken();
-  }, [hasHydrated, token, isAuthenticated, user, requireAuth]);
+  }, [hasHydrated, token, isAuthenticated, user, requireAuth, logout, router, setToken, setUser]);
 
   return {
     user,

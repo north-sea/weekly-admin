@@ -28,7 +28,9 @@
       "Bash(node:*)",
       "Bash(npx tsx:*)",
       "WebFetch(domain:docs.karakeep.app)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "WebFetch(domain:stitch.withgoogle.com)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []

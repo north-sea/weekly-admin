@@ -16,17 +16,18 @@ interface TagUsageChartProps {
   title?: string;
 }
 
+// 使用 DESIGN.md 定义的 Chart 颜色
 const COLORS = [
-  'hsl(var(--primary))',
-  'hsl(var(--accent))',
-  'hsl(var(--secondary))',
-  '#8884d8',
-  '#82ca9d',
-  '#ffc658',
-  '#ff8042',
-  '#a4de6c',
-  '#d0ed57',
-  '#83a6ed',
+  'hsl(12, 76%, 61%)',   // #E76F51 暖橙色
+  'hsl(173, 58%, 39%)',  // #2A9D8F 青绿色
+  'hsl(197, 37%, 24%)',  // #264653 深蓝色
+  'hsl(43, 74%, 66%)',   // #F4A261 金黄色
+  'hsl(27, 87%, 67%)',   // #E9C46A 珊瑚橙
+  'hsl(222, 47%, 11%)',  // #0F172A 深蓝灰
+  'hsl(214, 32%, 91%)',  // #E2E8F0 浅冷灰
+  'hsl(215, 16%, 47%)',  // #64748B 中灰
+  'hsl(210, 40%, 98%)',  // #F7F9FB 柔和灰蓝
+  'hsl(0, 72%, 51%)',    // #DC2626 鲜红
 ];
 
 export function TagUsageChart({

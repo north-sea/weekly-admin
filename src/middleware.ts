@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from './lib/auth-middleware';
 
+let lastDebugLogAt = 0;
+
 // Define protected routes
 const protectedRoutes = [
   '/dashboard',
@@ -24,23 +26,37 @@ const adminRoutes = [
   '/settings/system',
 ];
 
+function shouldDebug() {
+  return process.env.NODE_ENV === 'development';
+}
+
+function maybeLog(message: string, data: Record<string, unknown>) {
+  if (!shouldDebug()) return;
+  const now = Date.now();
+  if (now - lastDebugLogAt < 1000) return;
+  lastDebugLogAt = now;
+  console.log(`[middleware] ${message}`, data);
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // 如果访问登录页且已经有有效 token，则直接重定向到目标页
-  if (pathname.startsWith('/login')) {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.startsWith('Bearer ')
-      ? authHeader.substring(7)
-      : request.cookies.get('auth-token')?.value;
-
-    if (token) {
-      try {
-        await verifyToken(token);
-        const redirectParam = request.nextUrl.searchParams.get('redirect') || '/dashboard';
-        return NextResponse.redirect(new URL(redirectParam, request.url));
-      } catch {}
-    }
+  if (pathname.startsWith('/login') || pathname.startsWith('/dashboard')) {
+    const token = request.cookies.get('auth-token')?.value;
+    maybeLog('request', {
+      pathname,
+      search: request.nextUrl.search,
+      hasCookieToken: Boolean(token),
+      userAgent: request.headers.get('user-agent'),
+      forwardedFor: request.headers.get('x-forwarded-for'),
+      host: request.headers.get('host'),
+      rsc: request.headers.get('rsc') || request.headers.get('RSC'),
+      nextRouterPrefetch: request.headers.get('next-router-prefetch'),
+      secFetchMode: request.headers.get('sec-fetch-mode'),
+      secFetchDest: request.headers.get('sec-fetch-dest'),
+      secFetchUser: request.headers.get('sec-fetch-user'),
+      referer: request.headers.get('referer'),
+    });
   }
 
   // Allow public routes
@@ -69,10 +85,16 @@ export async function middleware(request: NextRequest) {
         { status: 401 }
       );
     }
-    
+
     // Redirect to login page
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);
+    maybeLog('redirect:no-token', {
+      from: pathname,
+      to: loginUrl.pathname + loginUrl.search,
+      isProtectedRoute,
+      isApiRoute,
+    });
     return NextResponse.redirect(loginUrl);
   }
 

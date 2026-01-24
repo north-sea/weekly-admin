@@ -117,19 +117,22 @@ const HeaderActions: React.FC = () => {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
-            variant="outline"
-            className="flex items-center gap-2 rounded-md border border-border/80 bg-background/60 px-2 py-1 shadow-sm"
+            variant="ghost"
+            className={cn(
+              "flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1 shadow-sm transition-all duration-200",
+              "hover:bg-slate-50 hover:border-slate-300 hover:shadow"
+            )}
           >
-            <Avatar className="h-9 w-9">
-              <AvatarFallback className="text-sm font-semibold text-foreground">
+            <Avatar className="h-8 w-8 border border-slate-200">
+              <AvatarFallback className="text-sm font-semibold bg-slate-100 text-slate-900">
                 {initials}
               </AvatarFallback>
             </Avatar>
             <div className="flex flex-col items-start text-left leading-tight">
-              <span className="text-sm font-semibold text-foreground line-clamp-1">
+              <span className="text-sm font-medium text-slate-900 line-clamp-1">
                 {user?.displayName || user?.username || '访客'}
               </span>
-              <span className="text-xs text-muted-foreground">{roleLabel}</span>
+              <span className="text-xs text-slate-500">{roleLabel}</span>
             </div>
           </Button>
         </DropdownMenuTrigger>

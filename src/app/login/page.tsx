@@ -27,9 +27,10 @@ interface LoginFeedback {
 
 export default function LoginPage() {
   const searchParams = useSearchParams();
-  const redirectUrl = searchParams.get('redirect') || '/dashboard';
-  const { login, isAuthenticated, hasHydrated } = useAuthStore();
+  const [redirectUrl, setRedirectUrl] = useState('/dashboard');
+  const { login, logout, isAuthenticated, hasHydrated } = useAuthStore();
   const redirectedRef = useRef(false);
+  const checkedSessionRef = useRef(false);
 
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<LoginFeedback | null>(null);
@@ -49,12 +50,83 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!hasHydrated) return;
-    if (isAuthenticated && !redirectedRef.current) {
-      redirectedRef.current = true;
-      // 已登录用户访问登录页，直接跳转
-      window.location.href = redirectUrl;
-    }
-  }, [hasHydrated, isAuthenticated, redirectUrl]);
+    if (checkedSessionRef.current) return;
+    checkedSessionRef.current = true;
+
+    const normalizeUrlAndResolveRedirect = () => {
+      try {
+        const redirectFromQuery = searchParams.get('redirect');
+        const currentPath = `${window.location.pathname}${window.location.search}`;
+        const storedRedirect = sessionStorage.getItem('post-login-redirect');
+
+        const resolvedRedirect = redirectFromQuery || storedRedirect || '/dashboard';
+        setRedirectUrl(resolvedRedirect);
+
+        if (redirectFromQuery) {
+          sessionStorage.setItem('post-login-redirect', redirectFromQuery);
+        } else if (window.location.pathname !== '/login') {
+          sessionStorage.setItem('post-login-redirect', currentPath);
+        }
+
+        // Keep the URL stable on the login page (no redirect query param).
+        if (window.location.pathname !== '/login' || window.location.search) {
+          window.history.replaceState(null, '', '/login');
+        }
+      } catch {}
+    };
+
+    const clearAuthCookie = () => {
+      try {
+        const isHttps =
+          typeof window !== 'undefined' && window.location.protocol === 'https:';
+        const secureAttr = isHttps ? '; Secure' : '';
+        document.cookie = `auth-token=; Path=/; Max-Age=0; SameSite=Lax${secureAttr}`;
+      } catch {}
+    };
+
+    const syncSessionWithServer = async () => {
+      try {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[auth] login session check: /api/auth/me');
+        }
+        const response = await fetch('/api/auth/me', {
+          method: 'GET',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[auth] /api/auth/me status:', response.status);
+        }
+        if (response.ok) {
+          if (!redirectedRef.current) {
+            redirectedRef.current = true;
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[nav] already authed ->', redirectUrl);
+            }
+            window.location.href = redirectUrl;
+          }
+          return;
+        }
+
+        if (response.status === 401) {
+          if (isAuthenticated) {
+            setFeedback({ type: 'error', message: '登录状态已过期，请重新登录' });
+            logout();
+          }
+          clearAuthCookie();
+          try {
+            sessionStorage.removeItem('post-login-redirect');
+          } catch {}
+        }
+      } catch {
+        // 网络异常时不做强制登出，避免误伤
+      }
+    };
+
+    normalizeUrlAndResolveRedirect();
+    void syncSessionWithServer();
+  }, [hasHydrated, isAuthenticated, logout, redirectUrl, searchParams]);
 
   const onSubmit = async (values: z.infer<typeof loginSchema>) => {
     setLoading(true);
@@ -89,6 +161,9 @@ export default function LoginPage() {
 
         // 使用硬跳转确保 middleware 能正确处理认证状态
         // Next.js client-side router 不会重新触发 middleware
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[nav] login success ->', redirectUrl);
+        }
         window.location.href = redirectUrl;
       } else {
         setFeedback({ type: 'error', message: data.error || '登录失败，请检查账号或密码' });
