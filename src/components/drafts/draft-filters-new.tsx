@@ -138,10 +138,12 @@ export function DraftFilters({ value = {}, onChange, className, sources = [] }: 
 
         {/* 重置按钮 */}
         <Button
+          type="button"
           variant="outline"
           size="icon"
           onClick={handleReset}
           title="重置筛选"
+          aria-label="重置筛选"
         >
           <RotateCcw className="h-4 w-4" />
         </Button>

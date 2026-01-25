@@ -69,7 +69,13 @@ const HoverImagePreview: React.FC<HoverImagePreviewProps> = ({ imageUrl, title, 
               style={portalStyle}
             >
               <div className="relative aspect-video bg-muted">
-                <img src={imageUrl} alt={title} className="h-full w-full object-cover" />
+                <img
+                  src={imageUrl}
+                  alt={title}
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                  decoding="async"
+                />
               </div>
               <div className="line-clamp-2 px-3 py-2 text-xs text-muted-foreground">
                 {title}

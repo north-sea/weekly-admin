@@ -19,10 +19,10 @@ export default function SettingsLayout({
   const pathname = usePathname();
 
   return (
-    <div className="flex-1 space-y-6 p-8 pt-6">
+    <div className="flex-1 space-y-6">
       {/* Tab Navigation */}
-      <div className="border-b border-slate-200">
-        <nav className="flex gap-1" aria-label="设置导航">
+      <div className="border-b border-border overflow-x-auto">
+        <nav className="flex min-w-max gap-1" aria-label="设置导航">
           {settingsNav.map((item) => {
             const active = pathname === item.href;
             const Icon = item.icon;
@@ -31,11 +31,12 @@ export default function SettingsLayout({
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors duration-200 border-b-2',
+                  'ui-focus-ring flex items-center gap-2 px-3 py-3 text-sm font-medium transition-colors duration-200 border-b-2 sm:px-4',
                   active
-                    ? 'border-slate-900 text-slate-900'
-                    : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
+                    ? 'border-foreground text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                 )}
+                aria-current={active ? 'page' : undefined}
               >
                 <Icon className="h-4 w-4" />
                 {item.label}

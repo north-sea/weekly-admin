@@ -1,23 +1,23 @@
 'use client';
 
 import React from 'react';
-import { useRouter } from 'next/navigation';
 import {
   FileText,
   Calendar,
   FolderOpen,
-  Tag,
   TrendingUp,
   Eye,
   FileEdit,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { StatCard } from '@/components/dashboard/stat-card';
 import { QuickActions } from '@/components/dashboard/quick-actions';
 import { RecentActivities } from '@/components/dashboard/recent-activities';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { ErrorState } from '@/components/ui/error-state';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import {
   Select,
   SelectContent,
@@ -25,41 +25,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
   const [timeRange, setTimeRange] = React.useState(30);
   const { data: analytics, loading: analyticsLoading, error: analyticsError, refetch } = useAnalytics(timeRange);
 
   if (authLoading || !user) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center space-y-4">
-          <Skeleton className="h-8 w-8 rounded mx-auto" />
-          <Skeleton className="h-4 w-[200px]" />
-        </div>
-      </div>
-    );
+    return <LoadingSpinner text="加载中..." />;
   }
 
   return (
-    <div className="flex-1 space-y-6 p-8 pt-6">
+    <div className="flex-1 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">数据仪表板</h2>
           <p className="text-base text-muted-foreground">
             欢迎回来，{user.displayName || user.username}！
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           <Select
             value={timeRange.toString()}
             onValueChange={(value) => setTimeRange(Number(value))}
           >
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-full sm:w-[140px]">
               <SelectValue placeholder="选择时间范围" />
             </SelectTrigger>
             <SelectContent>
@@ -69,23 +60,29 @@ export default function DashboardPage() {
               <SelectItem value="365">最近365天</SelectItem>
             </SelectContent>
           </Select>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={analyticsLoading}
+            aria-label="刷新仪表板数据"
+          >
+            <RefreshCw className={analyticsLoading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+          </Button>
         </div>
       </div>
 
-      {/* Error Alert */}
-      {analyticsError && (
-        <Alert variant="destructive">
-          <AlertDescription className="flex items-center justify-between">
-            <span>数据加载失败: {analyticsError}</span>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>
-              重试
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
+      {analyticsError ? (
+        <ErrorState
+          title="数据加载失败"
+          description={String(analyticsError)}
+          onRetry={() => refetch()}
+        />
+      ) : null}
 
       {/* Overview Statistics - First Row */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="总内容数"
           value={analytics?.overview.totalContents || 0}
@@ -115,7 +112,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Key Stats - Second Row */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="发布率"
           value={`${analytics?.overview.publishRate || 0}%`}
@@ -144,11 +141,11 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick Actions and Recent Activities */}
-      <div className="grid grid-cols-7 gap-4">
-        <div className="col-span-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-7">
+        <div className="lg:col-span-3">
           <QuickActions />
         </div>
-        <div className="col-span-4">
+        <div className="lg:col-span-4">
           <RecentActivities
             activities={analytics?.activities}
             loading={analyticsLoading}

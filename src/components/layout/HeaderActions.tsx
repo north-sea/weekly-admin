@@ -42,7 +42,7 @@ const quickLinks: QuickLink[] = [
   {
     label: '系统设置',
     description: '角色与标签配置',
-    href: '/settings/users',
+    href: '/settings/categories',
     icon: Settings,
   },
 ];
@@ -84,12 +84,15 @@ const HeaderActions: React.FC = () => {
 
   return (
     <div className="flex items-center gap-2">
-      <Badge variant="secondary" className="inline-flex items-center gap-1">
+      <Badge
+        variant="secondary"
+        className="hidden items-center gap-1 xl:inline-flex"
+      >
         <Sparkles className="h-3.5 w-3.5 text-primary" />
         <span className="text-xs font-medium">体验优化中</span>
       </Badge>
 
-      <div className="flex items-center gap-2">
+      <div className="hidden items-center gap-2 lg:flex">
         {quickLinks.map((item) => (
           <Button
             asChild
@@ -119,20 +122,20 @@ const HeaderActions: React.FC = () => {
           <Button
             variant="ghost"
             className={cn(
-              "flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1 shadow-sm transition-all duration-200",
-              "hover:bg-slate-50 hover:border-slate-300 hover:shadow"
+              "flex items-center gap-2 rounded-md border border-border bg-card px-2 py-1 shadow-sm transition-all duration-200",
+              "hover:bg-muted/50 hover:shadow"
             )}
           >
-            <Avatar className="h-8 w-8 border border-slate-200">
-              <AvatarFallback className="text-sm font-semibold bg-slate-100 text-slate-900">
+            <Avatar className="h-8 w-8 border border-border">
+              <AvatarFallback className="text-sm font-semibold bg-muted text-foreground">
                 {initials}
               </AvatarFallback>
             </Avatar>
-            <div className="flex flex-col items-start text-left leading-tight">
-              <span className="text-sm font-medium text-slate-900 line-clamp-1">
+            <div className="hidden flex-col items-start text-left leading-tight sm:flex">
+              <span className="text-sm font-medium text-foreground line-clamp-1">
                 {user?.displayName || user?.username || '访客'}
               </span>
-              <span className="text-xs text-slate-500">{roleLabel}</span>
+              <span className="text-xs text-muted-foreground">{roleLabel}</span>
             </div>
           </Button>
         </DropdownMenuTrigger>

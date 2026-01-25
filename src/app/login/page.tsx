@@ -5,13 +5,15 @@ import { useSearchParams } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
-import { Loader2, Lock, LogIn, ShieldCheck, UserRound } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Loader2, Lock, LogIn, ShieldCheck, UserRound } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { FormMessage } from '@/components/ui/form-message';
+import { useToast } from '@/components/ui/use-toast';
 import { useAuthStore } from '@/stores/auth';
 
 const loginSchema = z.object({
@@ -29,6 +31,7 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const [redirectUrl, setRedirectUrl] = useState('/dashboard');
   const { login, logout, isAuthenticated, hasHydrated } = useAuthStore();
+  const { toast } = useToast();
   const redirectedRef = useRef(false);
   const checkedSessionRef = useRef(false);
 
@@ -177,8 +180,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="grid min-h-screen grid-cols-2 bg-slate-100">
-      <div className="relative flex flex-col justify-between bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-12 py-14 text-white shadow-inner">
+    <div className="grid min-h-screen grid-cols-1 bg-background lg:grid-cols-2">
+      <div className="relative hidden flex-col justify-between bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-12 py-14 text-white shadow-inner lg:flex">
         <div className="space-y-3">
           <div className="inline-flex items-center gap-2 rounded-md bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
             <Lock className="h-3.5 w-3.5" />
@@ -211,10 +214,10 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <div className="flex items-center justify-center px-12">
-        <Card className="w-full max-w-lg border-slate-200 bg-white text-foreground shadow-lg">
+      <div className="flex items-center justify-center px-6 py-10 sm:px-12">
+        <Card className="w-full max-w-lg shadow-lg">
           <CardHeader className="space-y-2 text-center">
-            <CardTitle className="text-2xl font-semibold tracking-tight text-slate-900">
+            <CardTitle className="text-2xl font-semibold tracking-tight text-foreground">
               Weekly 内容管理系统
             </CardTitle>
             <CardDescription className="text-sm text-muted-foreground">
@@ -224,13 +227,18 @@ export default function LoginPage() {
           <CardContent className="space-y-6">
             {feedback && (
               <div
-                className={`flex items-center justify-center rounded-md border px-3 py-2 text-sm ${
+                className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
                   feedback.type === 'success'
                     ? 'border-green-200 bg-green-50 text-green-700'
                     : 'border-destructive/30 bg-destructive/10 text-destructive'
                 }`}
               >
-                {feedback.message}
+                {feedback.type === 'success' ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <AlertCircle className="h-4 w-4" />
+                )}
+                <span>{feedback.message}</span>
               </div>
             )}
 
@@ -255,9 +263,9 @@ export default function LoginPage() {
                     )}
                   />
                 </div>
-                {errors.username && (
-                  <p className="text-sm text-destructive">{errors.username.message}</p>
-                )}
+                {errors.username?.message ? (
+                  <FormMessage>{errors.username.message}</FormMessage>
+                ) : null}
               </div>
 
               <div className="space-y-2">
@@ -281,9 +289,9 @@ export default function LoginPage() {
                     )}
                   />
                 </div>
-                {errors.password && (
-                  <p className="text-sm text-destructive">{errors.password.message}</p>
-                )}
+                {errors.password?.message ? (
+                  <FormMessage>{errors.password.message}</FormMessage>
+                ) : null}
               </div>
 
               <div className="flex items-center justify-between">
@@ -291,33 +299,33 @@ export default function LoginPage() {
                   control={control}
                   name="remember"
                   render={({ field }) => (
-                    <label className="flex items-center space-x-2 text-sm">
+                    <label className="group flex items-center space-x-2 text-sm cursor-pointer">
                       <Checkbox
                         checked={field.value}
                         onCheckedChange={field.onChange}
                         id="remember"
                       />
-                      <span>记住我</span>
+                      <span className="transition-colors group-hover:text-foreground">记住我</span>
                     </label>
                   )}
                 />
-                <button type="button" className="text-sm text-primary hover:underline">
+                <button
+                  type="button"
+                  className="ui-focus-ring-sm rounded-sm px-1 text-sm text-primary hover:underline underline-offset-4"
+                  onClick={() =>
+                    toast({
+                      title: '功能开发中',
+                      description: '请联系管理员重置密码',
+                    })
+                  }
+                >
                   忘记密码？
                 </button>
               </div>
 
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    登录中...
-                  </>
-                ) : (
-                  <>
-                    <LogIn className="mr-2 h-4 w-4" />
-                    登录
-                  </>
-                )}
+              <Button type="submit" className="w-full" loading={loading} loadingText="登录中...">
+                <LogIn className="mr-2 h-4 w-4" />
+                登录
               </Button>
             </form>
           </CardContent>

@@ -259,7 +259,7 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId, onContentsChange }
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base">可选内容</CardTitle>
-                  <Button variant="ghost" size="icon" onClick={handleRefresh}>
+                  <Button type="button" variant="ghost" size="icon" onClick={handleRefresh} aria-label="刷新内容列表">
                     <RefreshCw className="h-4 w-4" />
                   </Button>
                 </div>
@@ -279,7 +279,7 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId, onContentsChange }
                         }
                       }}
                     />
-                    <Button variant="default" size="icon" onClick={handleSearch}>
+                    <Button type="button" variant="default" size="icon" onClick={handleSearch} aria-label="搜索内容">
                       <Search className="h-4 w-4" />
                     </Button>
                   </div>

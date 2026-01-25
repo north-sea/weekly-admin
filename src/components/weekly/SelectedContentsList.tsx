@@ -80,6 +80,7 @@ const SelectedContentsList: React.FC<SelectedContentsListProps> = ({
                   onClick={() => moveItem(index, 'up')}
                   disabled={index === 0}
                   title="上移"
+                  aria-label="上移"
                 >
                   <MoveUp className="h-4 w-4" />
                 </Button>
@@ -90,6 +91,7 @@ const SelectedContentsList: React.FC<SelectedContentsListProps> = ({
               onClick={() => moveItem(index, 'down')}
               disabled={index === contents.length - 1}
               title="下移"
+              aria-label="下移"
             >
               <MoveDown className="h-4 w-4" />
             </Button>
@@ -143,6 +145,7 @@ const SelectedContentsList: React.FC<SelectedContentsListProps> = ({
                 className="h-8 w-8"
                 onClick={() => onRemoveContent(content.id)}
                 title="移除内容"
+                aria-label="移除内容"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>

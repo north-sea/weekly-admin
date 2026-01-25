@@ -143,6 +143,8 @@ const WeeklyContentCard: React.FC<{
             alt={content.title}
             className="w-full rounded-lg object-contain transition duration-300 group-hover:scale-[1.01]"
             style={{ maxHeight: 320 }}
+            loading="lazy"
+            decoding="async"
           />
         </div>
       )}

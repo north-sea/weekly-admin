@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Table,
   TableBody,
@@ -69,6 +70,7 @@ export default function RssSourcesPage() {
   const [lastResult, setLastResult] = useState<RssFetchResult | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
   const sortedSources = useMemo(() => {
     return (sources ?? []).slice().sort((a, b) => b.id - a.id);
@@ -78,7 +80,7 @@ export default function RssSourcesPage() {
     try {
       await createSource.mutateAsync(newSource);
       setNewSource({ name: '', feed_url: '', type: 'normal', enabled: true });
-      toast({ title: '已创建 RSS 源' });
+      toast({ title: '已创建 RSS 源', variant: 'success' });
     } catch (error) {
       toast({ title: '创建失败', description: error instanceof Error ? error.message : String(error), variant: 'destructive' });
     }
@@ -112,11 +114,15 @@ export default function RssSourcesPage() {
     }
   }
 
-  async function handleDelete(sourceId: number) {
-    if (!confirm('确认删除该 RSS 源？')) return;
+  function handleDelete(sourceId: number) {
+    setPendingDeleteId(sourceId);
+  }
+
+  async function handleConfirmDelete() {
+    if (pendingDeleteId === null) return;
     try {
-      await deleteSource.mutateAsync(sourceId);
-      toast({ title: '已删除 RSS 源' });
+      await deleteSource.mutateAsync(pendingDeleteId);
+      toast({ title: '已删除 RSS 源', variant: 'success' });
     } catch (error) {
       toast({ title: '删除失败', description: error instanceof Error ? error.message : String(error), variant: 'destructive' });
     }
@@ -150,7 +156,12 @@ export default function RssSourcesPage() {
                 <SelectItem value="aggregator">aggregator</SelectItem>
               </SelectContent>
             </Select>
-            <Button onClick={handleCreate} disabled={createSource.isPending || !newSource.name || !newSource.feed_url}>
+            <Button
+              onClick={handleCreate}
+              disabled={createSource.isPending || !newSource.name || !newSource.feed_url}
+              loading={createSource.isPending}
+              loadingText="创建中..."
+            >
               创建
             </Button>
           </div>
@@ -254,6 +265,19 @@ export default function RssSourcesPage() {
           </CardContent>
         </Card>
       ) : null}
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteId(null);
+        }}
+        title="删除 RSS 源"
+        description="此操作不可撤销，确定要删除该 RSS 源吗？"
+        variant="destructive"
+        confirmText="删除"
+        confirmLoadingText="正在删除..."
+        onConfirm={handleConfirmDelete}
+      />
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-2xl">

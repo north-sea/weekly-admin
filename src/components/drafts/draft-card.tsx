@@ -166,6 +166,8 @@ export function DraftCard({
               src={draft.image_url}
               alt={draft.title}
               className="w-full h-full object-cover"
+              loading="lazy"
+              decoding="async"
             />
           </div>
         )}

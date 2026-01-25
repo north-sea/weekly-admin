@@ -52,14 +52,14 @@ export function QuickActions() {
         <CardDescription>常用功能快捷入口</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {actions.map((action) => {
             const Icon = action.icon;
             return (
               <Button
                 key={action.title}
                 variant={action.variant}
-                className="h-auto flex-col items-start p-4 space-y-2"
+                className="h-auto flex-col items-start gap-2 p-4 text-left transition-all duration-200 hover:shadow-md"
                 onClick={action.onClick}
               >
                 <div className="flex items-center gap-2 w-full">

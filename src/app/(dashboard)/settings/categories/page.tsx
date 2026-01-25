@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import {
@@ -44,6 +45,7 @@ export default function CategoriesSettingsPage() {
   const [slugEdited, setSlugEdited] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'tree'>('grid');
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const debouncedSearch = useDebouncedValue(searchQuery, 300);
 
   const { data: categoriesData, isLoading } = useCategoryList({ search: debouncedSearch || undefined });
@@ -117,11 +119,15 @@ export default function CategoriesSettingsPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('确定要删除这个分类吗?')) return;
+  const handleDelete = (id: number) => {
+    setPendingDeleteId(id);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (pendingDeleteId === null) return;
     try {
-      await deleteCategory.mutateAsync({ id });
-      toast({ title: '删除成功', description: '分类已成功删除' });
+      await deleteCategory.mutateAsync({ id: pendingDeleteId });
+      toast({ title: '删除成功', description: '分类已成功删除', variant: 'success' });
     } catch (error: any) {
       toast({
         title: '删除失败',
@@ -146,13 +152,13 @@ export default function CategoriesSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Categories</p>
-          <h2 className="text-3xl font-semibold tracking-tight text-slate-900">分类管理</h2>
+          <h2 className="text-3xl font-semibold tracking-tight text-foreground">分类管理</h2>
           <p className="text-sm text-muted-foreground">管理内容分类</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <Button variant="outline" onClick={() => setIsMergeDialogOpen(true)}>
             <GitMerge className="h-4 w-4 mr-2" />
             合并分类
@@ -166,15 +172,15 @@ export default function CategoriesSettingsPage() {
 
       <Card className="shadow-sm">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle>分类列表</CardTitle>
               <CardDescription>
                 共 {categories.length} 个分类
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="relative w-64">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="relative w-full sm:w-64">
                 <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   value={searchQuery}
@@ -188,17 +194,19 @@ export default function CategoriesSettingsPage() {
                     size="sm"
                     className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
                     onClick={() => setSearchQuery('')}
+                    aria-label="清空搜索"
                   >
                     <X className="h-3 w-3" />
                   </Button>
                 )}
               </div>
-              <div className="flex border rounded">
+              <div className="flex rounded border border-border">
                 <Button
                   variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
                   size="sm"
                   className="rounded-r-none"
                   onClick={() => setViewMode('grid')}
+                  aria-label="切换到网格视图"
                 >
                   <LayoutGrid className="h-4 w-4" />
                 </Button>
@@ -207,6 +215,7 @@ export default function CategoriesSettingsPage() {
                   size="sm"
                   className="rounded-l-none"
                   onClick={() => setViewMode('tree')}
+                  aria-label="切换到树形视图"
                 >
                   <List className="h-4 w-4" />
                 </Button>
@@ -269,6 +278,19 @@ export default function CategoriesSettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteId(null);
+        }}
+        title="删除分类"
+        description="此操作不可撤销，确定要删除该分类吗？"
+        variant="destructive"
+        confirmText="删除"
+        confirmLoadingText="正在删除..."
+        onConfirm={handleConfirmDelete}
+      />
 
       {/* Create Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>

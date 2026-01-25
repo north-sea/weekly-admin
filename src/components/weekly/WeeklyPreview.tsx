@@ -133,7 +133,13 @@ const WeeklyPreview: React.FC<WeeklyPreviewProps> = ({ issueId, contents }) => {
       <div className="flex items-start gap-3">
         {content.image_url && (
           <div className="w-24 h-16 rounded bg-muted/60 overflow-hidden">
-            <img src={content.image_url} alt="" className="object-cover w-full h-full" />
+            <img
+              src={content.image_url}
+              alt=""
+              className="object-cover w-full h-full"
+              loading="lazy"
+              decoding="async"
+            />
           </div>
         )}
         <div className="flex-1 space-y-2 min-w-0">
@@ -195,6 +201,8 @@ const WeeklyPreview: React.FC<WeeklyPreviewProps> = ({ issueId, contents }) => {
               src={issue.cover}
               alt={issue.title}
               className="h-40 w-full object-cover"
+              loading="lazy"
+              decoding="async"
             />
           </div>
         )}

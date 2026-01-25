@@ -44,7 +44,7 @@ export default function SearchPage() {
     <div className="space-y-6">
       <div>
         <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Search</p>
-        <h2 className="text-3xl font-semibold tracking-tight text-slate-900">内容搜索</h2>
+        <h2 className="text-3xl font-semibold tracking-tight text-foreground">内容搜索</h2>
         <p className="text-sm text-muted-foreground">搜索内容、草稿和周刊</p>
       </div>
 
@@ -56,7 +56,7 @@ export default function SearchPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -80,7 +80,7 @@ export default function SearchPage() {
             </div>
 
             {/* Filters */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:gap-4">
               <Select value={contentType} onValueChange={setContentType}>
                 <SelectTrigger>
                   <SelectValue placeholder="内容类型" />
@@ -139,7 +139,7 @@ export default function SearchPage() {
               {results.map((result: any) => (
                 <div
                   key={result.id}
-                  className="cursor-pointer rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                  className="cursor-pointer rounded-lg border border-border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                   onClick={() => router.push(`/content/${result.id}`)}
                 >
                   <div className="flex items-start justify-between gap-4">

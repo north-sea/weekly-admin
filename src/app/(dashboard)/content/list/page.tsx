@@ -7,6 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Select,
   SelectContent,
@@ -32,9 +35,11 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
 import { useContentList, useDeleteContent } from '@/hooks/queries';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import {
   Plus,
   Search,
+  FileText,
   Edit,
   Eye,
   Trash2,
@@ -47,6 +52,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import dayjs from 'dayjs';
 import HoverImagePreview from '@/components/weekly/HoverImagePreview';
+import type { ContentWithRelations } from '@/types/content';
 
 const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: '草稿', variant: 'outline' },
@@ -58,6 +64,12 @@ const statusMap: Record<string, { label: string; variant: 'default' | 'secondary
 const contentTypeMap: Record<string, { label: string; color: string }> = {
   blog: { label: 'Blog', color: 'bg-blue-500' },
   weekly: { label: 'Weekly', color: 'bg-green-500' },
+};
+
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return '请稍后重试';
 };
 
 export default function ContentListPage() {
@@ -73,11 +85,20 @@ export default function ContentListPage() {
     summary_score_min: undefined as number | undefined,
   });
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const debouncedSearch = useDebouncedValue(filters.search, 300);
 
-  const { data: contentData, isLoading } = useContentList(filters);
+  const {
+    data: contentData,
+    isLoading,
+    isFetching,
+    isError,
+    error,
+    refetch,
+  } = useContentList({ ...filters, search: debouncedSearch });
   const deleteContent = useDeleteContent();
 
-  const contents = contentData?.data || [];
+  const contents: ContentWithRelations[] = contentData?.data || [];
   const pagination = contentData?.pagination || {
     page: 1,
     pageSize: 20,
@@ -125,15 +146,19 @@ export default function ContentListPage() {
     setFilters({ ...filters, page: newPage });
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('确定要删除这个内容吗?')) return;
+  const handleRequestDelete = (id: number) => {
+    setPendingDeleteId(id);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (pendingDeleteId === null) return;
     try {
-      await deleteContent.mutateAsync({ id });
-      toast({ title: '删除成功', description: '内容已成功删除' });
-    } catch (error: any) {
+      await deleteContent.mutateAsync({ id: pendingDeleteId });
+      toast({ title: '删除成功', description: '内容已成功删除', variant: 'success' });
+    } catch (error: unknown) {
       toast({
         title: '删除失败',
-        description: error.message || '请稍后重试',
+        description: getErrorMessage(error),
         variant: 'destructive',
       });
     }
@@ -149,21 +174,35 @@ export default function ContentListPage() {
     if (selectedIds.length === contents.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(contents.map((c: any) => Number(c.id)));
+      setSelectedIds(contents.map((content) => Number(content.id)));
     }
   };
 
+  const handleRowClick = (content: ContentWithRelations) => {
+    router.push(`/content/preview/${content.id}`);
+  };
+
   return (
-    <div className="flex-1 space-y-6 p-8 pt-6">
+    <div className="flex-1 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">内容库</h2>
           <p className="text-base text-muted-foreground">
             管理 Blog 和 Weekly 内容
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            aria-label="刷新内容列表"
+          >
+            <RefreshCw className={isFetching ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+          </Button>
           <Button onClick={() => router.push('/content/new')}>
             <Plus className="h-4 w-4 mr-2" />
             新建内容
@@ -177,8 +216,8 @@ export default function ContentListPage() {
           <CardTitle>筛选条件</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-6 gap-4">
-            <div className="relative col-span-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6 lg:gap-4">
+            <div className="relative sm:col-span-2 lg:col-span-2">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="搜索标题或内容..."
@@ -274,6 +313,24 @@ export default function ContentListPage() {
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
             </div>
+          ) : isError ? (
+            <ErrorState
+              title="内容加载失败"
+              description={getErrorMessage(error)}
+              onRetry={() => refetch()}
+            />
+          ) : contents.length === 0 ? (
+            <EmptyState
+              title="暂无内容"
+              description="试试调整筛选条件，或直接创建一条新内容。"
+              icon={<FileText className="h-5 w-5" />}
+              action={
+                <Button type="button" onClick={() => router.push('/content/new')}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  新建内容
+                </Button>
+              }
+            />
           ) : (
             <>
               <div className="rounded border">
@@ -298,108 +355,120 @@ export default function ContentListPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {contents.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={10} className="text-center text-muted-foreground">
-                          暂无内容
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      contents.map((content: any) => {
-                        const status = statusMap[content.status] || statusMap.draft;
-                        const contentType = contentTypeMap[content.content_type?.slug] || contentTypeMap.blog;
-                        const previewImage = content.image_url || content.cover_image || content.screenshot_api;
-                        return (
-                          <TableRow key={content.id}>
-                            <TableCell>
-                              <Checkbox
-                                checked={selectedIds.includes(Number(content.id))}
-                                onCheckedChange={() => toggleSelection(Number(content.id))}
-                              />
-                            </TableCell>
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                <HoverImagePreview imageUrl={previewImage} title={content.title}>
-                                  <span className="block max-w-[260px] truncate">
-                                    {content.title}
-                                  </span>
-                                </HoverImagePreview>
-                                {content.featured && (
-                                  <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge className={contentType.color}>
-                                {contentType.label}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{content.category?.name || '-'}</TableCell>
-                            <TableCell>
-                              <Badge variant={status.variant}>{status.label}</Badge>
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {content.original_score === null || content.original_score === undefined ? '-' : content.original_score}
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {content.summary_score === null || content.summary_score === undefined ? '-' : content.summary_score}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-wrap gap-1">
-                                {content.tags?.slice(0, 2).map((tag: any) => (
-                                  <Badge key={tag.id} variant="secondary">
-                                    {tag.name}
-                                  </Badge>
-                                ))}
-                                {content.tags?.length > 2 && (
-                                  <Badge variant="secondary">
-                                    +{content.tags.length - 2}
-                                  </Badge>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              {dayjs(content.created_at).format('YYYY-MM-DD HH:mm')}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem
-                                    onClick={() => router.push(`/content/preview/${content.id}`)}
+                    {contents.map((content) => {
+                      const status = statusMap[content.status] || statusMap.draft;
+                      const contentType = contentTypeMap[content.content_type?.slug] || contentTypeMap.blog;
+                      const previewImage =
+                        content.image_url ?? content.cover_image ?? content.screenshot_api ?? undefined;
+                      const contentId = Number(content.id);
+                      const selected = selectedIds.includes(contentId);
+
+                      return (
+                        <TableRow
+                          key={content.id}
+                          data-state={selected ? 'selected' : undefined}
+                          tabIndex={0}
+                          className="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                          onClick={() => handleRowClick(content)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              handleRowClick(content);
+                            }
+                          }}
+                        >
+                          <TableCell onClick={(event) => event.stopPropagation()}>
+                            <Checkbox
+                              checked={selected}
+                              onCheckedChange={() => toggleSelection(contentId)}
+                              aria-label={selected ? '取消选择' : '选择内容'}
+                            />
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <HoverImagePreview imageUrl={previewImage} title={content.title ?? '未命名'}>
+                                <span className="block max-w-[260px] truncate">
+                                  {content.title ?? '未命名'}
+                                </span>
+                              </HoverImagePreview>
+                              {content.featured && (
+                                <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={contentType.color}>
+                              {contentType.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{content.category?.name || '-'}</TableCell>
+                          <TableCell>
+                            <Badge variant={status.variant}>{status.label}</Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {content.original_score === null || content.original_score === undefined ? '-' : content.original_score}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {content.summary_score === null || content.summary_score === undefined ? '-' : content.summary_score}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {content.tags?.slice(0, 2).map((tag) => (
+                                <Badge key={tag.id} variant="secondary">
+                                  {tag.name}
+                                </Badge>
+                              ))}
+                              {content.tags?.length > 2 && (
+                                <Badge variant="secondary">
+                                  +{content.tags.length - 2}
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {dayjs(content.created_at).format('YYYY-MM-DD HH:mm')}
+                          </TableCell>
+                          <TableCell
+                            className="text-right"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" aria-label="打开操作菜单">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onSelect={() => router.push(`/content/preview/${content.id}`)}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  预览
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                  <Link
+                                    href={`/content/${content.id}`}
+                                    target="_blank"
+                                    rel="noreferrer"
                                   >
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    预览
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem asChild>
-                                    <Link
-                                      href={`/content/${content.id}`}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                    >
-                                      <Edit className="h-4 w-4 mr-2" />
-                                      编辑
-                                    </Link>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    onClick={() => handleDelete(Number(content.id))}
-                                    className="text-destructive"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    删除
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    编辑
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onSelect={() => handleRequestDelete(contentId)}
+                                  className="text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  删除
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -438,6 +507,19 @@ export default function ContentListPage() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteId(null);
+        }}
+        title="删除内容"
+        description="此操作不可撤销，确定要删除该内容吗？"
+        variant="destructive"
+        confirmText="删除"
+        confirmLoadingText="正在删除..."
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 }

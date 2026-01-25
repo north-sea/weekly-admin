@@ -20,10 +20,10 @@ const SelectTrigger = React.forwardRef<
     ref={ref}
     data-slot="select"
     className={cn(
-      "flex h-10 w-full items-center justify-between rounded border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition-colors duration-200",
-      "ring-offset-background placeholder:text-slate-400",
-      "focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900",
-      "disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-slate-50",
+      "flex h-10 w-full items-center justify-between rounded border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors duration-200",
+      "ring-offset-background placeholder:text-muted-foreground",
+      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+      "disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-muted",
       "[&>span]:line-clamp-1",
       className
     )}

@@ -20,9 +20,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { useTagList, useCreateTag, useUpdateTag, useDeleteTag, useAllTags } from '@/hooks/queries/useTagQueries';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { Plus, Edit, Trash2, Search, GitMerge, ChevronLeft, ChevronRight, Cloud, LayoutList, Sparkles } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TagCloud, TagStatsCard, UnusedTagsCleanupDialog, TagMergeWizard } from '@/components/tags';
@@ -47,9 +49,11 @@ export default function TagsSettingsPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [viewMode, setViewMode] = useState<'list' | 'cloud'>('list');
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
 
   const { data: tagsData, isLoading } = useTagList({
-    search: searchQuery || undefined,
+    search: debouncedSearchQuery || undefined,
     page,
     pageSize,
     sort_by: 'count',
@@ -140,11 +144,15 @@ export default function TagsSettingsPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('确定要删除这个标签吗?')) return;
+  const handleDelete = (id: number) => {
+    setPendingDeleteId(id);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (pendingDeleteId === null) return;
     try {
-      await deleteTag.mutateAsync({ id });
-      toast({ title: '删除成功', description: '标签已成功删除' });
+      await deleteTag.mutateAsync({ id: pendingDeleteId });
+      toast({ title: '删除成功', description: '标签已成功删除', variant: 'success' });
     } catch (error: any) {
       toast({
         title: '删除失败',
@@ -166,13 +174,13 @@ export default function TagsSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Tags</p>
-          <h2 className="text-3xl font-semibold tracking-tight text-slate-900">标签管理</h2>
+          <h2 className="text-3xl font-semibold tracking-tight text-foreground">标签管理</h2>
           <p className="text-sm text-muted-foreground">管理内容标签</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
           <Button variant="outline" onClick={() => setIsCleanupDialogOpen(true)}>
             <Sparkles className="h-4 w-4 mr-2" />
             清理未使用
@@ -194,15 +202,15 @@ export default function TagsSettingsPage() {
       {/* Tags List */}
       <Card className="shadow-sm">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle>标签列表</CardTitle>
               <CardDescription>
                 共 {pagination.total} 个标签
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="relative w-64">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="搜索标签..."
@@ -214,12 +222,13 @@ export default function TagsSettingsPage() {
                   className="pl-10"
                 />
               </div>
-              <div className="flex border rounded">
+              <div className="flex rounded border border-border">
                 <Button
                   variant={viewMode === 'list' ? 'secondary' : 'ghost'}
                   size="sm"
                   className="rounded-r-none"
                   onClick={() => setViewMode('list')}
+                  aria-label="切换到列表视图"
                 >
                   <LayoutList className="h-4 w-4" />
                 </Button>
@@ -228,6 +237,7 @@ export default function TagsSettingsPage() {
                   size="sm"
                   className="rounded-l-none"
                   onClick={() => setViewMode('cloud')}
+                  aria-label="切换到词云视图"
                 >
                   <Cloud className="h-4 w-4" />
                 </Button>
@@ -354,6 +364,19 @@ export default function TagsSettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteId(null);
+        }}
+        title="删除标签"
+        description="此操作不可撤销，确定要删除该标签吗？"
+        variant="destructive"
+        confirmText="删除"
+        confirmLoadingText="正在删除..."
+        onConfirm={handleConfirmDelete}
+      />
 
       {/* Create Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>

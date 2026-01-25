@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Select,
   SelectContent,
@@ -56,6 +57,7 @@ export function WeeklyGenerator() {
   const [generating, setGenerating] = useState(false);
   const [applying, setApplying] = useState(false);
   const [result, setResult] = useState<OrganizeResult | null>(null);
+  const [pendingApply, setPendingApply] = useState<{ id: number; items: OrganizeItem[] } | null>(null);
 
   useEffect(() => {
     const run = async () => {
@@ -103,7 +105,7 @@ export function WeeklyGenerator() {
       const json = await response.json();
       if (!json?.success) throw new Error(json?.error?.message || '生成失败');
       setResult(json.data as OrganizeResult);
-      toast({ title: '生成完成', description: '已生成周刊组织建议' });
+      toast({ title: '生成完成', description: '已生成周刊组织建议', variant: 'success' });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : '生成失败';
       toast({ title: '生成失败', description: message, variant: 'destructive' });
@@ -112,18 +114,21 @@ export function WeeklyGenerator() {
     }
   };
 
-  const handleApply = async () => {
+  const handleApply = () => {
     const id = Number(weeklyIssueId);
     if (!id || !result?.items?.length) return;
-    if (!confirm('将覆盖该周刊现有内容，确定要应用 AI 结果吗？')) return;
+    setPendingApply({ id, items: result.items });
+  };
 
+  const handleConfirmApply = async () => {
+    if (!pendingApply) return;
     setApplying(true);
     try {
-      const response = await fetch(`/api/weekly/${id}/contents`, {
+      const response = await fetch(`/api/weekly/${pendingApply.id}/contents`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: result.items.map((item, index) => ({
+          contents: pendingApply.items.map((item, index) => ({
             content_id: item.content_id,
             sort_order: index,
             section: item.section,
@@ -133,7 +138,7 @@ export function WeeklyGenerator() {
       });
       const json = await response.json();
       if (!json?.success) throw new Error(json?.error?.message || '应用失败');
-      toast({ title: '已应用', description: '已写入周刊内容列表' });
+      toast({ title: '已应用', description: '已写入周刊内容列表', variant: 'success' });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : '应用失败';
       toast({ title: '应用失败', description: message, variant: 'destructive' });
@@ -151,8 +156,8 @@ export function WeeklyGenerator() {
             选择一个周刊草稿，生成候选条目分组建议（不会自动写入数据库）
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-3 gap-4">
-          <div className="space-y-2 col-span-2">
+        <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="col-span-1 space-y-2 md:col-span-2">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">周刊</span>
               {loadingIssues && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
@@ -180,19 +185,10 @@ export function WeeklyGenerator() {
               onChange={(e) => setMaxItems(Number(e.target.value))}
             />
           </div>
-          <div className="col-span-3 flex items-center gap-2">
-            <Button onClick={handleGenerate} disabled={generating}>
-              {generating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  生成中
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  AI 生成建议
-                </>
-              )}
+          <div className="col-span-1 flex flex-wrap items-center gap-2 md:col-span-3">
+            <Button onClick={handleGenerate} disabled={generating} loading={generating} loadingText="生成中">
+              <Sparkles className="h-4 w-4 mr-2" />
+              AI 生成建议
             </Button>
             {result && (
               <>
@@ -202,21 +198,33 @@ export function WeeklyGenerator() {
                 >
                   复制 JSON
                 </Button>
-                <Button variant="outline" onClick={handleApply} disabled={applying || !weeklyIssueId}>
-                  {applying ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      应用中
-                    </>
-                  ) : (
-                    '应用到周刊'
-                  )}
+                <Button
+                  variant="outline"
+                  onClick={handleApply}
+                  disabled={applying || !weeklyIssueId}
+                  loading={applying}
+                  loadingText="应用中"
+                >
+                  应用到周刊
                 </Button>
               </>
             )}
           </div>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={pendingApply !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingApply(null);
+        }}
+        title="应用 AI 结果"
+        description="将覆盖该周刊现有内容，此操作不可撤销。确定要继续吗？"
+        variant="destructive"
+        confirmText="继续应用"
+        confirmLoadingText="正在应用..."
+        onConfirm={handleConfirmApply}
+      />
 
       {result && (
         <Card>

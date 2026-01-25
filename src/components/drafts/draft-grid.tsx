@@ -434,21 +434,25 @@ export function DraftGrid({ drafts, isLoading, onPreview }: DraftGridProps) {
                   <TableCell className="align-top">
                     <div className="flex items-center gap-1">
                       <Button
+                        type="button"
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
                         onClick={() => onPreview?.(draft)}
                         title="预览"
+                        aria-label={`预览：${draft.title || '未命名草稿'}`}
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
                       <Button
+                        type="button"
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
                         onClick={() => handleAdopt(draft)}
                         disabled={convertDraft.isPending || draft.status !== 'pending'}
                         title="采用"
+                        aria-label={`采用：${draft.title || '未命名草稿'}`}
                       >
                         {convertDraft.isPending ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -457,22 +461,26 @@ export function DraftGrid({ drafts, isLoading, onPreview }: DraftGridProps) {
                         )}
                       </Button>
                       <Button
+                        type="button"
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-orange-500 hover:text-orange-600 hover:bg-orange-50"
                         onClick={() => handleReject(draft)}
                         disabled={updateDraft.isPending || draft.status !== 'pending'}
                         title="拒绝"
+                        aria-label={`拒绝：${draft.title || '未命名草稿'}`}
                       >
                         <X className="h-4 w-4" />
                       </Button>
                       <Button
+                        type="button"
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-destructive hover:bg-destructive/10"
                         onClick={() => handleDelete(draft)}
                         disabled={deleteDraft.isPending}
                         title="删除"
+                        aria-label={`删除：${draft.title || '未命名草稿'}`}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

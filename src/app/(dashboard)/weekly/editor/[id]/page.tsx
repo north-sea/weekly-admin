@@ -440,9 +440,16 @@ const WeeklyEditorPage: React.FC = () => {
     <div className="space-y-6">
       <Card className="shadow-sm">
         <CardHeader>
-          <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={() => router.push('/weekly')}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => router.push('/weekly')}
+                aria-label="返回周刊列表"
+                title="返回周刊列表"
+              >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div>
@@ -671,7 +678,13 @@ const WeeklyEditorPage: React.FC = () => {
                 {previewCover && (
                   <div className="space-y-2">
                     <div className="overflow-hidden rounded border">
-                      <img src={previewCover.url} alt="封面预览" className="w-full object-contain" />
+                      <img
+                        src={previewCover.url}
+                        alt="封面预览"
+                        className="w-full object-contain"
+                        loading="lazy"
+                        decoding="async"
+                      />
                     </div>
                     <div className="flex gap-2">
                       <Button
@@ -726,8 +739,9 @@ const WeeklyEditorPage: React.FC = () => {
                 )}
                 {/* 上传/粘贴区域 */}
                 {!previewCover && (
-                  <div
-                    className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                  <button
+                    type="button"
+                    className="ui-focus-ring w-full border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors border-slate-200 hover:border-slate-300 hover:bg-slate-50"
                     onPaste={async (e) => {
                       const items = e.clipboardData?.items;
                       if (!items) return;
@@ -766,22 +780,32 @@ const WeeklyEditorPage: React.FC = () => {
                       };
                       input.click();
                     }}
+                    aria-label="上传封面图片"
+                    title="上传封面图片"
                   >
                     <Upload className="h-8 w-8 mx-auto text-slate-400 mb-2" />
                     <p className="text-sm text-slate-600">点击上传、拖拽或粘贴图片</p>
                     <p className="text-xs text-muted-foreground mt-1">支持 PNG、JPG、WebP 格式</p>
-                  </div>
+                  </button>
                 )}
                 {/* 已上传的封面 */}
                 {cover && !previewCover && (
                   <div className="relative group">
-                    <img src={cover} alt="当前封面" className="w-full object-contain rounded border" />
+                    <img
+                      src={cover}
+                      alt="当前封面"
+                      className="w-full object-contain rounded border"
+                      loading="lazy"
+                      decoding="async"
+                    />
                     <Button
                       type="button"
                       variant="destructive"
                       size="sm"
                       className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={() => setCover('')}
+                      aria-label="删除封面"
+                      title="删除封面"
                     >
                       <X className="h-4 w-4" />
                     </Button>
