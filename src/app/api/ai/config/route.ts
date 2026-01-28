@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server';
 
 import { authenticateRequest } from '@/lib/auth';
+import { AiConfigService } from '@/lib/services/ai-config';
+import { AiPromptService } from '@/lib/services/ai-prompt';
 import { createNextErrorResponse, createNextSuccessResponse } from '@/lib/utils/serialization';
 
 const normalizeBaseUrl = (value: string) => value.replace(/\/+$/, '');
@@ -12,35 +14,49 @@ export async function GET(request: NextRequest) {
       return createNextErrorResponse('UNAUTHORIZED', '未授权访问', 401);
     }
 
-    const provider = (process.env.AI_PROVIDER ?? '').toLowerCase() || 'openai';
+    const dbConfig = await AiConfigService.getResolvedDefault().catch(() => null);
+    const fallbackProvider = (process.env.AI_PROVIDER ?? '').toLowerCase() || 'openai';
+
+    const provider = dbConfig?.enabled ? dbConfig.provider : fallbackProvider;
 
     const baseUrl = normalizeBaseUrl(
-      process.env.AI_BASE_URL ??
+      (dbConfig?.enabled ? dbConfig.baseUrl : null) ??
+        process.env.AI_BASE_URL ??
         process.env.OPENAI_BASE_URL ??
         (provider === 'anthropic' ? process.env.ANTHROPIC_BASE_URL ?? 'https://api.anthropic.com' : 'https://api.openai.com')
     );
 
     const textModel =
+      (dbConfig?.enabled ? dbConfig.textModel : null) ??
       process.env.AI_TEXT_MODEL ??
       process.env.OPENAI_MODEL ??
       (provider === 'anthropic' ? process.env.ANTHROPIC_MODEL ?? 'claude-3-5-sonnet-latest' : 'gpt-4o-mini');
 
-    const imageModel = process.env.AI_IMAGE_MODEL ?? process.env.AI_TEXT_MODEL ?? 'gpt-image-1';
+    const imageModel =
+      (dbConfig?.enabled ? dbConfig.imageModel : null) ??
+      process.env.AI_IMAGE_MODEL ??
+      process.env.AI_TEXT_MODEL ??
+      'gpt-image-1';
+
+    const weeklyDescPromptRecord = await AiPromptService.getByScene('weekly_desc');
+    const weeklyCoverPromptRecord = await AiPromptService.getByScene('weekly_cover');
 
     const weeklyDescPrompt =
-      process.env.AI_WEEKLY_DESC_PROMPT ??
-      '你是一个周刊编辑，请基于本期标题、时间范围和收录的内容，生成 25-40 字的中文简介，语气简洁有吸引力，不要使用 Markdown。标题：{{title}}；时间：{{date_range}}；收录：{{contents_summary}}';
+      weeklyDescPromptRecord.is_default && process.env.AI_WEEKLY_DESC_PROMPT
+        ? process.env.AI_WEEKLY_DESC_PROMPT
+        : weeklyDescPromptRecord.prompt;
 
     const weeklyCoverPrompt =
-      process.env.AI_WEEKLY_COVER_PROMPT ??
-      'Design a sleek, modern cover image for a Chinese tech/design weekly digest. Title: "{{title}}". Topics: {{contents_summary}}. Tone: dark elegant, subtle gradient, clean typography.';
+      weeklyCoverPromptRecord.is_default && process.env.AI_WEEKLY_COVER_PROMPT
+        ? process.env.AI_WEEKLY_COVER_PROMPT
+        : weeklyCoverPromptRecord.prompt;
 
     return createNextSuccessResponse({
       provider,
       baseUrl,
       textModel,
       imageModel,
-      hasKey: Boolean(process.env.AI_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY),
+      hasKey: Boolean(dbConfig?.enabled ? dbConfig.apiKey : process.env.AI_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY),
       weeklyDescPrompt,
       weeklyCoverPrompt,
     });
@@ -49,4 +65,3 @@ export async function GET(request: NextRequest) {
     return createNextErrorResponse('INTERNAL_ERROR', message, 500);
   }
 }
-

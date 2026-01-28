@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { AiConfigService, type AiProvider } from '@/lib/services/ai-config';
+
 const getRequiredEnv = (key: string) => {
   const value = process.env[key];
   if (!value) {
@@ -7,8 +9,6 @@ const getRequiredEnv = (key: string) => {
   }
   return value;
 };
-
-type AiProvider = 'openai' | 'anthropic';
 
 export interface AiMessage {
   role: 'user' | 'assistant';
@@ -21,6 +21,7 @@ export interface AiGenerateOptions {
   maxTokens?: number;
   temperature?: number;
   model?: string;
+  configId?: number;
   signal?: AbortSignal;
 }
 
@@ -54,16 +55,59 @@ const getProvider = (): AiProvider => {
   return 'openai';
 };
 
-async function openaiGenerateText(options: AiGenerateOptions): Promise<string> {
-  const { apiKey, baseUrl, model: defaultModel } = getOpenAiConfig();
-  const response = await fetch(`${baseUrl}/v1/chat/completions`, {
+type ResolvedTextConfig = {
+  provider: AiProvider;
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+};
+
+const resolveTextConfig = async (options: AiGenerateOptions): Promise<ResolvedTextConfig> => {
+  if (typeof options.configId === 'number') {
+    const config = await AiConfigService.getResolvedById(options.configId).catch(() => null);
+    if (!config) {
+      throw new Error('AI 配置不存在');
+    }
+    if (!config.enabled) {
+      throw new Error('AI 配置已禁用');
+    }
+    return {
+      provider: config.provider,
+      apiKey: config.apiKey,
+      baseUrl: normalizeBaseUrl(config.baseUrl),
+      model: config.textModel,
+    };
+  }
+
+  const defaultConfig = await AiConfigService.getResolvedDefault().catch(() => null);
+  if (defaultConfig && defaultConfig.enabled) {
+    return {
+      provider: defaultConfig.provider,
+      apiKey: defaultConfig.apiKey,
+      baseUrl: normalizeBaseUrl(defaultConfig.baseUrl),
+      model: defaultConfig.textModel,
+    };
+  }
+
+  const provider = getProvider();
+  if (provider === 'anthropic') {
+    const { apiKey, baseUrl, model } = getAnthropicConfig();
+    return { provider, apiKey, baseUrl, model };
+  }
+
+  const { apiKey, baseUrl, model } = getOpenAiConfig();
+  return { provider, apiKey, baseUrl, model };
+};
+
+async function openaiGenerateText(config: ResolvedTextConfig, options: AiGenerateOptions): Promise<string> {
+  const response = await fetch(`${config.baseUrl}/v1/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${config.apiKey}`,
     },
     body: JSON.stringify({
-      model: options.model ?? defaultModel,
+      model: options.model ?? config.model,
       messages: [
         ...(options.system ? [{ role: 'system', content: options.system }] : []),
         ...(options.messages ?? []),
@@ -79,35 +123,63 @@ async function openaiGenerateText(options: AiGenerateOptions): Promise<string> {
     throw new Error(errorText || 'OpenAI request failed');
   }
 
-  type OpenAIChatResponse = {
-    choices?: Array<{
-      message?: {
-        content?: string;
-      };
-    }>;
+  const contentType = response.headers.get('content-type') ?? '';
+  if (!contentType.toLowerCase().includes('application/json')) {
+    const raw = await response.text();
+    throw new Error(raw || 'OpenAI request failed (non-JSON response)');
+  }
+
+  const result: any = await response.json();
+
+  if (result?.error?.message && typeof result.error.message === 'string') {
+    throw new Error(result.error.message);
+  }
+
+  const extractText = (value: unknown): string | undefined => {
+    if (typeof value === 'string') return value;
+    if (!Array.isArray(value)) return undefined;
+    const joined = value
+      .map((part) => {
+        if (typeof part === 'string') return part;
+        if (!part || typeof part !== 'object') return '';
+        if ((part as any).type === 'text' && typeof (part as any).text === 'string') return (part as any).text;
+        if (typeof (part as any).text === 'string') return (part as any).text;
+        if (typeof (part as any).content === 'string') return (part as any).content;
+        if (typeof (part as any).value === 'string') return (part as any).value;
+        return '';
+      })
+      .join('');
+    return joined || undefined;
   };
 
-  const result: OpenAIChatResponse = await response.json();
-  const text = result.choices?.[0]?.message?.content;
+  const choice = result?.choices?.[0];
+  const text =
+    extractText(choice?.message?.content) ??
+    (typeof choice?.text === 'string' ? choice.text : undefined) ??
+    (typeof result?.output_text === 'string' ? result.output_text : undefined) ??
+    (typeof result?.text === 'string' ? result.text : undefined);
 
   if (!text) {
+    const refusal = choice?.message?.refusal;
+    if (typeof refusal === 'string' && refusal) {
+      throw new Error(refusal);
+    }
     throw new Error('OpenAI response missing text content');
   }
 
   return text;
 }
 
-async function anthropicGenerateText(options: AiGenerateOptions): Promise<string> {
-  const { apiKey, baseUrl, model: defaultModel } = getAnthropicConfig();
-  const response = await fetch(`${baseUrl}/v1/messages`, {
+async function anthropicGenerateText(config: ResolvedTextConfig, options: AiGenerateOptions): Promise<string> {
+  const response = await fetch(`${config.baseUrl}/v1/messages`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': apiKey,
+      'x-api-key': config.apiKey,
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: options.model ?? defaultModel,
+      model: options.model ?? config.model,
       max_tokens: options.maxTokens ?? 512,
       temperature: options.temperature ?? 0.2,
       system: options.system,
@@ -139,9 +211,9 @@ async function anthropicGenerateText(options: AiGenerateOptions): Promise<string
 }
 
 export async function serverGenerateText(options: AiGenerateOptions): Promise<string> {
-  const provider = getProvider();
-  if (provider === 'anthropic') return anthropicGenerateText(options);
-  return openaiGenerateText(options);
+  const config = await resolveTextConfig(options);
+  if (config.provider === 'anthropic') return anthropicGenerateText(config, options);
+  return openaiGenerateText(config, options);
 }
 
 export async function serverGenerateJSON<T>(options: AiGenerateOptions): Promise<T> {

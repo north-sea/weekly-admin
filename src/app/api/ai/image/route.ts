@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 
 import { authenticateRequest } from '@/lib/auth';
+import { AiConfigService } from '@/lib/services/ai-config';
 import { createNextErrorResponse, createNextSuccessResponse } from '@/lib/utils/serialization';
 
 const BodySchema = z.object({
@@ -12,7 +13,16 @@ const BodySchema = z.object({
 
 const normalizeBaseUrl = (value: string) => value.replace(/\/+$/, '');
 
-const getOpenAiConfig = () => {
+const getOpenAiConfig = async () => {
+  const defaultConfig = await AiConfigService.getResolvedDefault().catch(() => null);
+  if (defaultConfig?.enabled && defaultConfig.provider === 'openai') {
+    return {
+      apiKey: defaultConfig.apiKey,
+      baseUrl: normalizeBaseUrl(defaultConfig.baseUrl),
+      imageModel: defaultConfig.imageModel ?? process.env.AI_IMAGE_MODEL ?? process.env.AI_TEXT_MODEL ?? 'gpt-image-1',
+    };
+  }
+
   const apiKey = process.env.AI_API_KEY ?? process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error('Missing required env var: AI_API_KEY (or OPENAI_API_KEY)');
@@ -57,7 +67,7 @@ export async function POST(request: NextRequest) {
       return createNextErrorResponse('VALIDATION_ERROR', '参数验证失败', 400);
     }
 
-    const { apiKey, baseUrl, imageModel } = getOpenAiConfig();
+    const { apiKey, baseUrl, imageModel } = await getOpenAiConfig();
     const model = parsed.data.model ?? imageModel;
     const prompt = parsed.data.prompt;
     const size = parsed.data.size ?? '1024x576';
@@ -129,4 +139,3 @@ export async function POST(request: NextRequest) {
     return createNextErrorResponse('INTERNAL_ERROR', message, 500);
   }
 }
-

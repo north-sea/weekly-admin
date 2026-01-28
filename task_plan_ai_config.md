@@ -30,19 +30,19 @@
 ## 执行计划
 
 ### Phase 1: 移除多余导航
-- **状态**: `pending`
+- **状态**: `completed`
 - **文件**: `src/app/(dashboard)/settings/layout.tsx`
 - **操作**: 移除 Tab 导航，只保留 children 渲染
 
 ### Phase 2: 数据库表设计
-- **状态**: `pending`
+- **状态**: `completed`
 - **文件**: `prisma/schema.prisma`
 - **操作**:
   - 新增 `ai_configs` 表（多组 API 配置）
   - 新增 `ai_prompts` 表（Prompt 模板）
 
 ### Phase 3: 加密工具
-- **状态**: `pending`
+- **状态**: `completed`
 - **新建文件**: `src/lib/crypto.ts`
 - **功能**:
   - `encrypt(plaintext)` - AES-256-GCM 加密
@@ -50,13 +50,13 @@
   - `maskApiKey(key)` - 脱敏显示 `sk-****xxxx`
 
 ### Phase 4: 服务层实现
-- **状态**: `pending`
+- **状态**: `completed`
 - **新建文件**:
   - `src/lib/services/ai-config.ts` - 配置 CRUD
   - `src/lib/services/ai-prompt.ts` - Prompt CRUD
 
 ### Phase 5: API 路由
-- **状态**: `pending`
+- **状态**: `completed`
 - **新建/修改文件**:
   - `src/app/api/ai/configs/route.ts` - GET/POST
   - `src/app/api/ai/configs/[id]/route.ts` - GET/PUT/DELETE
@@ -67,7 +67,7 @@
   - `src/app/api/ai/prompts/[scene]/reset/route.ts` - POST 重置
 
 ### Phase 6: 修改 AI Client
-- **状态**: `pending`
+- **状态**: `completed`
 - **文件**: `src/lib/ai/server/client.ts`
 - **操作**:
   - 优先从数据库读取默认配置
@@ -75,7 +75,7 @@
   - 支持指定 configId 调用
 
 ### Phase 7: 前端页面重构
-- **状态**: `pending`
+- **状态**: `completed`
 - **文件**: `src/app/(dashboard)/settings/ai/page.tsx`
 - **功能**:
   - API 配置列表（卡片式）
@@ -85,10 +85,10 @@
   - 重置为默认 Prompt
 
 ### Phase 8: 初始化默认数据
-- **状态**: `pending`
+- **状态**: `completed`
 - **操作**:
   - 创建 seed 脚本或 API 初始化默认 Prompt
-  - 6 个场景的默认 Prompt 模板
+  - 场景化默认 Prompt 模板（含 `summary_score`）
 
 ---
 
@@ -180,24 +180,32 @@ AI_TEXT_MODEL="gpt-4o-mini"
 ## 文件变更清单
 
 ### 新建文件
-- [ ] `src/lib/crypto.ts`
-- [ ] `src/lib/services/ai-config.ts`
-- [ ] `src/lib/services/ai-prompt.ts`
-- [ ] `src/app/api/ai/configs/route.ts`
-- [ ] `src/app/api/ai/configs/[id]/route.ts`
-- [ ] `src/app/api/ai/configs/[id]/test/route.ts`
-- [ ] `src/app/api/ai/configs/[id]/default/route.ts`
-- [ ] `src/app/api/ai/prompts/route.ts`
-- [ ] `src/app/api/ai/prompts/[scene]/route.ts`
-- [ ] `src/app/api/ai/prompts/[scene]/reset/route.ts`
-- [ ] `src/lib/validations/ai.ts`
+- [x] `src/lib/crypto.ts`
+- [x] `src/lib/services/ai-config.ts`
+- [x] `src/lib/services/ai-prompt.ts`
+- [x] `src/app/api/ai/configs/route.ts`
+- [x] `src/app/api/ai/configs/[id]/route.ts`
+- [x] `src/app/api/ai/configs/[id]/test/route.ts`
+- [x] `src/app/api/ai/configs/[id]/default/route.ts`
+- [x] `src/app/api/ai/prompts/route.ts`
+- [x] `src/app/api/ai/prompts/[scene]/route.ts`
+- [x] `src/app/api/ai/prompts/[scene]/reset/route.ts`
+- [x] `src/lib/validations/ai.ts`
+- [x] `src/lib/ai/server/prompt-template.ts`
 
 ### 修改文件
-- [ ] `prisma/schema.prisma`
-- [ ] `src/app/(dashboard)/settings/layout.tsx`
-- [ ] `src/app/(dashboard)/settings/ai/page.tsx`
-- [ ] `src/lib/ai/server/client.ts`
-- [ ] `src/lib/ai/server/content-scorer.ts`
+- [x] `prisma/schema.prisma`
+- [x] `.env.example`
+- [x] `scripts/migrate-db.ts`
+- [x] `src/app/(dashboard)/settings/layout.tsx`
+- [x] `src/app/(dashboard)/settings/ai/page.tsx`
+- [x] `src/app/api/ai/config/route.ts`
+- [x] `src/app/api/ai/image/route.ts`
+- [x] `src/lib/ai/server/client.ts`
+- [x] `src/lib/ai/server/content-scorer.ts`
+- [x] `src/lib/ai/server/summary-generator.ts`
+- [x] `src/lib/ai/server/summary-scorer.ts`
+- [x] `src/lib/ai/server/weekly-organizer.ts`
 - [ ] `src/lib/ai/server/summary-generator.ts`
 - [ ] `src/lib/ai/server/weekly-organizer.ts`
 - [ ] `.env.example`

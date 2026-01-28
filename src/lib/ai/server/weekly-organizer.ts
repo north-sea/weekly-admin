@@ -3,6 +3,8 @@ import 'server-only';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { serverGenerateJSON } from '@/lib/ai/server/client';
+import { AiPromptService } from '@/lib/services/ai-prompt';
+import { renderPromptTemplate } from '@/lib/ai/server/prompt-template';
 
 const OrganizeRequestSchema = z.object({
   weeklyIssueId: z.number().int().positive(),
@@ -54,6 +56,12 @@ export async function organizeWeekly(request: OrganizeRequest): Promise<Organize
 
   if (!issue) throw new Error('周刊不存在');
 
+  const rangeStart = new Date(issue.start_date);
+  rangeStart.setUTCHours(0, 0, 0, 0);
+  const rangeEndExclusive = new Date(issue.end_date);
+  rangeEndExclusive.setUTCHours(0, 0, 0, 0);
+  rangeEndExclusive.setUTCDate(rangeEndExclusive.getUTCDate() + 1);
+
   const existingItems = await prisma.weekly_content_items.findMany({
     where: { weekly_issue_id: issue.id },
     select: { content_id: true },
@@ -64,6 +72,11 @@ export async function organizeWeekly(request: OrganizeRequest): Promise<Organize
     where: {
       content_type_id: 3,
       status: 'draft',
+      created_at: {
+        gte: rangeStart,
+        lt: rangeEndExclusive,
+      },
+      weekly_content_items: { none: {} },
       id: { notIn: existingItems.map((i) => i.content_id) },
     },
     select: {
@@ -77,8 +90,8 @@ export async function organizeWeekly(request: OrganizeRequest): Promise<Organize
       summary_score: true,
       created_at: true,
     },
-    orderBy: [{ updated_at: 'desc' }],
-    take: 60,
+    orderBy: [{ created_at: 'asc' }],
+    take: 200,
   });
 
   const scored = candidates
@@ -95,28 +108,21 @@ export async function organizeWeekly(request: OrganizeRequest): Promise<Organize
       score: (c.original_score ?? 0) + (c.summary_score ?? 0),
     }))
     .sort((a, b) => b.score - a.score)
-    .slice(0, 30);
+    .slice(0, 30)
+    .sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? ''));
 
   if (scored.length === 0) {
     throw new Error('没有可用的候选内容（请先创建/同步内容，或清空周刊关联）');
   }
 
-  const prompt = [
-    '你是技术周刊编辑。请从候选内容中挑选并组织本期周刊的条目。',
-    '',
-    `周刊标题：${issue.title}`,
-    `时间范围：${issue.start_date.toISOString().slice(0, 10)} ~ ${issue.end_date.toISOString().slice(0, 10)}`,
-    `目标数量：${parsed.maxItems}`,
-    '',
-    '要求：',
-    '- 选择最值得推荐的条目（优先参考 original_score/summary_score，但也可基于标题/摘要判断）',
-    '- 为每条选择一个 section（例如：工具/文章/教程/开源/资源/观点）',
-    '- 可标记 1-2 条 featured=true',
-    '- reason 用 1 句话解释为何入选（可选）',
-    '',
-    '候选列表（JSON 数组）：',
-    JSON.stringify(scored),
-  ].join('\n');
+  const template = (await AiPromptService.getByScene('weekly_organize')).prompt;
+  const prompt = renderPromptTemplate(template, {
+    title: issue.title,
+    start_date: issue.start_date.toISOString().slice(0, 10),
+    end_date: issue.end_date.toISOString().slice(0, 10),
+    max_items: parsed.maxItems,
+    candidates: JSON.stringify(scored),
+  });
 
   const result = await serverGenerateJSON<unknown>({
     messages: [{ role: 'user', content: prompt }],
@@ -130,9 +136,15 @@ export async function organizeWeekly(request: OrganizeRequest): Promise<Organize
   }
 
   const byId = new Map(scored.map((c) => [c.id, c]));
-  return {
-    intro: parsedResult.data.intro,
-    items: parsedResult.data.items.map((item) => {
+  const missingIds = parsedResult.data.items
+    .map((item) => item.content_id)
+    .filter((id) => !byId.has(id));
+  if (missingIds.length > 0) {
+    throw new Error(`AI 返回了不存在的 content_id: ${missingIds.join(', ')}`);
+  }
+
+  const items = parsedResult.data.items
+    .map((item) => {
       const candidate = byId.get(item.content_id);
       return {
         ...item,
@@ -141,6 +153,15 @@ export async function organizeWeekly(request: OrganizeRequest): Promise<Organize
         original_score: candidate?.original_score ?? null,
         summary_score: candidate?.summary_score ?? null,
       };
-    }),
+    })
+    .sort((a, b) => {
+      const aCreatedAt = byId.get(a.content_id)?.created_at ?? '';
+      const bCreatedAt = byId.get(b.content_id)?.created_at ?? '';
+      return aCreatedAt.localeCompare(bCreatedAt);
+    });
+
+  return {
+    intro: parsedResult.data.intro,
+    items,
   };
 }

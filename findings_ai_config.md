@@ -249,3 +249,10 @@ POST   /api/ai/prompts/:scene/reset # 重置为默认
 ```
 Design a sleek, modern cover image for a Chinese tech/design weekly digest. Title: "{{title}}". Topics: {{contents_summary}}. Tone: dark elegant, subtle gradient, clean typography.
 ```
+
+---
+
+## 补充发现（实现阶段）
+
+1. 现有周刊编辑器依赖 `GET /api/ai/config` 获取 `weeklyDescPrompt` / `weeklyCoverPrompt`，需要兼容数据库 Prompt（否则旧逻辑无法感知新配置）。
+2. 除 “摘要生成/优化” 外，系统还存在 “摘要评分”（`summary-scorer.ts`），需要独立 Prompt（scene：`summary_score`）。

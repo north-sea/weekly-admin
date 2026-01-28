@@ -2,6 +2,8 @@ import 'server-only';
 
 import { prisma } from '@/lib/db';
 import { serverGenerateText } from '@/lib/ai/server/client';
+import { AiPromptService } from '@/lib/services/ai-prompt';
+import { renderPromptTemplate } from '@/lib/ai/server/prompt-template';
 
 const truncate = (value: string, maxChars: number) => {
   if (value.length <= maxChars) return value;
@@ -32,24 +34,13 @@ export async function generateSummary(contentId: number): Promise<string> {
 
   if (!content) throw new Error('内容不存在');
 
-  const prompt = [
-    '你是技术周刊编辑助手。请为下面内容生成中文摘要。',
-    '',
-    '要求：',
-    '- 100-200 字',
-    '- 客观、信息密度高',
-    '- 不要使用 Markdown',
-    '- 只输出摘要文本，不要加标题或引号',
-    '',
-    `标题：${content.title}`,
-    content.source_url ? `来源：${content.source_url}` : '',
-    content.description ? `描述：${content.description}` : '',
-    '',
-    '原文：',
-    truncate(content.content ?? '', 12000),
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const template = (await AiPromptService.getByScene('summary_generate')).prompt;
+  const prompt = renderPromptTemplate(template, {
+    title: content.title,
+    source_url: content.source_url,
+    description: content.description,
+    content: truncate(content.content ?? '', 12000),
+  });
 
   const text = await serverGenerateText({
     messages: [{ role: 'user', content: prompt }],
@@ -102,23 +93,12 @@ export async function optimizeSummary(contentId: number): Promise<string> {
   if (!content) throw new Error('内容不存在');
   if (!content.summary || !content.summary.trim()) throw new Error('该内容没有摘要，无法优化');
 
-  const prompt = [
-    '你是技术周刊编辑助手。请优化下面的中文摘要。',
-    '',
-    '要求：',
-    '- 仍保持 100-200 字',
-    '- 更清晰、更准确、更精炼',
-    '- 不要使用 Markdown',
-    '- 只输出优化后的摘要文本，不要加标题或引号',
-    '',
-    `标题：${content.title}`,
-    '',
-    '当前摘要：',
-    truncate(content.summary, 2000),
-    '',
-    '原文（供参考）：',
-    truncate(content.content ?? '', 8000),
-  ].join('\n');
+  const template = (await AiPromptService.getByScene('summary_optimize')).prompt;
+  const prompt = renderPromptTemplate(template, {
+    title: content.title,
+    summary: truncate(content.summary, 2000),
+    content: truncate(content.content ?? '', 8000),
+  });
 
   const text = await serverGenerateText({
     messages: [{ role: 'user', content: prompt }],
@@ -155,4 +135,3 @@ export async function optimizeSummary(contentId: number): Promise<string> {
 
   return summary;
 }
-

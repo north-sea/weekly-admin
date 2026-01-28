@@ -58,9 +58,9 @@ export function DraftFilters({ value = {}, onChange, className, sources = [] }: 
   return (
     <div className={className}>
       {/* 主筛选行 */}
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
         {/* 搜索框 */}
-        <form onSubmit={handleSearchSubmit} className="flex-1">
+        <form onSubmit={handleSearchSubmit} className="min-w-0 flex-1">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -78,7 +78,7 @@ export function DraftFilters({ value = {}, onChange, className, sources = [] }: 
           value={filters.stage || 'all'}
           onValueChange={(val) => handleChange('stage', val === 'all' ? undefined : val)}
         >
-          <SelectTrigger className="w-[160px]">
+          <SelectTrigger className="w-full lg:w-[160px]">
             <SelectValue placeholder="全部草稿" />
           </SelectTrigger>
           <SelectContent>
@@ -93,7 +93,7 @@ export function DraftFilters({ value = {}, onChange, className, sources = [] }: 
           value={filters.status || 'all'}
           onValueChange={(val) => handleChange('status', val === 'all' ? undefined : val)}
         >
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="w-full lg:w-[140px]">
             <SelectValue placeholder="全部状态" />
           </SelectTrigger>
           <SelectContent>
@@ -109,7 +109,7 @@ export function DraftFilters({ value = {}, onChange, className, sources = [] }: 
           value={filters.sortBy || 'karakeep_created_at'}
           onValueChange={(val) => handleChange('sortBy', val)}
         >
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="w-full lg:w-[140px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -127,7 +127,7 @@ export function DraftFilters({ value = {}, onChange, className, sources = [] }: 
           value={filters.sortOrder || 'desc'}
           onValueChange={(val) => handleChange('sortOrder', val)}
         >
-          <SelectTrigger className="w-[100px]">
+          <SelectTrigger className="w-full lg:w-[100px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -144,6 +144,7 @@ export function DraftFilters({ value = {}, onChange, className, sources = [] }: 
           onClick={handleReset}
           title="重置筛选"
           aria-label="重置筛选"
+          className="shrink-0"
         >
           <RotateCcw className="h-4 w-4" />
         </Button>

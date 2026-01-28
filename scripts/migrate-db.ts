@@ -1,7 +1,28 @@
+import 'dotenv/config';
+
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
+
+const normalizeBaseUrl = (value: string) => value.replace(/\/+$/, '');
+
+const encryptApiKey = (plaintext: string) => {
+  const rawKey = (process.env.AI_ENCRYPTION_KEY ?? '').trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(rawKey)) {
+    throw new Error('AI_ENCRYPTION_KEY 未配置或格式不正确（需要 64 位 hex）');
+  }
+
+  const key = Buffer.from(rawKey, 'hex');
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+
+  const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+
+  return `${iv.toString('base64')}:${authTag.toString('base64')}:${ciphertext.toString('base64')}`;
+};
 
 async function migrateDatabase() {
   try {
@@ -215,6 +236,232 @@ async function migrateDatabase() {
       `;
       console.log('✅ rss_sources 表创建 idx_rss_sources_category_id 索引');
     }
+
+    // AI 配置表（支持多组配置）
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS ai_configs (
+          id INT PRIMARY KEY AUTO_INCREMENT,
+          name VARCHAR(100) NOT NULL UNIQUE,
+          provider ENUM('openai', 'anthropic') DEFAULT 'openai',
+          base_url VARCHAR(500) NOT NULL,
+          api_key_encrypted TEXT NOT NULL,
+          text_model VARCHAR(100) NOT NULL,
+          image_model VARCHAR(100) NULL,
+          is_default BOOLEAN DEFAULT false,
+          enabled BOOLEAN DEFAULT true,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX idx_ai_configs_enabled (enabled),
+          INDEX idx_ai_configs_is_default (is_default)
+      )
+    `;
+    console.log('✅ AI 配置表创建完成');
+
+    // 初始化默认 AI 配置（基于当前环境变量；仅当表为空时写入）
+    const aiConfigsCountRows = (await prisma.$queryRaw`
+      SELECT COUNT(*) as count FROM ai_configs
+    `) as Array<{ count: number }>;
+    const aiConfigsCount = Number(aiConfigsCountRows?.[0]?.count ?? 0);
+
+    if (aiConfigsCount === 0) {
+      const provider = ((process.env.AI_PROVIDER ?? 'openai').toLowerCase() === 'anthropic' ? 'anthropic' : 'openai') as
+        | 'openai'
+        | 'anthropic';
+
+      const apiKey =
+        provider === 'anthropic'
+          ? process.env.ANTHROPIC_API_KEY
+          : process.env.AI_API_KEY ?? process.env.OPENAI_API_KEY;
+
+      if (apiKey && apiKey.trim()) {
+        const baseUrl =
+          provider === 'anthropic'
+            ? normalizeBaseUrl(process.env.ANTHROPIC_BASE_URL ?? 'https://api.anthropic.com')
+            : normalizeBaseUrl(process.env.AI_BASE_URL ?? process.env.OPENAI_BASE_URL ?? 'https://api.openai.com');
+
+        const textModel =
+          provider === 'anthropic'
+            ? process.env.ANTHROPIC_MODEL ?? 'claude-3-5-sonnet-latest'
+            : process.env.AI_TEXT_MODEL ?? process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
+
+        const imageModel =
+          provider === 'openai' ? process.env.AI_IMAGE_MODEL ?? process.env.AI_TEXT_MODEL ?? 'gpt-image-1' : null;
+
+        const encrypted = encryptApiKey(apiKey.trim());
+
+        await prisma.$executeRaw`
+          INSERT IGNORE INTO ai_configs
+            (name, provider, base_url, api_key_encrypted, text_model, image_model, is_default, enabled)
+          VALUES
+            ('默认配置（ENV）', ${provider}, ${baseUrl}, ${encrypted}, ${textModel}, ${imageModel}, true, true)
+        `;
+        console.log('✅ 默认 AI 配置初始化完成');
+      } else {
+        console.log('ℹ️ 未检测到可用的 API Key，跳过默认 AI 配置初始化');
+      }
+    }
+
+    // AI Prompt 表（场景化 Prompt 模板）
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS ai_prompts (
+          id INT PRIMARY KEY AUTO_INCREMENT,
+          scene VARCHAR(50) NOT NULL UNIQUE,
+          name VARCHAR(100) NOT NULL,
+          prompt TEXT NOT NULL,
+          variables JSON NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `;
+    console.log('✅ AI Prompt 表创建完成');
+
+    // 初始化默认 Prompt（仅首次插入，不覆盖已有自定义）
+    const defaultAiPrompts: Array<{
+      scene: string;
+      name: string;
+      prompt: string;
+      variables: string[];
+    }> = [
+      {
+        scene: 'content_score',
+        name: '内容评分',
+        variables: ['title', 'source_url', 'description', 'summary', 'content'],
+        prompt: [
+          '你是技术周刊编辑助手。请对下面的"原文内容"进行 0-10 分打分，并给出简短理由（中文）。',
+          '',
+          '评分维度：',
+          '- relevance：与技术从业者/开发者相关性',
+          '- quality：信息密度、可信度、结构清晰度',
+          '- practicality：可实践性、可操作性、可迁移性',
+          '- overall：综合评分（0-10，可带 0.5）',
+          '',
+          '输出 JSON 字段：overall, relevance, quality, practicality, reasons（数组，1-8 条）。',
+          '',
+          '标题：{{title}}',
+          '{{#source_url}}来源：{{source_url}}{{/source_url}}',
+          '{{#description}}描述：{{description}}{{/description}}',
+          '{{#summary}}摘要：{{summary}}{{/summary}}',
+          '',
+          '原文内容：',
+          '{{content}}',
+        ].join('\n'),
+      },
+      {
+        scene: 'summary_generate',
+        name: '摘要生成',
+        variables: ['title', 'source_url', 'description', 'content'],
+        prompt: [
+          '你是技术周刊编辑助手。请为下面内容生成中文摘要。',
+          '',
+          '要求：',
+          '- 100-200 字',
+          '- 客观、信息密度高',
+          '- 不要使用 Markdown',
+          '- 只输出摘要文本，不要加标题或引号',
+          '',
+          '标题：{{title}}',
+          '{{#source_url}}来源：{{source_url}}{{/source_url}}',
+          '{{#description}}描述：{{description}}{{/description}}',
+          '',
+          '原文：',
+          '{{content}}',
+        ].join('\n'),
+      },
+      {
+        scene: 'summary_optimize',
+        name: '摘要优化',
+        variables: ['title', 'summary', 'content'],
+        prompt: [
+          '你是技术周刊编辑助手。请优化下面的中文摘要。',
+          '',
+          '要求：',
+          '- 仍保持 100-200 字',
+          '- 更清晰、更准确、更精炼',
+          '- 不要使用 Markdown',
+          '- 只输出优化后的摘要文本，不要加标题或引号',
+          '',
+          '标题：{{title}}',
+          '',
+          '当前摘要：',
+          '{{summary}}',
+          '',
+          '原文（供参考）：',
+          '{{content}}',
+        ].join('\n'),
+      },
+      {
+        scene: 'summary_score',
+        name: '摘要评分',
+        variables: ['title', 'summary', 'content'],
+        prompt: [
+          '你是技术周刊编辑助手。请对下面“摘要”质量进行 0-10 分打分，并给出简短理由（中文）。',
+          '',
+          '评分维度：',
+          '- clarity：表达是否清晰、是否易读',
+          '- accuracy：是否忠实于原文要点、是否有臆断',
+          '- conciseness：是否精炼、是否有废话',
+          '- overall：综合评分（0-10，可带 0.5）',
+          '',
+          '输出 JSON 字段：overall, clarity, accuracy, conciseness, reasons（数组，1-8 条）。',
+          '',
+          '标题：{{title}}',
+          '',
+          '摘要：',
+          '{{summary}}',
+          '',
+          '（供参考）原文内容：',
+          '{{content}}',
+        ].join('\n'),
+      },
+      {
+        scene: 'weekly_organize',
+        name: '周刊组织',
+        variables: ['title', 'start_date', 'end_date', 'max_items', 'candidates'],
+        prompt: [
+          '你是技术周刊编辑。请从候选内容中挑选并组织本期周刊的条目。',
+          '',
+          '周刊标题：{{title}}',
+          '时间范围：{{start_date}} ~ {{end_date}}',
+          '目标数量：{{max_items}}',
+          '',
+          '要求：',
+          '- 选择最值得推荐的条目（优先参考 original_score/summary_score，但也可基于标题/摘要判断）',
+          '- 为每条选择一个 section（例如：工具/文章/教程/开源/资源/观点）',
+          '- 可标记 1-2 条 featured=true',
+          '- reason 用 1 句话解释为何入选（可选）',
+          '',
+          '候选列表（JSON 数组）：',
+          '{{candidates}}',
+        ].join('\n'),
+      },
+      {
+        scene: 'weekly_desc',
+        name: '周刊简介',
+        variables: ['title', 'date_range', 'contents_summary'],
+        prompt: [
+          '你是一个周刊编辑，请基于本期标题、时间范围和收录的内容，生成 25-40 字的中文简介，语气简洁有吸引力，不要使用 Markdown。',
+          '',
+          '标题：{{title}}',
+          '时间：{{date_range}}',
+          '收录：{{contents_summary}}',
+        ].join('\n'),
+      },
+      {
+        scene: 'weekly_cover',
+        name: '周刊封面',
+        variables: ['title', 'contents_summary'],
+        prompt:
+          'Design a sleek, modern cover image for a Chinese tech/design weekly digest. Title: "{{title}}". Topics: {{contents_summary}}. Tone: dark elegant, subtle gradient, clean typography.',
+      },
+    ];
+
+    for (const item of defaultAiPrompts) {
+      await prisma.$executeRaw`
+        INSERT IGNORE INTO ai_prompts (scene, name, prompt, variables)
+        VALUES (${item.scene}, ${item.name}, ${item.prompt}, ${JSON.stringify(item.variables)})
+      `;
+    }
+    console.log('✅ 默认 AI Prompt 初始化完成');
 
     // 检查 weekly_issues 表是否有 created_by 字段
     const weeklyIssuesColumns = await prisma.$queryRaw`

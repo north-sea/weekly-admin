@@ -16,10 +16,10 @@ const ProLayoutWrapper: React.FC<ProLayoutWrapperProps> = ({ children }) => {
         <div className="hidden md:flex">
           <AppSidebar />
         </div>
-        <div className="flex min-h-screen flex-1 flex-col">
+        <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <SiteHeader />
-          <main className="flex-1 p-4 sm:p-6">
-            <div className="mx-auto w-full max-w-7xl space-y-6">
+          <main className="flex-1 min-w-0 p-4 sm:p-6">
+            <div className="mx-auto w-full min-w-0 max-w-7xl space-y-6">
               {children}
             </div>
           </main>

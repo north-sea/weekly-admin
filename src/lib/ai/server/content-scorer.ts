@@ -3,6 +3,8 @@ import 'server-only';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { serverGenerateJSON } from '@/lib/ai/server/client';
+import { AiPromptService } from '@/lib/services/ai-prompt';
+import { renderPromptTemplate } from '@/lib/ai/server/prompt-template';
 
 const ScoreSchema = z.object({
   overall: z.number().min(0).max(10),
@@ -38,27 +40,14 @@ export async function scoreContentOriginal(contentId: number): Promise<ContentSc
     throw new Error('内容不存在');
   }
 
-  const prompt = [
-    '你是技术周刊编辑助手。请对下面的“原文内容”进行 0-10 分打分，并给出简短理由（中文）。',
-    '',
-    '评分维度：',
-    '- relevance：与技术从业者/开发者相关性',
-    '- quality：信息密度、可信度、结构清晰度',
-    '- practicality：可实践性、可操作性、可迁移性',
-    '- overall：综合评分（0-10，可带 0.5）',
-    '',
-    '输出 JSON 字段：overall, relevance, quality, practicality, reasons（数组，1-8 条）。',
-    '',
-    `标题：${content.title}`,
-    content.source_url ? `来源：${content.source_url}` : '',
-    content.description ? `描述：${content.description}` : '',
-    content.summary ? `摘要：${content.summary}` : '',
-    '',
-    '原文内容：',
-    truncate(content.content ?? '', 12000),
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const template = (await AiPromptService.getByScene('content_score')).prompt;
+  const prompt = renderPromptTemplate(template, {
+    title: content.title,
+    source_url: content.source_url,
+    description: content.description,
+    summary: content.summary,
+    content: truncate(content.content ?? '', 12000),
+  });
 
   const result = await serverGenerateJSON<unknown>({
     messages: [{ role: 'user', content: prompt }],
@@ -105,4 +94,3 @@ export async function scoreContentOriginal(contentId: number): Promise<ContentSc
 
   return score;
 }
-

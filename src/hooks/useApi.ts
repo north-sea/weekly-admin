@@ -148,7 +148,7 @@ export function useGet<TData = unknown, TError = Error>(
 
 // POST 突变钩子
 export function usePost<TData = unknown, TVariables = unknown, TError = Error>(
-  url: string,
+  url: string | ((variables: TVariables) => string),
   options?: UseMutationOptions<TData, TError, TVariables> & {
     apiOptions?: ApiOptions;
   }
@@ -156,7 +156,10 @@ export function usePost<TData = unknown, TVariables = unknown, TError = Error>(
   const { apiOptions, ...mutationOptions } = options || {};
   
   return useMutation<TData, TError, TVariables>({
-    mutationFn: (variables: TVariables) => apiClient.post<TData>(url, variables, apiOptions),
+    mutationFn: (variables: TVariables) => {
+      const resolvedUrl = typeof url === 'function' ? url(variables) : url;
+      return apiClient.post<TData>(resolvedUrl, variables, apiOptions);
+    },
     ...mutationOptions,
   });
 }

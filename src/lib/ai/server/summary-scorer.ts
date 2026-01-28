@@ -3,6 +3,8 @@ import 'server-only';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { serverGenerateJSON } from '@/lib/ai/server/client';
+import { AiPromptService } from '@/lib/services/ai-prompt';
+import { renderPromptTemplate } from '@/lib/ai/server/prompt-template';
 
 const ScoreSchema = z.object({
   overall: z.number().min(0).max(10),
@@ -39,25 +41,12 @@ export async function scoreContentSummary(contentId: number): Promise<SummarySco
     throw new Error('该内容没有摘要，无法评分');
   }
 
-  const prompt = [
-    '你是技术周刊编辑助手。请对下面“摘要”质量进行 0-10 分打分，并给出简短理由（中文）。',
-    '',
-    '评分维度：',
-    '- clarity：表达是否清晰、是否易读',
-    '- accuracy：是否忠实于原文要点、是否有臆断',
-    '- conciseness：是否精炼、是否有废话',
-    '- overall：综合评分（0-10，可带 0.5）',
-    '',
-    '输出 JSON 字段：overall, clarity, accuracy, conciseness, reasons（数组，1-8 条）。',
-    '',
-    `标题：${content.title}`,
-    '',
-    '摘要：',
-    truncate(content.summary, 2000),
-    '',
-    '（供参考）原文内容：',
-    truncate(content.content ?? '', 8000),
-  ].join('\n');
+  const template = (await AiPromptService.getByScene('summary_score')).prompt;
+  const prompt = renderPromptTemplate(template, {
+    title: content.title,
+    summary: truncate(content.summary, 2000),
+    content: truncate(content.content ?? '', 8000),
+  });
 
   const result = await serverGenerateJSON<unknown>({
     messages: [{ role: 'user', content: prompt }],
@@ -104,4 +93,3 @@ export async function scoreContentSummary(contentId: number): Promise<SummarySco
 
   return score;
 }
-
