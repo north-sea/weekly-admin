@@ -6,6 +6,7 @@ import {
   archiveKarakeepBookmark,
   removeBookmarkFromKarakeepList,
 } from '@/lib/services/karakeep-api';
+import { DataSourceService } from '@/lib/services/data-source';
 
 const KARAKEEP_WEEKLY_LIST_ID = process.env.KARAKEEP_WEEKLY_LIST_ID || '';
 const KARAKEEP_DRAFT_LIST_ID = process.env.KARAKEEP_DRAFT_LIST_ID || '';
@@ -310,6 +311,13 @@ export class InboxService {
       } catch (error) {
         console.error('归档 Karakeep 书签失败:', error);
       }
+    }
+
+    // 更新数据源的晋升统计
+    try {
+      await DataSourceService.updateSourceStats(item.source_id, { increment_promoted: 1 });
+    } catch (error) {
+      console.error('更新数据源统计失败:', error);
     }
 
     return content;

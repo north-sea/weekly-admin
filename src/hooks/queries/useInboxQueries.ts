@@ -19,8 +19,12 @@ export type InboxItem = {
   favicon_url?: string | null;
   source_name?: string | null;
   ai_score?: number | null;
+  ai_score_details?: any;
   category_suggestion?: string | null;
   tags_suggestion?: any;
+  similar_item_id?: string | null;
+  similarity_score?: number | null;
+  image_status?: string | null;
   status?: InboxStatus | null;
   priority?: number | null;
   auto_promoted?: boolean | null;

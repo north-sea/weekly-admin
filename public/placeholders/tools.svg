@@ -1,0 +1,8 @@
+<svg width="800" height="450" viewBox="0 0 800 450" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="800" height="450" fill="#7c2d12"/>
+  <rect x="50" y="50" width="700" height="350" rx="8" fill="#f97316" fill-opacity="0.2"/>
+  <circle cx="400" cy="200" r="60" stroke="#fb923c" stroke-width="6" fill="none"/>
+  <path d="M400 160 L400 200 L430 220" stroke="#fb923c" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M340 280 L360 300 L380 280 M420 280 L440 300 L460 280" stroke="#fb923c" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="400" y="380" text-anchor="middle" fill="#fdba74" font-family="system-ui, sans-serif" font-size="24" font-weight="600">Tools</text>
+</svg>

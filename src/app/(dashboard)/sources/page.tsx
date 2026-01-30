@@ -11,7 +11,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
+import { ExternalLink, RefreshCw, Settings, Trash2, AlertTriangle } from 'lucide-react';
 import {
   useCreateDataSource,
   useDataSources,
@@ -19,8 +19,10 @@ import {
   useSyncAllSources,
   useSyncDataSource,
   useUpdateDataSource,
+  type DataSource,
   type DataSourceType,
 } from '@/hooks/queries/useDataSourceQueries';
+import { SourceConfigDialog } from '@/components/sources/source-config-dialog';
 
 type RssSourceType = 'normal' | 'aggregator';
 
@@ -34,6 +36,25 @@ function getRssSourceType(config: unknown): RssSourceType {
   if (!config || typeof config !== 'object') return 'normal';
   const sourceType = (config as any).source_type;
   return sourceType === 'aggregator' ? 'aggregator' : 'normal';
+}
+
+function calculatePromotionRate(source: { total_synced?: number | null; total_promoted?: number | null }): number | null {
+  const synced = source.total_synced ?? 0;
+  const promoted = source.total_promoted ?? 0;
+  if (synced === 0) return null;
+  return promoted / synced;
+}
+
+function calculatePublishRate(source: { total_promoted?: number | null; total_published?: number | null }): number | null {
+  const promoted = source.total_promoted ?? 0;
+  const published = source.total_published ?? 0;
+  if (promoted === 0) return null;
+  return published / promoted;
+}
+
+function formatPercent(rate: number | null): string {
+  if (rate === null) return '-';
+  return `${(rate * 100).toFixed(1)}%`;
 }
 
 export default function SourcesPage() {
@@ -50,6 +71,7 @@ export default function SourcesPage() {
   const [newFeedUrl, setNewFeedUrl] = useState('');
   const [newRssType, setNewRssType] = useState<RssSourceType>('normal');
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const [configSource, setConfigSource] = useState<DataSource | null>(null);
 
   const sortedSources = useMemo(() => {
     return (sources ?? []).slice().sort((a, b) => b.id - a.id);
@@ -128,6 +150,10 @@ export default function SourcesPage() {
     }
   }
 
+  async function handleSaveConfig(id: number, data: { score_weight?: number }) {
+    await updateSource.mutateAsync({ id, data: data as any });
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -193,6 +219,8 @@ export default function SourcesPage() {
                   <TableHead>名称</TableHead>
                   <TableHead>类型</TableHead>
                   <TableHead>配置</TableHead>
+                  <TableHead>入选率</TableHead>
+                  <TableHead>入刊率</TableHead>
                   <TableHead>启用</TableHead>
                   <TableHead>同步</TableHead>
                   <TableHead className="text-right">操作</TableHead>
@@ -201,13 +229,13 @@ export default function SourcesPage() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
                       加载中...
                     </TableCell>
                   </TableRow>
                 ) : sortedSources.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
                       暂无数据源
                     </TableCell>
                   </TableRow>
@@ -215,6 +243,9 @@ export default function SourcesPage() {
                   sortedSources.map((source) => {
                     const feedUrl = source.type === 'rss' ? getFeedUrl(source.config) : null;
                     const rssType = source.type === 'rss' ? getRssSourceType(source.config) : null;
+                    const promotionRate = calculatePromotionRate(source);
+                    const publishRate = calculatePublishRate(source);
+                    const isLowPromotion = promotionRate !== null && promotionRate < 0.1;
                     return (
                       <TableRow key={source.id}>
                         <TableCell className="font-mono text-xs">{source.id}</TableCell>
@@ -239,6 +270,23 @@ export default function SourcesPage() {
                           ) : null}
                         </TableCell>
                         <TableCell>
+                          <div className="flex items-center gap-1">
+                            <span className={isLowPromotion ? 'text-orange-500' : ''}>
+                              {formatPercent(promotionRate)}
+                            </span>
+                            {isLowPromotion && <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />}
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {source.total_promoted ?? 0}/{source.total_synced ?? 0}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span>{formatPercent(publishRate)}</span>
+                          <span className="text-xs text-muted-foreground block">
+                            {source.total_published ?? 0}/{source.total_promoted ?? 0}
+                          </span>
+                        </TableCell>
+                        <TableCell>
                           <Switch
                             checked={Boolean(source.enabled)}
                             onCheckedChange={(checked) => handleToggleEnabled(source.id, checked)}
@@ -256,9 +304,14 @@ export default function SourcesPage() {
                           </Button>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(source.id)}>
-                            <Trash2 className="h-4 w-4 text-muted-foreground" />
-                          </Button>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => setConfigSource(source)} title="配置">
+                              <Settings className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDelete(source.id)} title="删除">
+                              <Trash2 className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -278,6 +331,13 @@ export default function SourcesPage() {
         confirmText="删除"
         cancelText="取消"
         onConfirm={handleConfirmDelete}
+      />
+
+      <SourceConfigDialog
+        source={configSource}
+        open={configSource !== null}
+        onOpenChange={(open) => !open && setConfigSource(null)}
+        onSave={handleSaveConfig}
       />
     </div>
   );

@@ -18,6 +18,10 @@ export type DataSource = {
   sync_count?: number | null;
   error_count?: number | null;
   last_error?: string | null;
+  score_weight?: number | null;
+  total_synced?: number | null;
+  total_promoted?: number | null;
+  total_published?: number | null;
   created_at?: string | null;
   updated_at?: string | null;
 };

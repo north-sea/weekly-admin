@@ -240,6 +240,10 @@ model data_sources {
   sync_count              Int?           @default(0)
   error_count             Int?           @default(0)
   last_error              String?        @db.Text
+  score_weight            Int?           @default(0)
+  total_synced            Int?           @default(0)
+  total_promoted          Int?           @default(0)
+  total_published         Int?           @default(0)
   created_at              DateTime?      @default(now()) @db.Timestamp(0)
   updated_at              DateTime?      @default(now()) @db.Timestamp(0)
 
@@ -262,10 +266,14 @@ model inbox_items {
   slug                String?     @db.VarChar(255)
   source_name         String?     @db.VarChar(100)
   ai_score            Float?
+  ai_score_details    Json?
   category_suggestion String?     @db.VarChar(100)
   tags_suggestion     Json?
   summarization_status String?    @db.VarChar(20)
   tagging_status      String?     @db.VarChar(20)
+  similar_item_id     BigInt?
+  similarity_score    Float?
+  image_status        String?     @db.VarChar(20)
   status              InboxStatus? @default(pending)
   priority            Int?        @default(0)
   auto_promoted       Boolean?    @default(false)
@@ -280,6 +288,8 @@ model inbox_items {
   linked_content contents?    @relation(fields: [content_id], references: [id])
   duplicate_of   inbox_items? @relation("InboxDuplicate", fields: [duplicate_of_id], references: [id])
   duplicates     inbox_items[] @relation("InboxDuplicate")
+  similar_to     inbox_items? @relation("InboxSimilar", fields: [similar_item_id], references: [id])
+  similar_items  inbox_items[] @relation("InboxSimilar")
 
   @@unique([source_id, source_item_id])
   @@index([status])
@@ -287,6 +297,8 @@ model inbox_items {
   @@index([source_id])
   @@index([content_id])
   @@index([duplicate_of_id])
+  @@index([similar_item_id])
+  @@index([image_status])
 }
 
 model ai_configs {

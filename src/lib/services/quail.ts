@@ -12,6 +12,7 @@ import {
   QuailApiError,
   QuailChannel,
 } from './quail-api';
+import { DataSourceService } from './data-source';
 
 export interface PublishResult {
   success: boolean;
@@ -138,6 +139,9 @@ export class QuailService {
           // 邮件发送失败不影响发布结果
         }
       }
+
+      // 更新各数据源的入刊统计
+      await this.updateSourcePublishStats(issue);
 
       return {
         success: true,
@@ -296,6 +300,41 @@ export class QuailService {
     } catch (error) {
       console.error('获取 Quail 频道信息失败:', error);
       return null;
+    }
+  }
+
+  /**
+   * 更新各数据源的入刊统计
+   * 统计周刊中各内容来源的数据源，增加其 total_published 计数
+   */
+  private async updateSourcePublishStats(issue: any): Promise<void> {
+    try {
+      // 统计各数据源的入刊数量
+      const sourceCountMap = new Map<number, number>();
+
+      for (const item of issue.weekly_content_items) {
+        const content = item.content;
+        if (!content) continue;
+
+        // 查找该内容对应的 inbox_item，获取其 source_id
+        const inboxItem = await prisma.inbox_items.findFirst({
+          where: { content_id: content.id },
+          select: { source_id: true },
+        });
+
+        if (inboxItem) {
+          const count = sourceCountMap.get(inboxItem.source_id) || 0;
+          sourceCountMap.set(inboxItem.source_id, count + 1);
+        }
+      }
+
+      // 更新各数据源的统计
+      for (const [sourceId, count] of sourceCountMap) {
+        await DataSourceService.updateSourceStats(sourceId, { increment_published: count });
+      }
+    } catch (error) {
+      console.error('更新数据源入刊统计失败:', error);
+      // 不抛出错误，避免影响发布流程
     }
   }
 

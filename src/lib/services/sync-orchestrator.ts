@@ -9,6 +9,8 @@ import type { Prisma } from '@prisma/client';
 export type SyncOptions = {
   max_items?: number;
   similarity_check?: boolean;
+  /** 是否在同步后自动执行 AI 预处理（评分、相似度检测），默认 false */
+  auto_preprocess?: boolean;
 };
 
 type DuplicateSource = 'inbox_items' | 'contents';
@@ -32,6 +34,12 @@ type SyncResult = {
     from_inbox: number;
     from_contents: number;
     from_similarity: number;
+  };
+  /** AI 预处理结果（如果启用） */
+  preprocess_result?: {
+    scored: number;
+    similar_detected: number;
+    errors: string[];
   };
 };
 
@@ -417,9 +425,76 @@ export class SyncOrchestrator {
     const source = await prisma.data_sources.findUnique({ where: { id: sourceId } });
     if (!source) throw new Error(`Data source not found: ${sourceId}`);
 
-    if (source.type === 'rss') return syncRssToInbox(sourceId, options);
-    if (source.type === 'karakeep') return syncKarakeepToInbox(sourceId);
+    let result: SyncResult;
+    if (source.type === 'rss') {
+      result = await syncRssToInbox(sourceId, options);
+    } else if (source.type === 'karakeep') {
+      result = await syncKarakeepToInbox(sourceId);
+    } else {
+      throw new Error(`暂不支持的数据源类型: ${source.type}`);
+    }
 
-    throw new Error(`暂不支持的数据源类型: ${source.type}`);
+    // 如果启用了自动预处理，执行 AI 评分和相似度检测
+    if (options?.auto_preprocess && result.upserted > 0) {
+      result.preprocess_result = await this.preprocessNewItems(sourceId, result.upserted);
+    }
+
+    return result;
+  }
+
+  /**
+   * 对新同步的条目执行 AI 预处理
+   * 包括：AI 评分、相似度检测
+   */
+  static async preprocessNewItems(
+    sourceId: number,
+    limit: number = 50
+  ): Promise<{ scored: number; similar_detected: number; errors: string[] }> {
+    const errors: string[] = [];
+    let scored = 0;
+    let similarDetected = 0;
+
+    // 获取该源最近同步的未评分条目
+    const items = await prisma.inbox_items.findMany({
+      where: {
+        source_id: sourceId,
+        status: 'pending',
+        ai_score: null,
+      },
+      select: { id: true, title: true },
+      orderBy: { synced_at: 'desc' },
+      take: limit,
+    });
+
+    // 动态导入以避免循环依赖
+    const { scoreInboxItem } = await import('@/lib/ai/server/inbox-scorer');
+    const { detectSimilarItem } = await import('@/lib/services/inbox-deduplicator');
+
+    for (const item of items) {
+      // AI 评分
+      try {
+        await scoreInboxItem(item.id);
+        scored += 1;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        errors.push(`[评分] ${item.id}: ${message}`);
+      }
+
+      // 相似度检测
+      try {
+        const similar = await detectSimilarItem(item.id);
+        if (similar) {
+          similarDetected += 1;
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        errors.push(`[相似度] ${item.id}: ${message}`);
+      }
+
+      // 延迟以避免 API 限流
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+
+    return { scored, similar_detected: similarDetected, errors };
   }
 }
