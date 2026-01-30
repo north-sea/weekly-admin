@@ -23,10 +23,10 @@ export function QuickActions() {
       variant: 'default' as const,
     },
     {
-      title: '查看草稿',
-      description: '管理待处理的草稿内容',
+      title: '收件箱',
+      description: '管理待采纳内容',
       icon: FileText,
-      onClick: () => router.push('/content/drafts'),
+      onClick: () => router.push('/inbox'),
       variant: 'outline' as const,
     },
     {

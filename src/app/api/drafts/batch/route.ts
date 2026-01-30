@@ -3,8 +3,8 @@
  * POST /api/drafts/batch - 批量更新草稿状态
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { DraftService } from '@/lib/services/draft';
+import { NextRequest } from 'next/server';
+import { prisma } from '@/lib/db';
 import { authenticateRequest } from '@/lib/auth';
 import { createNextSuccessResponse, createNextErrorResponse } from '@/lib/utils/serialization';
 
@@ -33,7 +33,12 @@ export async function POST(request: NextRequest) {
         if (!status || !['pending', 'adopted', 'rejected'].includes(status)) {
           return createNextErrorResponse('INVALID_PARAMS', 'status 参数无效', 400);
         }
-        count = await DraftService.batchUpdateStatus(ids, status);
+        const mappedStatus = status === 'adopted' ? 'promoted' : status;
+        const result = await prisma.inbox_items.updateMany({
+          where: { id: { in: ids.map((id: string) => BigInt(id)) } },
+          data: { status: mappedStatus },
+        });
+        count = result.count;
         break;
 
       default:
@@ -46,4 +51,3 @@ export async function POST(request: NextRequest) {
     return createNextErrorResponse('BATCH_UPDATE_ERROR', '批量操作失败', 500);
   }
 }
-

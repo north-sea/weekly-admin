@@ -36,19 +36,19 @@ export async function checkDuplicateUrl(url: string): Promise<DuplicateCheckResu
   const normalizedUrl = normalizeUrl(url);
   const urls = url === normalizedUrl ? [url] : [url, normalizedUrl];
 
-  const draft = await prisma.drafts.findFirst({
+  const inbox = await prisma.inbox_items.findFirst({
     where: { url: { in: urls } },
     select: { id: true, title: true, url: true },
   });
 
-  if (draft) {
+  if (inbox) {
     return {
       exists: true,
       normalized_url: normalizedUrl,
-      source: 'drafts',
-      id: draft.id,
-      title: draft.title,
-      matched_url: draft.url,
+      source: 'inbox_items',
+      id: inbox.id,
+      title: inbox.title ?? undefined,
+      matched_url: inbox.url,
     };
   }
 
@@ -81,8 +81,8 @@ export async function batchCheckDuplicateUrls(urls: string[]) {
     if (normalized !== url) allUrls.push(normalized);
   }
 
-  const [drafts, contents] = await Promise.all([
-    prisma.drafts.findMany({
+  const [inboxItems, contents] = await Promise.all([
+    prisma.inbox_items.findMany({
       where: { url: { in: allUrls } },
       select: { id: true, title: true, url: true },
     }),
@@ -92,21 +92,21 @@ export async function batchCheckDuplicateUrls(urls: string[]) {
     }),
   ]);
 
-  const draftByUrl = new Map(drafts.map(d => [d.url, d] as const));
+  const inboxByUrl = new Map(inboxItems.map(d => [d.url, d] as const));
   const contentByUrl = new Map(contents.map(c => [c.source_url ?? '', c] as const));
 
   const result = new Map<string, DuplicateCheckResult>();
   for (const url of urls) {
     const normalized = normalizedMap.get(url) ?? url;
-    const directDraft = draftByUrl.get(url) ?? draftByUrl.get(normalized);
-    if (directDraft) {
+    const directInbox = inboxByUrl.get(url) ?? inboxByUrl.get(normalized);
+    if (directInbox) {
       result.set(url, {
         exists: true,
         normalized_url: normalized,
-        source: 'drafts',
-        id: directDraft.id,
-        title: directDraft.title,
-        matched_url: directDraft.url,
+        source: 'inbox_items',
+        id: directInbox.id,
+        title: directInbox.title ?? undefined,
+        matched_url: directInbox.url,
       });
       continue;
     }

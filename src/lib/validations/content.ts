@@ -14,7 +14,7 @@ export const BaseContentSchema = z.object({
   description: z.string().max(1000, '描述长度不能超过1000字符').optional(),
   category_id: z.number().int().positive().optional(),
   tag_ids: z.array(z.number().int().positive()).default([]),
-  status: z.enum(['draft', 'published', 'archived', 'hidden']).default('draft'),
+  status: z.enum(['draft', 'ready', 'published', 'archived', 'hidden']).default('draft'),
   featured: z.boolean().default(false),
   meta_title: z.string().max(500, 'SEO标题长度不能超过500字符').optional(),
   meta_description: z.string().max(1000, 'SEO描述长度不能超过1000字符').optional(),
@@ -50,7 +50,7 @@ export const ContentQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
   contentType: z.enum(['blog', 'weekly', 'all']).default('all'),
-  status: z.enum(['draft', 'published', 'archived', 'hidden']).optional(),
+  status: z.enum(['draft', 'ready', 'published', 'archived', 'hidden']).optional(),
   category_id: z.coerce.number().int().positive().optional(),
   tag_ids: z.string().transform((val) => {
     if (!val) return [];
@@ -74,7 +74,7 @@ export const ContentUpdateSchema = z.object({
   description: z.string().max(1000, '描述长度不能超过1000字符').optional(),
   category_id: z.number().int().positive().optional(),
   tag_ids: z.array(z.number().int().positive()).optional(),
-  status: z.enum(['draft', 'published', 'archived', 'hidden']).optional(),
+  status: z.enum(['draft', 'ready', 'published', 'archived', 'hidden']).optional(),
   featured: z.boolean().optional(),
   meta_title: z.string().max(500, 'SEO标题长度不能超过500字符').optional(),
   meta_description: z.string().max(1000, 'SEO描述长度不能超过1000字符').optional(),

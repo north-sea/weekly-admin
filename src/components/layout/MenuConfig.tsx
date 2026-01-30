@@ -28,8 +28,8 @@ export const menuConfig: NavItem[] = [
     icon: LayoutDashboard,
   },
   {
-    path: '/content/drafts',
-    name: '草稿管理',
+    path: '/inbox',
+    name: '收件箱',
     icon: FileText,
   },
   {
@@ -43,8 +43,8 @@ export const menuConfig: NavItem[] = [
     icon: CalendarClock,
   },
   {
-    path: '/rss',
-    name: 'RSS 源',
+    path: '/sources',
+    name: '数据源',
     icon: Rss,
   },
   {

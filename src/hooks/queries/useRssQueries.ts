@@ -25,7 +25,7 @@ export function useCreateRssSource() {
   const invalidate = useInvalidateQueries();
   return usePost<RssSource, RssSourceInput>('/api/rss/sources', {
     onSuccess: async () => {
-      await invalidate(queryKeys.rss.sources());
+      await invalidate.invalidate(queryKeys.rss.sources());
     },
   });
 }
@@ -36,7 +36,7 @@ export function useUpdateRssSource() {
     ({ id, data }) => apiClient.put<RssSource>(`/api/rss/sources/${id}`, data),
     {
     onSuccess: async () => {
-      await invalidate(queryKeys.rss.sources());
+      await invalidate.invalidate(queryKeys.rss.sources());
     },
     }
   );
@@ -46,7 +46,7 @@ export function useDeleteRssSource() {
   const invalidate = useInvalidateQueries();
   return useDelete<RssSource, number>((id) => `/api/rss/sources/${id}`, {
     onSuccess: async () => {
-      await invalidate(queryKeys.rss.sources());
+      await invalidate.invalidate(queryKeys.rss.sources());
     },
   });
 }
@@ -58,7 +58,7 @@ export function useFetchRssSource() {
     { source_id: number; max_items?: number; include_images?: boolean; image_fetch_limit?: number; similarity_check?: boolean }
   >('/api/rss/fetch', {
     onSuccess: async () => {
-      await invalidate(queryKeys.content.lists());
+      await invalidate.invalidate(queryKeys.content.lists());
     },
   });
 }

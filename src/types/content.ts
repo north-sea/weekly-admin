@@ -1,3 +1,5 @@
+export type ContentStatus = 'draft' | 'ready' | 'published' | 'archived' | 'hidden';
+
 export interface ContentWithRelations {
   id: string | number;
   title: string;
@@ -16,7 +18,7 @@ export interface ContentWithRelations {
   content_format?: string | null;
   source?: string | null;
   source_url?: string | null;
-  status: string;
+  status: ContentStatus;
   meta_title?: string | null;
   meta_description?: string | null;
   word_count?: number | null;
@@ -25,6 +27,7 @@ export interface ContentWithRelations {
   screenshot_api?: string | null;
   recommendation_reason?: string | null;
   featured?: boolean;
+  collected_at?: string;
   published_at?: string;
   created_at?: string;
   updated_at?: string;

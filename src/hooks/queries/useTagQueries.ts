@@ -64,7 +64,6 @@ export function useTagList(params?: PaginationParams & {
       pageSize: params?.pageSize ?? 20,
     }),
     staleTime: 3 * 60 * 1000, // 3分钟缓存
-    keepPreviousData: true,
     select: (data) => {
       if (Array.isArray(data)) {
         return {
@@ -169,7 +168,7 @@ export function useCreateTag() {
       const optimisticTag = {
         id: tempId,
         ...newTag,
-        content_count: 0,
+        count: 0,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       } as TagWithStats;
@@ -179,18 +178,20 @@ export function useCreateTag() {
       return { tempId, optimisticTag };
     },
     onSuccess: (data, variables, context) => {
+      const ctx = context as { tempId?: number } | undefined;
       // 移除乐观更新的临时数据
-      if (context?.tempId) {
-        optimistic.removeItem(queryKeys.tags.lists(), context.tempId);
+      if (ctx?.tempId) {
+        optimistic.removeItem(queryKeys.tags.lists(), ctx.tempId);
       }
       
       // 无效化相关查询
       invalidate.invalidateTags();
     },
     onError: (error, variables, context) => {
+      const ctx = context as { tempId?: number } | undefined;
       // 回滚乐观更新
-      if (context?.tempId) {
-        optimistic.removeItem(queryKeys.tags.lists(), context.tempId);
+      if (ctx?.tempId) {
+        optimistic.removeItem(queryKeys.tags.lists(), ctx.tempId);
       }
     },
   });
@@ -241,9 +242,10 @@ export function useUpdateTag() {
         invalidate.invalidateTags(id);
       },
       onError: (error, variables, context) => {
-        if (context) {
+        const ctx = context as { id: string | number } | undefined;
+        if (ctx?.id !== undefined) {
           // 回滚乐观更新
-          invalidate.invalidateTags(context.id);
+          invalidate.invalidateTags(ctx.id);
         }
       },
     }

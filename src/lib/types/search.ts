@@ -15,6 +15,7 @@ export interface SearchOptions {
   page?: number;
   limit?: number;
   highlight?: boolean;
+  attributesToHighlight?: string[];
 }
 
 export interface SearchResult {

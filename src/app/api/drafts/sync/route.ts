@@ -3,8 +3,9 @@
  * POST /api/drafts/sync - 从 Karakeep 同步书签
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { syncFromKarakeep } from '@/lib/services/draft';
+import { NextRequest } from 'next/server';
+import { prisma } from '@/lib/db';
+import { SyncOrchestrator } from '@/lib/services/sync-orchestrator';
 import { authenticateRequest } from '@/lib/auth';
 import { createNextSuccessResponse, createNextErrorResponse } from '@/lib/utils/serialization';
 
@@ -20,8 +21,43 @@ export async function POST(request: NextRequest) {
       return createNextErrorResponse('UNAUTHORIZED', '未授权访问', 401);
     }
     console.log('开始同步 Karakeep 书签...');
-    
-    const stats = await syncFromKarakeep();
+
+    const sources = await prisma.data_sources.findMany({
+      where: { type: 'karakeep', enabled: true },
+    });
+
+    if (sources.length === 0) {
+      return createNextErrorResponse('NO_KARAKEEP_SOURCE', '未配置可用的 Karakeep 数据源', 400);
+    }
+
+    let total = 0;
+    let created = 0;
+    let errors = 0;
+    let duplicatesDetected = 0;
+
+    for (const source of sources) {
+      try {
+        const result = await SyncOrchestrator.syncDataSource(source.id);
+        total += result.total_candidates;
+        created += result.upserted;
+        errors += result.errors.length;
+        duplicatesDetected += result.skipped_duplicates;
+      } catch (error) {
+        errors += 1;
+        console.error('Karakeep 同步失败:', error);
+      }
+    }
+
+    const stats = {
+      total,
+      created,
+      updated: 0,
+      unchanged: 0,
+      errors,
+      duplicatesDetected,
+      categoriesSuggested: 0,
+      deleted: 0,
+    };
 
     const messageParts = [`新增 ${stats.created} 条`, `更新 ${stats.updated} 条`];
     if (stats.deleted > 0) {
@@ -39,4 +75,3 @@ export async function POST(request: NextRequest) {
     return createNextErrorResponse('SYNC_ERROR', '同步失败，请检查 Karakeep 配置', 500);
   }
 }
-

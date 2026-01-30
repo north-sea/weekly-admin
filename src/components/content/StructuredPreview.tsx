@@ -139,27 +139,11 @@ export default function StructuredPreview({
                 <div className="text-xs font-semibold uppercase text-muted-foreground">
                   {section.type}
                 </div>
-                {section.title && (
-                  <div className="mt-1 font-medium">{section.title}</div>
+                {section.heading && (
+                  <div className="mt-1 font-medium">{section.heading}</div>
                 )}
                 {section.content && (
                   <p className="mt-1 text-sm text-muted-foreground">{section.content}</p>
-                )}
-                {section.links && section.links.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {section.links.map((link, i) => (
-                      <a
-                        key={i}
-                        href={link.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center gap-1 text-sm text-primary underline"
-                      >
-                        <Link2 className="h-3 w-3" />
-                        {link.title || link.url}
-                      </a>
-                    ))}
-                  </div>
                 )}
               </div>
             ))}

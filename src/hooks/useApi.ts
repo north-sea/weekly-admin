@@ -94,21 +94,29 @@ export const queryKeys = {
     all: ['user'] as const,
     profile: () => [...queryKeys.user.all, 'profile'] as const,
   },
-  // 草稿相关
-  drafts: {
-    all: ['drafts'] as const,
-    lists: () => [...queryKeys.drafts.all, 'list'] as const,
-    list: (params?: Record<string, unknown>) => [...queryKeys.drafts.lists(), params] as const,
-    details: () => [...queryKeys.drafts.all, 'detail'] as const,
-    detail: (id: string | number) => [...queryKeys.drafts.details(), id] as const,
-    stats: () => [...queryKeys.drafts.all, 'stats'] as const,
-  },
   // RSS 相关
   rss: {
     all: ['rss'] as const,
     sources: () => [...queryKeys.rss.all, 'sources'] as const,
     fetch: (sourceId?: number) => [...queryKeys.rss.all, 'fetch', sourceId] as const,
     previewAggregator: (sourceId?: number, itemIndex?: number) => [...queryKeys.rss.all, 'preview-aggregator', sourceId, itemIndex] as const,
+  },
+  // 统一数据源相关
+  sources: {
+    all: ['sources'] as const,
+    lists: () => [...queryKeys.sources.all, 'list'] as const,
+    list: (params?: Record<string, unknown>) => [...queryKeys.sources.lists(), params] as const,
+    details: () => [...queryKeys.sources.all, 'detail'] as const,
+    detail: (id: string | number) => [...queryKeys.sources.details(), id] as const,
+  },
+  // 收件箱相关
+  inbox: {
+    all: ['inbox'] as const,
+    lists: () => [...queryKeys.inbox.all, 'list'] as const,
+    list: (params?: Record<string, unknown>) => [...queryKeys.inbox.lists(), params] as const,
+    details: () => [...queryKeys.inbox.all, 'detail'] as const,
+    detail: (id: string | number) => [...queryKeys.inbox.details(), id] as const,
+    stats: () => [...queryKeys.inbox.all, 'stats'] as const,
   },
 } as const;
 
@@ -500,13 +508,21 @@ export function useInvalidateQueries() {
     getQueryData: <T>(queryKey: readonly unknown[]): T | undefined =>
       queryClient.getQueryData<T>(queryKey),
 
-    // 无效化草稿相关查询
-    invalidateDrafts: (id?: string | number) => {
+    // 无效化数据源相关查询
+    invalidateSources: (id?: string | number) => {
       if (id) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.drafts.detail(id) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.sources.detail(id) });
       }
-      queryClient.invalidateQueries({ queryKey: queryKeys.drafts.lists() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.drafts.stats() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.sources.lists() });
+    },
+
+    // 无效化收件箱相关查询
+    invalidateInbox: (id?: string | number) => {
+      if (id) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.inbox.detail(id) });
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.inbox.lists() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.inbox.stats() });
     },
   };
 }

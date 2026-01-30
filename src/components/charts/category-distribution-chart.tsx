@@ -7,6 +7,7 @@ import { ChartContainer } from './chart-container';
 interface CategoryData {
   name: string;
   count: number;
+  [key: string]: string | number;
 }
 
 interface CategoryDistributionChartProps {
@@ -58,7 +59,7 @@ export function CategoryDistributionChart({
               stroke: 'hsl(var(--border))',
               strokeWidth: 1,
             }}
-            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+            label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
             outerRadius={100}
             innerRadius={55}
             fill="#8884d8"

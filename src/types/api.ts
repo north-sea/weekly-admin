@@ -172,7 +172,7 @@ export namespace ContentApi {
   export interface CreateRequest {
     title: string;
     content: string;
-    status: 'draft' | 'published' | 'archived';
+    status: 'draft' | 'ready' | 'published' | 'archived' | 'hidden';
     categoryId?: number;
     tagIds?: number[];
     source?: string;

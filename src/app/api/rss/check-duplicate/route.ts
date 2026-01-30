@@ -15,6 +15,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validated = RssDuplicateCheckSchema.parse(body);
     const result = await checkDuplicateUrl(validated.url);
+    if (result.exists) {
+      return createNextSuccessResponse(result);
+    }
 
     return createNextSuccessResponse(result);
   } catch (error) {
@@ -28,4 +31,3 @@ export async function POST(request: NextRequest) {
     return createNextErrorResponse('RSS_CHECK_DUPLICATE_ERROR', 'RSS 去重检查失败', 500);
   }
 }
-

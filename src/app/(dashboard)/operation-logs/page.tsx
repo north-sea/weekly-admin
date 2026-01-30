@@ -59,8 +59,8 @@ export default function OperationLogsPage() {
     totalPages: 0,
   };
 
-  const handleSearch = (search: string) => {
-    setFilters({ ...filters, search, page: 1 });
+  const handleSearch = (keyword: string) => {
+    setFilters({ ...filters, keyword, page: 1 });
   };
 
   const handleOperationTypeChange = (operationType: string) => {

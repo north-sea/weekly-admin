@@ -7,7 +7,7 @@ import { SearchOptions, SearchResult } from '@/lib/types/search';
 // 搜索查询 hook
 export function useSearchQuery(options: SearchOptions, enabled: boolean = false) {
   return useQuery({
-    queryKey: queryKeys.search.query(options),
+    queryKey: queryKeys.search.query(options as Record<string, unknown>),
     queryFn: () => searchApi.search(options),
     enabled,
     staleTime: 30000, // 30 seconds
@@ -34,7 +34,7 @@ export function useSearchMutation() {
     mutationFn: (options: SearchOptions) => searchApi.search(options),
     onSuccess: (data, variables) => {
       // 更新查询缓存
-      queryClient.setQueryData(queryKeys.search.query(variables), data);
+      queryClient.setQueryData(queryKeys.search.query(variables as Record<string, unknown>), data);
     },
   });
 }
@@ -45,7 +45,7 @@ export function usePrefetchSearch() {
   
   return (options: SearchOptions) => {
     return queryClient.prefetchQuery({
-      queryKey: queryKeys.search.query(options),
+      queryKey: queryKeys.search.query(options as Record<string, unknown>),
       queryFn: () => searchApi.search(options),
       staleTime: 30000,
     });

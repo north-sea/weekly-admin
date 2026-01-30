@@ -278,7 +278,12 @@ export class ContentService {
   
   // 创建内容
   static async createContent(data: ContentInput, userId: number, request?: NextRequest): Promise<ContentWithRelations> {
-    const { tag_ids, cover_image, recommendation_reason, content_type_id, ...contentData } = data;
+    const { tag_ids, cover_image, recommendation_reason, content_type_id, ...contentData } = data as ContentInput & {
+      cover_image?: string;
+      recommendation_reason?: string;
+    };
+    const source = 'source' in data ? data.source : undefined;
+    const sourceUrl = 'source_url' in data ? data.source_url : undefined;
     
     // 生成slug
     const slug = this.generateSlug(data.title);
@@ -323,9 +328,9 @@ export class ContentService {
         {
           title: data.title,
           content: data.content,
-          description: data.description,
-          source: data.source,
-          source_url: data.source_url,
+          description: data.description ?? undefined,
+          source: source ?? undefined,
+          source_url: sourceUrl ?? undefined,
           changes_summary: '初始版本'
         },
         userId
@@ -363,7 +368,10 @@ export class ContentService {
   
   // 更新内容
   static async updateContent(data: ContentUpdate, userId: number, request?: NextRequest): Promise<ContentWithRelations> {
-    const { id, tag_ids, cover_image, recommendation_reason, content_type_id, ...updateData } = data;
+    const { id, tag_ids, cover_image, recommendation_reason, content_type_id, ...updateData } = data as ContentUpdate & {
+      cover_image?: string;
+      recommendation_reason?: string;
+    };
     const contentId = BigInt(id);
     
     // 获取更新前的内容以便比较变化
@@ -428,9 +436,9 @@ export class ContentService {
         {
           title: updateData.title || oldContent.title,
           content: updateData.content || oldContent.content,
-          description: updateData.description || oldContent.description,
-          source: updateData.source || oldContent.source,
-          source_url: updateData.source_url || oldContent.source_url,
+          description: updateData.description ?? oldContent.description ?? undefined,
+          source: (updateData as Partial<{ source?: string }>).source ?? oldContent.source ?? undefined,
+          source_url: (updateData as Partial<{ source_url?: string }>).source_url ?? oldContent.source_url ?? undefined,
           changes_summary: changesSummary
         },
         userId
@@ -449,7 +457,7 @@ export class ContentService {
         {
           title: updateData.title || oldContent.title,
           contentType: oldContent.content_type_id === 3 ? 'weekly' : 'blog',
-          status: updateData.status || oldContent.status,
+          status: updateData.status ?? oldContent.status ?? undefined,
           changes
         },
         request

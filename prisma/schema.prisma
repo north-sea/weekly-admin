@@ -18,6 +18,7 @@ model categories {
   created_at  DateTime?  @default(now()) @db.Timestamp(0)
   updated_at  DateTime?  @default(now()) @db.Timestamp(0)
   contents    contents[]
+  data_sources data_sources[]
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -123,12 +124,13 @@ model contents {
   screenshot_api       contents_screenshot_api? @default(manual)
   sort_order           Int?                     @default(0)
   featured             Boolean?                 @default(false)
+  collected_at         DateTime?                @db.Timestamp(0)
   created_at           DateTime?                @default(now()) @db.Timestamp(0)
   updated_at           DateTime?                @default(now()) @db.Timestamp(0)
   user_id              Int?
   content_tags         content_tags[]
   categories           categories?              @relation(fields: [category_id], references: [id])
-  drafts               drafts[]
+  inbox_items          inbox_items[]
   weekly_content_items weekly_content_items[]
 
   @@index([category_id], map: "contents_category_id_fkey")
@@ -224,65 +226,67 @@ model weekly_issues {
   weekly_content_items weekly_content_items[]
 }
 
-/// 草稿表 - 存储从 Karakeep 同步的书签数据
-model drafts {
-  id                    BigInt         @id @default(autoincrement())
-  karakeep_id           String         @unique @db.VarChar(100)
-  title                 String         @db.VarChar(500)
-  url                   String         @db.VarChar(1000)
-  description           String?        @db.Text
-  note                  String?        @db.Text
-  favicon_url           String?        @db.VarChar(500)
-  image_url             String?        @db.VarChar(500)
-  karakeep_created_at   DateTime?      @db.Timestamp(0)
-  karakeep_updated_at   DateTime?      @db.Timestamp(0)
-  status                drafts_status? @default(pending)
-  priority              Int?           @default(0)
-  category_suggestion   String?        @db.VarChar(100)
-  tags_suggestion       String?        @db.Text
-  duplicate_of_draft_id BigInt?
-  content_id            BigInt?
-  synced_at             DateTime?      @db.Timestamp(0)
-  created_at            DateTime?      @default(now()) @db.Timestamp(0)
-  updated_at            DateTime?      @default(now()) @db.Timestamp(0)
-  content               String?        @db.LongText
-  slug                  String?        @db.VarChar(500)
-  source                String?        @db.VarChar(200)
-  summarization_status  String?        @db.VarChar(50)
-  summary               String?        @db.Text
-  tagging_status        String?        @db.VarChar(50)
-  word_count            Int?           @default(0)
-  linked_content        contents?      @relation(fields: [content_id], references: [id])
-  duplicate_of          drafts?        @relation("DraftDuplicate", fields: [duplicate_of_draft_id], references: [id])
-  duplicates            drafts[]       @relation("DraftDuplicate")
+model data_sources {
+  id                      Int            @id @default(autoincrement())
+  name                    String         @db.VarChar(200)
+  type                    DataSourceType
+  config                  Json?
+  enabled                 Boolean?       @default(true)
+  auto_promote_threshold  Float?
+  sync_interval_minutes   Int?           @default(60)
+  default_category_id     Int?
+  default_content_type_id Int?
+  last_synced_at          DateTime?      @db.Timestamp(0)
+  sync_count              Int?           @default(0)
+  error_count             Int?           @default(0)
+  last_error              String?        @db.Text
+  created_at              DateTime?      @default(now()) @db.Timestamp(0)
+  updated_at              DateTime?      @default(now()) @db.Timestamp(0)
 
-  @@index([status], map: "idx_status")
-  @@index([karakeep_id], map: "idx_karakeep_id")
-  @@index([synced_at], map: "idx_synced_at")
-  @@index([priority], map: "idx_priority")
-  @@index([content_id], map: "idx_content_id")
-  @@index([duplicate_of_draft_id], map: "idx_duplicate_of_draft_id")
+  default_category categories?  @relation(fields: [default_category_id], references: [id])
+  inbox_items      inbox_items[]
 }
 
-model rss_sources {
-  id             Int              @id @default(autoincrement())
-  name           String           @db.VarChar(200)
-  feed_url       String           @unique(map: "unique_feed_url") @db.VarChar(768)
-  type           rss_sources_type? @default(normal)
-  enabled        Boolean?         @default(true)
-  content_type_id Int?            @default(4)
-  category_id    Int?
-  config         Json?
-  last_fetched_at DateTime?       @db.Timestamp(0)
-  fetch_count    Int?             @default(0)
-  error_count    Int?             @default(0)
-  last_error     String?          @db.Text
-  created_at     DateTime?        @default(now()) @db.Timestamp(0)
-  updated_at     DateTime?        @default(now()) @db.Timestamp(0)
+model inbox_items {
+  id                  BigInt      @id @default(autoincrement())
+  source_id           Int
+  source_item_id      String?     @db.VarChar(255)
+  title               String?     @db.Text
+  url                 String      @db.VarChar(2048)
+  description         String?     @db.Text
+  note                String?     @db.Text
+  summary             String?     @db.Text
+  content             String?     @db.LongText
+  image_url           String?     @db.VarChar(2048)
+  favicon_url         String?     @db.VarChar(500)
+  slug                String?     @db.VarChar(255)
+  source_name         String?     @db.VarChar(100)
+  ai_score            Float?
+  category_suggestion String?     @db.VarChar(100)
+  tags_suggestion     Json?
+  summarization_status String?    @db.VarChar(20)
+  tagging_status      String?     @db.VarChar(20)
+  status              InboxStatus? @default(pending)
+  priority            Int?        @default(0)
+  auto_promoted       Boolean?    @default(false)
+  content_id          BigInt?
+  duplicate_of_id     BigInt?
+  source_published_at DateTime?   @db.Timestamp(0)
+  synced_at           DateTime?   @db.Timestamp(0)
+  created_at          DateTime?   @default(now()) @db.Timestamp(0)
+  updated_at          DateTime?   @default(now()) @db.Timestamp(0)
 
-  @@index([enabled], map: "idx_rss_sources_enabled")
-  @@index([type], map: "idx_rss_sources_type")
-  @@index([category_id], map: "idx_rss_sources_category_id")
+  data_source    data_sources @relation(fields: [source_id], references: [id])
+  linked_content contents?    @relation(fields: [content_id], references: [id])
+  duplicate_of   inbox_items? @relation("InboxDuplicate", fields: [duplicate_of_id], references: [id])
+  duplicates     inbox_items[] @relation("InboxDuplicate")
+
+  @@unique([source_id, source_item_id])
+  @@index([status])
+  @@index([ai_score])
+  @@index([source_id])
+  @@index([content_id])
+  @@index([duplicate_of_id])
 }
 
 model ai_configs {
@@ -357,9 +361,24 @@ enum contents_content_format {
 
 enum contents_status {
   draft
+  ready
   published
   archived
   hidden
+}
+
+enum DataSourceType {
+  rss
+  karakeep
+  webhook
+  manual
+}
+
+enum InboxStatus {
+  pending
+  promoted
+  rejected
+  duplicate
 }
 
 enum weekly_issues_status {
@@ -368,20 +387,10 @@ enum weekly_issues_status {
   archived
 }
 
-enum rss_sources_type {
-  normal
-  aggregator
-}
 
 enum contents_screenshot_api {
   ScreenshotLayer
   HCTI
   manual
   karakeep
-}
-
-enum drafts_status {
-  pending
-  adopted
-  rejected
 }

@@ -51,7 +51,7 @@ const contentSchema = z.object({
   content_type_id: z.number(),
   category_id: z.number().optional().nullable(),
   tag_ids: z.array(z.number()).optional(),
-  status: z.enum(['draft', 'published', 'archived', 'hidden']),
+  status: z.enum(['draft', 'ready', 'published', 'archived', 'hidden']),
   featured: z.boolean().optional(),
   // Blog专用字段
   description: z.string().max(1000, '描述长度不能超过1000字符').optional(),
@@ -691,6 +691,7 @@ export default function SimplifiedEditor({
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="draft">草稿</SelectItem>
+                            <SelectItem value="ready">就绪</SelectItem>
                             <SelectItem value="published">已发布</SelectItem>
                             <SelectItem value="archived">已归档</SelectItem>
                             <SelectItem value="hidden">已隐藏</SelectItem>

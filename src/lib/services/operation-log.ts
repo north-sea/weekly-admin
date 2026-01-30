@@ -377,7 +377,9 @@ export class OperationLogService {
       ip_address: log.ip_address || undefined,
       user_agent: log.user_agent || undefined,
       created_at: log.created_at || undefined,
-      user: user || undefined
+      user: user
+        ? { ...user, display_name: user.display_name ?? undefined }
+        : undefined
     };
   }
   

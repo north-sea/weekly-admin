@@ -71,7 +71,7 @@ export async function organizeWeekly(request: OrganizeRequest): Promise<Organize
   const candidates = await prisma.contents.findMany({
     where: {
       content_type_id: 3,
-      status: 'draft',
+      status: 'ready',
       created_at: {
         gte: rangeStart,
         lt: rangeEndExclusive,

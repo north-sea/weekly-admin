@@ -12,7 +12,7 @@ import {
 // 获取操作日志列表
 export function useOperationLogs(query: OperationLogsQuery, enabled: boolean = true) {
   return useQuery({
-    queryKey: queryKeys.operationLogs.list(query),
+    queryKey: queryKeys.operationLogs.list(query as Record<string, unknown>),
     queryFn: () => operationLogsApi.list(query),
     enabled,
     staleTime: 30000, // 30 seconds
@@ -23,7 +23,7 @@ export function useOperationLogs(query: OperationLogsQuery, enabled: boolean = t
 // 获取操作日志统计
 export function useOperationLogsStats(params?: { startDate?: string; endDate?: string }) {
   return useQuery({
-    queryKey: queryKeys.operationLogs.stats(params),
+    queryKey: queryKeys.operationLogs.stats(params as Record<string, unknown>),
     queryFn: () => operationLogsApi.stats(params),
     staleTime: 60000, // 1 minute
     gcTime: 5 * 60 * 1000, // 5 minutes
@@ -66,7 +66,7 @@ export function usePrefetchOperationLogs() {
   
   return (query: OperationLogsQuery) => {
     return queryClient.prefetchQuery({
-      queryKey: queryKeys.operationLogs.list(query),
+      queryKey: queryKeys.operationLogs.list(query as Record<string, unknown>),
       queryFn: () => operationLogsApi.list(query),
       staleTime: 30000,
     });

@@ -11,12 +11,16 @@ export function createRequestLogger() {
     requestHeaders.set('x-request-id', requestId);
     
     // Log incoming request
+    const forwardedFor = request.headers.get('x-forwarded-for');
+    const realIp = request.headers.get('x-real-ip');
+    const ipAddress = forwardedFor || realIp || undefined;
+
     logger.info('Incoming request', {
       requestId,
       method: request.method,
       url: request.url,
       userAgent: request.headers.get('user-agent'),
-      ip: request.ip || request.headers.get('x-forwarded-for'),
+      ip: ipAddress,
       type: 'request_start'
     });
 
@@ -36,7 +40,7 @@ export function createRequestLogger() {
       duration,
       {
         requestId,
-        ip: request.ip || request.headers.get('x-forwarded-for'),
+        ip: ipAddress,
       }
     );
 

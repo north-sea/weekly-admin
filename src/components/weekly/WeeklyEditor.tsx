@@ -104,7 +104,7 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId, onContentsChange }
         page: '1',
         pageSize: '20',
         excludeIssueId: issueId.toString(),
-        status: 'draft',
+        status: 'ready',
       });
 
       if (searchKeyword) {

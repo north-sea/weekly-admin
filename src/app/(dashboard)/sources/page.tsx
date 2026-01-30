@@ -1,0 +1,285 @@
+'use client';
+
+import { useMemo, useState } from 'react';
+import Link from 'next/link';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/components/ui/use-toast';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
+import {
+  useCreateDataSource,
+  useDataSources,
+  useDeleteDataSource,
+  useSyncAllSources,
+  useSyncDataSource,
+  useUpdateDataSource,
+  type DataSourceType,
+} from '@/hooks/queries/useDataSourceQueries';
+
+type RssSourceType = 'normal' | 'aggregator';
+
+function getFeedUrl(config: unknown): string | null {
+  if (!config || typeof config !== 'object') return null;
+  const feedUrl = (config as any).feed_url;
+  return typeof feedUrl === 'string' ? feedUrl : null;
+}
+
+function getRssSourceType(config: unknown): RssSourceType {
+  if (!config || typeof config !== 'object') return 'normal';
+  const sourceType = (config as any).source_type;
+  return sourceType === 'aggregator' ? 'aggregator' : 'normal';
+}
+
+export default function SourcesPage() {
+  const { toast } = useToast();
+  const { data: sources, isLoading } = useDataSources();
+  const createSource = useCreateDataSource();
+  const updateSource = useUpdateDataSource();
+  const deleteSource = useDeleteDataSource();
+  const syncSource = useSyncDataSource();
+  const syncAll = useSyncAllSources();
+
+  const [newType, setNewType] = useState<DataSourceType>('rss');
+  const [newName, setNewName] = useState('');
+  const [newFeedUrl, setNewFeedUrl] = useState('');
+  const [newRssType, setNewRssType] = useState<RssSourceType>('normal');
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+
+  const sortedSources = useMemo(() => {
+    return (sources ?? []).slice().sort((a, b) => b.id - a.id);
+  }, [sources]);
+
+  async function handleCreate() {
+    try {
+      if (!newName.trim()) return;
+      if (newType === 'rss' && !newFeedUrl.trim()) return;
+
+      const config =
+        newType === 'rss'
+          ? {
+              feed_url: newFeedUrl.trim(),
+              source_type: newRssType,
+            }
+          : {};
+
+      await createSource.mutateAsync({
+        name: newName.trim(),
+        type: newType,
+        enabled: true,
+        config,
+      });
+
+      setNewName('');
+      setNewFeedUrl('');
+      setNewRssType('normal');
+      toast({ title: '已创建数据源', variant: 'success' });
+    } catch (error) {
+      toast({ title: '创建失败', description: error instanceof Error ? error.message : String(error), variant: 'destructive' });
+    }
+  }
+
+  async function handleToggleEnabled(sourceId: number, enabled: boolean) {
+    try {
+      await updateSource.mutateAsync({ id: sourceId, data: { enabled } });
+    } catch (error) {
+      toast({ title: '更新失败', description: error instanceof Error ? error.message : String(error), variant: 'destructive' });
+    }
+  }
+
+  async function handleSync(sourceId: number) {
+    try {
+      const result = await syncSource.mutateAsync({ id: sourceId, options: { max_items: 50 } });
+      toast({
+        title: '同步完成',
+        description: `候选 ${result.total_candidates}，写入/更新 ${result.upserted}，跳过 ${result.skipped_duplicates}`,
+      });
+    } catch (error) {
+      toast({ title: '同步失败', description: error instanceof Error ? error.message : String(error), variant: 'destructive' });
+    }
+  }
+
+  async function handleSyncAll() {
+    try {
+      const result = await syncAll.mutateAsync({ max_items: 50 });
+      const ok = result.results.filter((r) => r.ok).length;
+      toast({ title: '同步完成', description: `共 ${result.total} 个数据源，成功 ${ok} 个` });
+    } catch (error) {
+      toast({ title: '同步失败', description: error instanceof Error ? error.message : String(error), variant: 'destructive' });
+    }
+  }
+
+  function handleDelete(sourceId: number) {
+    setPendingDeleteId(sourceId);
+  }
+
+  async function handleConfirmDelete() {
+    if (pendingDeleteId === null) return;
+    try {
+      await deleteSource.mutateAsync(pendingDeleteId);
+      toast({ title: '已删除数据源', variant: 'success' });
+    } catch (error) {
+      toast({ title: '删除失败', description: error instanceof Error ? error.message : String(error), variant: 'destructive' });
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <CardTitle>数据源管理</CardTitle>
+              <CardDescription>统一管理 RSS / Karakeep 等采集入口，并同步到收件箱。</CardDescription>
+            </div>
+            <Button onClick={handleSyncAll} disabled={syncAll.isPending} loading={syncAll.isPending}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              同步全部
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
+            <Input placeholder="名称" value={newName} onChange={(e) => setNewName(e.target.value)} />
+            <Select value={newType} onValueChange={(v) => setNewType(v as DataSourceType)}>
+              <SelectTrigger>
+                <SelectValue placeholder="类型" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="rss">rss</SelectItem>
+                <SelectItem value="karakeep">karakeep</SelectItem>
+                <SelectItem value="webhook">webhook</SelectItem>
+                <SelectItem value="manual">manual</SelectItem>
+              </SelectContent>
+            </Select>
+            {newType === 'rss' ? (
+              <>
+                <Input placeholder="Feed URL" value={newFeedUrl} onChange={(e) => setNewFeedUrl(e.target.value)} />
+                <Select value={newRssType} onValueChange={(v) => setNewRssType(v as RssSourceType)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="rss 类型" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="normal">normal</SelectItem>
+                    <SelectItem value="aggregator">aggregator</SelectItem>
+                  </SelectContent>
+                </Select>
+              </>
+            ) : (
+              <>
+                <div />
+                <div />
+              </>
+            )}
+            <Button
+              onClick={handleCreate}
+              disabled={createSource.isPending || !newName.trim() || (newType === 'rss' && !newFeedUrl.trim())}
+              loading={createSource.isPending}
+            >
+              新建
+            </Button>
+          </div>
+
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID</TableHead>
+                  <TableHead>名称</TableHead>
+                  <TableHead>类型</TableHead>
+                  <TableHead>配置</TableHead>
+                  <TableHead>启用</TableHead>
+                  <TableHead>同步</TableHead>
+                  <TableHead className="text-right">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                      加载中...
+                    </TableCell>
+                  </TableRow>
+                ) : sortedSources.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                      暂无数据源
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  sortedSources.map((source) => {
+                    const feedUrl = source.type === 'rss' ? getFeedUrl(source.config) : null;
+                    const rssType = source.type === 'rss' ? getRssSourceType(source.config) : null;
+                    return (
+                      <TableRow key={source.id}>
+                        <TableCell className="font-mono text-xs">{source.id}</TableCell>
+                        <TableCell className="font-medium">{source.name}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{source.type}</Badge>
+                          {rssType ? <Badge variant="outline" className="ml-2">{rssType}</Badge> : null}
+                        </TableCell>
+                        <TableCell className="max-w-[420px]">
+                          {feedUrl ? (
+                            <div className="flex items-center gap-2">
+                              <span className="truncate text-sm text-muted-foreground">{feedUrl}</span>
+                              <Link href={feedUrl} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground">
+                                <ExternalLink className="h-4 w-4" />
+                              </Link>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">-</span>
+                          )}
+                          {source.last_error ? (
+                            <p className="mt-1 truncate text-xs text-destructive">{source.last_error}</p>
+                          ) : null}
+                        </TableCell>
+                        <TableCell>
+                          <Switch
+                            checked={Boolean(source.enabled)}
+                            onCheckedChange={(checked) => handleToggleEnabled(source.id, checked)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSync(source.id)}
+                            disabled={syncSource.isPending}
+                          >
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                            同步
+                          </Button>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(source.id)}>
+                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => !open && setPendingDeleteId(null)}
+        title="删除数据源"
+        description="删除后将无法通过该数据源继续同步。已同步到收件箱的数据不会自动删除。"
+        confirmText="删除"
+        cancelText="取消"
+        onConfirm={handleConfirmDelete}
+      />
+    </div>
+  );
+}
+

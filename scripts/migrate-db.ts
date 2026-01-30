@@ -181,61 +181,86 @@ async function migrateDatabase() {
       console.log('✅ contents 表创建 idx_summary_score 索引');
     }
 
-    // RSS 源表
+    // contents.status 枚举扩展（支持 ready）
+    const contentsStatusColumn = (await prisma.$queryRaw`
+      SHOW COLUMNS FROM contents LIKE 'status'
+    `) as Array<{ Type?: string }>;
+
+    const contentsStatusType = String(contentsStatusColumn?.[0]?.Type ?? '');
+    if (contentsStatusType.startsWith('enum(') && !contentsStatusType.includes("'ready'")) {
+      await prisma.$executeRaw`
+        ALTER TABLE contents
+        MODIFY COLUMN status ENUM('draft','ready','published','archived','hidden') DEFAULT 'draft'
+      `;
+      console.log('✅ contents 表 status 枚举添加 ready');
+    }
+
+    // 统一数据源表
     await prisma.$executeRaw`
-      CREATE TABLE IF NOT EXISTS rss_sources (
+      CREATE TABLE IF NOT EXISTS data_sources (
           id INT PRIMARY KEY AUTO_INCREMENT,
           name VARCHAR(200) NOT NULL,
-          feed_url VARCHAR(768) NOT NULL,
-          type ENUM('normal', 'aggregator') DEFAULT 'normal',
-          enabled BOOLEAN DEFAULT true,
-          content_type_id INT DEFAULT 4,
-          category_id INT NULL,
+          type ENUM('rss', 'karakeep', 'webhook', 'manual') NOT NULL,
           config JSON NULL,
-          last_fetched_at TIMESTAMP NULL,
-          fetch_count INT DEFAULT 0,
+          enabled BOOLEAN DEFAULT true,
+          auto_promote_threshold FLOAT NULL,
+          default_category_id INT NULL,
+          default_content_type_id INT NULL,
+          last_synced_at TIMESTAMP NULL,
+          sync_count INT DEFAULT 0,
           error_count INT DEFAULT 0,
           last_error TEXT NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          UNIQUE KEY unique_feed_url (feed_url),
-          INDEX idx_rss_sources_enabled (enabled),
-          INDEX idx_rss_sources_type (type),
-          INDEX idx_rss_sources_category_id (category_id)
+          INDEX idx_data_sources_type (type),
+          INDEX idx_data_sources_enabled (enabled),
+          INDEX idx_data_sources_default_category_id (default_category_id),
+          INDEX idx_data_sources_last_synced_at (last_synced_at)
       )
     `;
-    console.log('✅ RSS 源表创建完成');
+    console.log('✅ data_sources 表创建完成');
 
-    // RSS 源表索引（兼容旧表结构）
-    const rssEnabledIndex = await prisma.$queryRaw`
-      SHOW INDEX FROM rss_sources WHERE Key_name = 'idx_rss_sources_enabled'
+    // 统一收件箱表
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS inbox_items (
+          id BIGINT PRIMARY KEY AUTO_INCREMENT,
+          source_id INT NOT NULL,
+          source_item_id VARCHAR(255) NULL,
+          title TEXT NULL,
+          url VARCHAR(2048) NOT NULL,
+          description TEXT NULL,
+          note TEXT NULL,
+          summary TEXT NULL,
+          content LONGTEXT NULL,
+          image_url VARCHAR(2048) NULL,
+          favicon_url VARCHAR(500) NULL,
+          slug VARCHAR(255) NULL,
+          source_name VARCHAR(100) NULL,
+          ai_score FLOAT NULL,
+          category_suggestion VARCHAR(100) NULL,
+          tags_suggestion JSON NULL,
+          summarization_status VARCHAR(20) NULL,
+          tagging_status VARCHAR(20) NULL,
+          status ENUM('pending', 'promoted', 'rejected', 'duplicate') DEFAULT 'pending',
+          priority INT DEFAULT 0,
+          auto_promoted BOOLEAN DEFAULT false,
+          content_id BIGINT NULL,
+          duplicate_of_id BIGINT NULL,
+          source_published_at TIMESTAMP NULL,
+          synced_at TIMESTAMP NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY unique_inbox_source_item (source_id, source_item_id),
+          INDEX idx_inbox_items_status (status),
+          INDEX idx_inbox_items_ai_score (ai_score),
+          INDEX idx_inbox_items_source_id (source_id),
+          INDEX idx_inbox_items_content_id (content_id),
+          INDEX idx_inbox_items_duplicate_of_id (duplicate_of_id),
+          INDEX idx_inbox_items_synced_at (synced_at),
+          INDEX idx_inbox_items_priority (priority)
+      )
     `;
-    if (Array.isArray(rssEnabledIndex) && rssEnabledIndex.length === 0) {
-      await prisma.$executeRaw`
-        CREATE INDEX idx_rss_sources_enabled ON rss_sources(enabled)
-      `;
-      console.log('✅ rss_sources 表创建 idx_rss_sources_enabled 索引');
-    }
-
-    const rssTypeIndex = await prisma.$queryRaw`
-      SHOW INDEX FROM rss_sources WHERE Key_name = 'idx_rss_sources_type'
-    `;
-    if (Array.isArray(rssTypeIndex) && rssTypeIndex.length === 0) {
-      await prisma.$executeRaw`
-        CREATE INDEX idx_rss_sources_type ON rss_sources(type)
-      `;
-      console.log('✅ rss_sources 表创建 idx_rss_sources_type 索引');
-    }
-
-    const rssCategoryIndex = await prisma.$queryRaw`
-      SHOW INDEX FROM rss_sources WHERE Key_name = 'idx_rss_sources_category_id'
-    `;
-    if (Array.isArray(rssCategoryIndex) && rssCategoryIndex.length === 0) {
-      await prisma.$executeRaw`
-        CREATE INDEX idx_rss_sources_category_id ON rss_sources(category_id)
-      `;
-      console.log('✅ rss_sources 表创建 idx_rss_sources_category_id 索引');
-    }
+    console.log('✅ inbox_items 表创建完成');
 
     // AI 配置表（支持多组配置）
     await prisma.$executeRaw`

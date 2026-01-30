@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 interface TagData {
   name: string;
   count: number;
+  [key: string]: string | number;
 }
 
 interface TagUsageChartProps {
@@ -66,7 +67,7 @@ export function TagUsageChart({
                 stroke: 'hsl(var(--border))',
                 strokeWidth: 1,
               }}
-              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+              label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
               outerRadius={85}
               innerRadius={45}
               fill="#8884d8"

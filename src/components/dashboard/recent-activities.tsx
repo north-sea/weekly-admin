@@ -18,11 +18,11 @@ interface Activity {
   id: string | number;
   operationType: string;
   resourceType: string;
-  resourceId?: string | number;
+  resourceId?: string | number | null;
   createdAt: string;
   user: {
     username: string;
-    displayName?: string;
+    displayName?: string | null;
   };
 }
 

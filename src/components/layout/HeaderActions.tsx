@@ -28,9 +28,9 @@ type QuickLink = {
 
 const quickLinks: QuickLink[] = [
   {
-    label: '快速创建',
-    description: '新建草稿并继续编辑',
-    href: '/content/drafts',
+    label: '收件箱',
+    description: '处理待采纳内容',
+    href: '/inbox',
     icon: FilePlus,
   },
   {

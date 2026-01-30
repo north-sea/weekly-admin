@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import type { CodeComponent } from 'react-markdown/lib/ast-to-react';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
@@ -28,8 +27,8 @@ interface ContentPreviewProps {
     tags?: Array<{ id: number; name: string; slug?: string }>;
     created_at?: string | Date;
     updated_at?: string | Date;
-    view_count?: number;
-    user?: { display_name?: string; username: string };
+    view_count?: number | null;
+    user?: { display_name?: string | null; username: string };
   };
   mode?: 'desktop' | 'mobile';
   showMeta?: boolean;
@@ -72,6 +71,111 @@ export default function ContentPreview({
     });
   };
 
+  const markdownComponents: Components = {
+    h1: ({ children, ...props }) => (
+      <h2 className="text-3xl font-semibold tracking-tight" {...props}>
+        {children}
+      </h2>
+    ),
+    h2: ({ children, ...props }) => (
+      <h3 className="text-2xl font-semibold tracking-tight" {...props}>
+        {children}
+      </h3>
+    ),
+    h3: ({ children, ...props }) => (
+      <h4 className="text-xl font-semibold tracking-tight" {...props}>
+        {children}
+      </h4>
+    ),
+    p: ({ children, ...props }) => (
+      <p className="text-base leading-7 text-foreground" {...props}>
+        {children}
+      </p>
+    ),
+    blockquote: ({ children, ...props }) => (
+      <blockquote
+        className="border-l-4 border-primary/50 pl-4 italic text-muted-foreground"
+        {...props}
+      >
+        {children}
+      </blockquote>
+    ),
+    ul: ({ children, ...props }) => (
+      <ul className="list-disc space-y-2 pl-6" {...props}>
+        {children}
+      </ul>
+    ),
+    ol: ({ children, ...props }) => (
+      <ol className="list-decimal space-y-2 pl-6" {...props}>
+        {children}
+      </ol>
+    ),
+    li: ({ children, ...props }) => (
+      <li className="text-base leading-7 text-foreground" {...props}>
+        {children}
+      </li>
+    ),
+    table: ({ children, ...props }) => (
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse border border-border text-sm" {...props}>
+          {children}
+        </table>
+      </div>
+    ),
+    th: ({ children, ...props }) => (
+      <th
+        className="border border-border bg-muted px-3 py-2 text-left font-semibold"
+        {...props}
+      >
+        {children}
+      </th>
+    ),
+    td: ({ children, ...props }) => (
+      <td className="border border-border px-3 py-2" {...props}>
+        {children}
+      </td>
+    ),
+    img: ({ src, alt, ...props }) => (
+      <img
+        src={src ?? undefined}
+        alt={alt || '图片'}
+        className="rounded w-full"
+        loading="lazy"
+        {...props}
+      />
+    ),
+    a: ({ href, children, ...props }) => (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary hover:underline inline-flex items-center gap-1"
+        {...props}
+      >
+        {children}
+        <ExternalLink className="h-3 w-3" />
+      </a>
+    ),
+    code: (props) => {
+      const { className, children, ...rest } = props;
+      const inline = (props as { inline?: boolean }).inline;
+      if (inline) {
+        return (
+          <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono" {...rest}>
+            {children}
+          </code>
+        );
+      }
+      return (
+        <pre className="bg-muted rounded p-4 overflow-x-auto">
+          <code className={className} {...rest}>
+            {children}
+          </code>
+        </pre>
+      );
+    },
+  };
+
   // Blog 预览
   const renderBlogPreview = () => (
     <article
@@ -106,13 +210,13 @@ export default function ContentPreview({
                 <span>{formatDate(content.created_at)}</span>
               </div>
             )}
-            {metadata?.estimatedReadingTime > 0 && (
+            {(metadata?.estimatedReadingTime ?? 0) > 0 && (
               <div className="flex items-center gap-1.5">
                 <Clock className="h-4 w-4" />
                 <span>{metadata?.estimatedReadingTime} 分钟阅读</span>
               </div>
             )}
-            {content.view_count !== undefined && (
+            {content.view_count !== undefined && content.view_count !== null && (
               <div className="flex items-center gap-1.5">
                 <Eye className="h-4 w-4" />
                 <span>{content.view_count} 次阅读</span>
@@ -154,112 +258,7 @@ export default function ContentPreview({
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           rehypePlugins={[rehypeHighlight, rehypeRaw]}
-          components={{
-            h1: ({ children, ...props }) => (
-              <h2 className="text-3xl font-semibold tracking-tight" {...props}>
-                {children}
-              </h2>
-            ),
-            h2: ({ children, ...props }) => (
-              <h3 className="text-2xl font-semibold tracking-tight" {...props}>
-                {children}
-              </h3>
-            ),
-            h3: ({ children, ...props }) => (
-              <h4 className="text-xl font-semibold tracking-tight" {...props}>
-                {children}
-              </h4>
-            ),
-            p: ({ children, ...props }) => (
-              <p className="text-base leading-7 text-foreground" {...props}>
-                {children}
-              </p>
-            ),
-            blockquote: ({ children, ...props }) => (
-              <blockquote
-                className="border-l-4 border-primary/50 pl-4 italic text-muted-foreground"
-                {...props}
-              >
-                {children}
-              </blockquote>
-            ),
-            ul: ({ children, ...props }) => (
-              <ul className="list-disc space-y-2 pl-6" {...props}>
-                {children}
-              </ul>
-            ),
-            ol: ({ children, ...props }) => (
-              <ol className="list-decimal space-y-2 pl-6" {...props}>
-                {children}
-              </ol>
-            ),
-            li: ({ children, ...props }) => (
-              <li className="text-base leading-7 text-foreground" {...props}>
-                {children}
-              </li>
-            ),
-            table: ({ children, ...props }) => (
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse border border-border text-sm" {...props}>
-                  {children}
-                </table>
-              </div>
-            ),
-            th: ({ children, ...props }) => (
-              <th
-                className="border border-border bg-muted px-3 py-2 text-left font-semibold"
-                {...props}
-              >
-                {children}
-              </th>
-            ),
-            td: ({ children, ...props }) => (
-              <td className="border border-border px-3 py-2" {...props}>
-                {children}
-              </td>
-            ),
-            img: ({ src, alt, ...props }) => (
-              <img
-                src={src}
-                alt={alt || '图片'}
-                className="rounded w-full"
-                loading="lazy"
-                {...props}
-              />
-            ),
-            a: ({ href, children, ...props }) => (
-              <a
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline inline-flex items-center gap-1"
-                {...props}
-              >
-                {children}
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            ),
-            code: ((props) => {
-              const { inline, className, children, ...rest } = props;
-              if (inline) {
-                return (
-                  <code
-                    className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono"
-                    {...rest}
-                  >
-                    {children}
-                  </code>
-                );
-              }
-              return (
-                <pre className="bg-muted rounded p-4 overflow-x-auto">
-                  <code className={className} {...rest}>
-                    {children}
-                  </code>
-                </pre>
-              );
-            }) as CodeComponent,
-          }}
+          components={markdownComponents}
         >
           {content.content}
         </ReactMarkdown>

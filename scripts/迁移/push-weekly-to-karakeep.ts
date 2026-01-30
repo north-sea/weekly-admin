@@ -188,7 +188,7 @@ async function main() {
         }
 
         if (!isDryRun) {
-          const bookmark = await createKarakeepBookmark({ url: sourceUrl, title: item.title, type: 'link' });
+          const bookmark = await createKarakeepBookmark({ url: sourceUrl, title: item.title });
           const karakeepId = bookmark.id;
           if (!karakeepId) {
             throw new Error('未返回书签 ID');

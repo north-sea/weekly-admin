@@ -56,6 +56,7 @@ import type { ContentWithRelations } from '@/types/content';
 
 const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: '草稿', variant: 'outline' },
+  ready: { label: '就绪', variant: 'secondary' },
   published: { label: '已发布', variant: 'default' },
   archived: { label: '已归档', variant: 'secondary' },
   hidden: { label: '已隐藏', variant: 'destructive' },
@@ -249,6 +250,7 @@ export default function ContentListPage() {
               <SelectContent>
                 <SelectItem value="all">全部状态</SelectItem>
                 <SelectItem value="draft">草稿</SelectItem>
+                <SelectItem value="ready">就绪</SelectItem>
                 <SelectItem value="published">已发布</SelectItem>
                 <SelectItem value="archived">已归档</SelectItem>
                 <SelectItem value="hidden">已隐藏</SelectItem>
@@ -350,7 +352,7 @@ export default function ContentListPage() {
                       <TableHead>原文分</TableHead>
                       <TableHead>摘要分</TableHead>
                       <TableHead>标签</TableHead>
-                      <TableHead>创建时间</TableHead>
+                      <TableHead>收集时间</TableHead>
                       <TableHead className="text-right">操作</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -426,7 +428,7 @@ export default function ContentListPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-sm">
-                            {dayjs(content.created_at).format('YYYY-MM-DD HH:mm')}
+                            {dayjs(content.collected_at || content.created_at).format('YYYY-MM-DD HH:mm')}
                           </TableCell>
                           <TableCell
                             className="text-right"

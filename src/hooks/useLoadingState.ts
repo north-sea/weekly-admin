@@ -26,12 +26,13 @@ export interface BatchLoadingState extends LoadingState {
  * @param query - React Query 查询结果
  */
 export function useQueryLoadingState<T>(query: UseQueryResult<T>): LoadingState {
+  const isIdle = query.fetchStatus === 'idle';
   return useMemo(() => ({
     loading: query.isLoading || query.isFetching,
     error: query.error,
     success: query.isSuccess && !query.isLoading,
-    idle: query.isIdle,
-  }), [query.isLoading, query.isFetching, query.error, query.isSuccess, query.isIdle]);
+    idle: isIdle,
+  }), [query.isLoading, query.isFetching, query.error, query.isSuccess, isIdle]);
 }
 
 /**
@@ -39,12 +40,14 @@ export function useQueryLoadingState<T>(query: UseQueryResult<T>): LoadingState 
  * @param mutation - React Query 突变结果
  */
 export function useMutationLoadingState<T>(mutation: UseMutationResult<T>): LoadingState {
+  const status = mutation.status;
+  const isIdle = status === 'idle';
   return useMemo(() => ({
-    loading: mutation.isPending,
+    loading: status === 'pending',
     error: mutation.error,
-    success: mutation.isSuccess && !mutation.isPending,
-    idle: mutation.isIdle,
-  }), [mutation.isPending, mutation.error, mutation.isSuccess, mutation.isIdle]);
+    success: status === 'success',
+    idle: isIdle,
+  }), [status, mutation.error, isIdle]);
 }
 
 /**
@@ -58,12 +61,13 @@ export function useBatchQueryLoadingState<T = any>(
     const loadingCount = queries.filter(q => q.isLoading || q.isFetching).length;
     const errorQueries = queries.filter(q => q.error);
     const successCount = queries.filter(q => q.isSuccess && !q.isLoading).length;
+    const idleCount = queries.filter(q => q.fetchStatus === 'idle').length;
     
     return {
       loading: loadingCount > 0,
       error: errorQueries.length > 0 ? errorQueries[0].error : null,
       success: successCount === queries.length && loadingCount === 0,
-      idle: queries.every(q => q.isIdle),
+      idle: idleCount === queries.length,
       loadingCount,
       totalCount: queries.length,
       progress: queries.length > 0 ? (successCount / queries.length) * 100 : 0,

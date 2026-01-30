@@ -44,13 +44,14 @@ export async function POST(request: NextRequest) {
     let config: RssSourceConfig = {};
 
     if (validated.source_id) {
-      const source = await prisma.rss_sources.findUnique({ where: { id: validated.source_id } });
-      if (!source) {
+      const source = await prisma.data_sources.findUnique({ where: { id: validated.source_id } });
+      if (!source || source.type !== 'rss') {
         return createNextErrorResponse('NOT_FOUND', 'RSS 源不存在', 404);
       }
-      feedUrl = source.feed_url;
-      sourceType = (source.type ?? 'normal') as RssSourceType;
-      config = (source.config ?? {}) as RssSourceConfig;
+      const cfg = (source.config ?? {}) as Record<string, unknown>;
+      feedUrl = typeof cfg.feed_url === 'string' ? cfg.feed_url : undefined;
+      sourceType = (cfg.source_type === 'aggregator' ? 'aggregator' : 'normal') as RssSourceType;
+      config = cfg as RssSourceConfig;
     }
 
     if (!feedUrl) {
@@ -82,10 +83,11 @@ export async function POST(request: NextRequest) {
       is_aggregator: isAggregator,
       links: links.map(link => {
         const dup = dedupMap.get(link.url);
+        const exists = Boolean(dup?.exists);
         return {
           url: link.url,
           title: link.title,
-          is_duplicate: Boolean(dup?.exists),
+          is_duplicate: exists,
           existing_source: dup?.source,
           existing_id: dup?.id,
           existing_title: dup?.title,
@@ -105,4 +107,3 @@ export async function POST(request: NextRequest) {
     return createNextErrorResponse('RSS_PREVIEW_AGGREGATOR_ERROR', 'RSS 聚合预览失败', 500);
   }
 }
-

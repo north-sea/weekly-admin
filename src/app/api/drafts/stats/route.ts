@@ -15,18 +15,18 @@ export async function GET(request: NextRequest) {
       return createNextErrorResponse('UNAUTHORIZED', '未授权访问', 401);
     }
 
-    // drafts 池统计
-    const [inboxAll, inboxPending, inboxAdopted] = await Promise.all([
-      prisma.drafts.count({}),
-      prisma.drafts.count({ where: { status: 'pending' } }),
-      prisma.drafts.count({ where: { status: 'adopted' } }),
+    // inbox 统计（统一收件箱）
+    const [inboxAll, inboxPending, inboxPromoted] = await Promise.all([
+      prisma.inbox_items.count({}),
+      prisma.inbox_items.count({ where: { status: 'pending' } }),
+      prisma.inbox_items.count({ where: { status: 'promoted' } }),
     ]);
 
     // 编辑草稿（内容库，status=draft）统计
     const editorAll = await prisma.contents.count({ where: { status: 'draft' } });
 
     // 获取所有来源域名（从 URL 中提取）
-    const draftsWithUrls = await prisma.drafts.findMany({
+    const draftsWithUrls = await prisma.inbox_items.findMany({
       select: { url: true },
       where: { url: { not: '' } },
     });
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
       inbox: {
         all: inboxAll,
         pending: inboxPending,
-        adopted: inboxAdopted,
+        adopted: inboxPromoted,
       },
       editor: {
         all: editorAll,
@@ -64,5 +64,4 @@ export async function GET(request: NextRequest) {
     return createNextErrorResponse('GET_DRAFTS_STATS_ERROR', '获取草稿统计失败', 500);
   }
 }
-
 

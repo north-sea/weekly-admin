@@ -34,7 +34,7 @@ export type ParsedFeed = {
   items: ParsedFeedItem[];
 };
 
-export type DuplicateSource = 'drafts' | 'contents';
+export type DuplicateSource = 'inbox_items' | 'contents';
 
 export type DuplicateCheckResult = {
   exists: boolean;
@@ -49,15 +49,16 @@ export type DeduplicationReport = {
   total: number;
   new: number;
   duplicates: {
-    from_drafts: number;
+    from_inbox: number;
     from_contents: number;
     from_similarity: number;
+    from_drafts?: number;
   };
   details: Array<{
     url: string;
     normalized_url: string;
     title?: string;
-    reason: 'draft' | 'content' | 'similar';
+    reason: 'inbox' | 'content' | 'similar';
     existing_id?: number | string | bigint;
     existing_title?: string;
   }>;

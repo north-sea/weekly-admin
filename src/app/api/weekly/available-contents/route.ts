@@ -12,7 +12,7 @@ const GetAvailableContentsSchema = z.object({
   tagIds: z.string().optional(),
   excludeIssueId: z.string().transform(Number).pipe(z.number().int().positive()).optional(),
   dateRange: z.string().optional(),
-  status: z.enum(['published', 'draft', 'all']).optional(),
+  status: z.enum(['published', 'draft', 'ready', 'all']).optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -28,18 +28,18 @@ export async function GET(request: NextRequest) {
       tagIds: searchParams.get('tagIds') || undefined,
       excludeIssueId: searchParams.get('excludeIssueId') || undefined,
       dateRange: searchParams.get('dateRange') || undefined,
-      status: searchParams.get('status') as 'published' | 'draft' | 'all' | null,
+      status: searchParams.get('status') as 'published' | 'draft' | 'ready' | 'all' | null,
     });
 
     const where: any = {
       content_type_id: 3, // Weekly 类型
     };
 
-    // 状态筛选（默认 published，支持 all/draft）
+    // 状态筛选（默认 ready，支持 all/draft/published）
     if (params.status && params.status !== 'all') {
       where.status = params.status;
     } else if (!params.status) {
-      where.status = 'published';
+      where.status = 'ready';
     }
 
     // 搜索条件

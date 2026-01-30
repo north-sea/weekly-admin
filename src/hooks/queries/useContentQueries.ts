@@ -120,25 +120,27 @@ export function useCreateContent() {
         ...newContent,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      } as ContentWithRelations;
+      } as unknown as ContentWithRelations;
       
       optimistic.addItem(queryKeys.content.lists(), optimisticContent);
       
       return { tempId, optimisticContent };
     },
     onSuccess: (data, variables, context) => {
+      const ctx = context as { tempId?: number } | undefined;
       // 移除乐观更新的临时数据
-      if (context?.tempId) {
-        optimistic.removeItem(queryKeys.content.lists(), context.tempId);
+      if (ctx?.tempId) {
+        optimistic.removeItem(queryKeys.content.lists(), ctx.tempId);
       }
       
       // 无效化相关查询
       invalidate.invalidateContent();
     },
     onError: (error, variables, context) => {
+      const ctx = context as { tempId?: number } | undefined;
       // 回滚乐观更新
-      if (context?.tempId) {
-        optimistic.removeItem(queryKeys.content.lists(), context.tempId);
+      if (ctx?.tempId) {
+        optimistic.removeItem(queryKeys.content.lists(), ctx.tempId);
       }
     },
   });
@@ -188,9 +190,10 @@ export function useUpdateContent() {
         invalidate.invalidateContent(id);
       },
       onError: (error, variables, context) => {
-        if (context) {
+        const ctx = context as { id: string | number } | undefined;
+        if (ctx?.id !== undefined) {
           // 回滚乐观更新
-          invalidate.invalidateContent(context.id);
+          invalidate.invalidateContent(ctx.id);
         }
       },
     }

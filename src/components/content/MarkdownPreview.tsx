@@ -1,8 +1,7 @@
 'use client';
 
 import React from 'react';
-import type { CodeComponent } from 'react-markdown/lib/ast-to-react';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
@@ -27,8 +26,8 @@ interface ContentPreviewProps {
     tags?: Array<{ id: number; name: string }>;
     created_at?: string;
     updated_at?: string;
-    view_count?: number;
-    user?: { display_name?: string; username: string };
+    view_count?: number | null;
+    user?: { display_name?: string | null; username: string };
   };
   mode?: 'desktop' | 'mobile';
   showMeta?: boolean;
@@ -44,19 +43,22 @@ export default function MarkdownPreview({
 }: ContentPreviewProps) {
   const isBlog = content.content_type?.id === 4;
 
-  const code: CodeComponent = ({ inline, className, children, ...props }) => {
-    const match = /language-(\w+)/.exec(className || '');
-    return !inline ? (
-      <pre className="rounded-md bg-muted p-3 text-sm">
-        <code className={className} {...props}>
+  const markdownComponents: Components = {
+    code: (props) => {
+      const { className, children, ...rest } = props;
+      const inline = (props as { inline?: boolean }).inline;
+      return !inline ? (
+        <pre className="rounded-md bg-muted p-3 text-sm">
+          <code className={className} {...rest}>
+            {children}
+          </code>
+        </pre>
+      ) : (
+        <code className={className} {...rest}>
           {children}
         </code>
-      </pre>
-    ) : (
-      <code className={className} {...props}>
-        {children}
-      </code>
-    );
+      );
+    },
   };
 
   return (
@@ -83,7 +85,7 @@ export default function MarkdownPreview({
                   {dayjs(content.created_at).format('YYYY-MM-DD HH:mm')}
                 </span>
               )}
-              {content.view_count !== undefined && (
+              {content.view_count !== undefined && content.view_count !== null && (
                 <span className="inline-flex items-center gap-1">
                   <Eye className="h-4 w-4" />
                   {content.view_count} 次阅读
@@ -109,7 +111,7 @@ export default function MarkdownPreview({
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeHighlight, rehypeRaw]}
-            components={{ code }}
+            components={markdownComponents}
           >
             {content.content}
           </ReactMarkdown>

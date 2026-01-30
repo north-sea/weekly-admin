@@ -55,7 +55,6 @@ export function useCategoryList(params?: PaginationParams & {
     select: (data) => {
       // 兼容非数组结构（旧接口或分页数据）
       if (Array.isArray(data)) return data;
-      // @ts-expect-error 兼容 data 字段
       if (Array.isArray((data as any)?.data)) return (data as any).data;
       return [];
     },
@@ -126,18 +125,20 @@ export function useCreateCategory() {
       return { tempId, optimisticCategory };
     },
     onSuccess: (data, variables, context) => {
+      const ctx = context as { tempId?: number } | undefined;
       // 移除乐观更新的临时数据
-      if (context?.tempId) {
-        optimistic.removeItem(queryKeys.categories.lists(), context.tempId);
+      if (ctx?.tempId) {
+        optimistic.removeItem(queryKeys.categories.lists(), ctx.tempId);
       }
       
       // 无效化相关查询
       invalidate.invalidateCategories();
     },
     onError: (error, variables, context) => {
+      const ctx = context as { tempId?: number } | undefined;
       // 回滚乐观更新
-      if (context?.tempId) {
-        optimistic.removeItem(queryKeys.categories.lists(), context.tempId);
+      if (ctx?.tempId) {
+        optimistic.removeItem(queryKeys.categories.lists(), ctx.tempId);
       }
     },
   });
@@ -188,9 +189,10 @@ export function useUpdateCategory() {
         invalidate.invalidateCategories(id);
       },
       onError: (error, variables, context) => {
-        if (context) {
+        const ctx = context as { id: string | number } | undefined;
+        if (ctx?.id !== undefined) {
           // 回滚乐观更新
-          invalidate.invalidateCategories(context.id);
+          invalidate.invalidateCategories(ctx.id);
         }
       },
     }

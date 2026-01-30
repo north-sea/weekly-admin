@@ -249,7 +249,9 @@ export class VersionService {
       changes_summary: version.changes_summary || undefined,
       created_by: version.created_by,
       created_at: version.created_at || undefined,
-      creator: creator || undefined
+      creator: creator
+        ? { ...creator, display_name: creator.display_name ?? undefined }
+        : undefined
     };
   }
 }
