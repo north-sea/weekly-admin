@@ -30,7 +30,13 @@
       "WebFetch(domain:docs.karakeep.app)",
       "Bash(curl:*)",
       "WebFetch(domain:stitch.withgoogle.com)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(npx tsc:*)",
+      "Bash(pnpm install:*)",
+      "Bash(./node_modules/.bin/tsc:*)",
+      "Bash(node_modules/.bin/tsc:*)",
+      "Bash(pnpm prisma db push:*)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []
