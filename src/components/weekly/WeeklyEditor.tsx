@@ -8,11 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { Search, RefreshCw } from 'lucide-react';
-import { DndContext } from '@dnd-kit/core';
-import { useDroppable } from '@dnd-kit/core';
 import AvailableContentsList from './AvailableContentsList';
 import SelectedContentsList from './SelectedContentsList';
 import WeeklyPreview from './WeeklyPreview';
+import { PendingContentsBar } from './PendingContentsBar';
+import { CompletenessIndicator } from './CompletenessIndicator';
 
 export interface WeeklyEditorContent {
   id: number;
@@ -46,21 +46,6 @@ interface Category {
   id: number;
   name: string;
 }
-
-const DroppableArea: React.FC<{ id: string; children: React.ReactNode }> = ({ id, children }) => {
-  const { setNodeRef, isOver } = useDroppable({ id });
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={`min-h-[200px] rounded transition-all ${
-        isOver ? 'bg-blue-50 border-2 border-dashed border-blue-300' : ''
-      }`}
-    >
-      {children}
-    </div>
-  );
-};
 
 const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId, onContentsChange }) => {
   const { toast } = useToast();
@@ -251,7 +236,23 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId, onContentsChange }
   }, [selectedContents, onContentsChange, hasLoadedContents]);
 
   return (
-    <DndContext>
+    <div className="space-y-4">
+      {/* 待关联内容提示栏 */}
+      <PendingContentsBar
+        weeklyId={issueId}
+        onLinked={() => {
+          void fetchSelectedContents();
+          void fetchAvailableContents();
+        }}
+      />
+
+      {/* 完整度指示器 */}
+      <CompletenessIndicator
+        current={selectedContents.length}
+        min={10}
+        max={15}
+      />
+
       <div className="h-[70vh]">
         <div className="grid h-full grid-cols-12 gap-6">
           <div className="col-span-3 h-full min-h-0">
@@ -319,13 +320,11 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId, onContentsChange }
                 </div>
               </CardHeader>
               <CardContent className="flex-1 overflow-hidden pb-4 min-h-0 flex flex-col">
-                <DroppableArea id="selected-contents">
-                  <SelectedContentsList
-                    contents={selectedContents}
-                    onRemoveContent={handleRemoveContent}
-                    onReorderContents={handleReorderContents}
-                  />
-                </DroppableArea>
+                <SelectedContentsList
+                  contents={selectedContents}
+                  onRemoveContent={handleRemoveContent}
+                  onReorderContents={handleReorderContents}
+                />
               </CardContent>
             </Card>
           </div>
@@ -342,7 +341,7 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId, onContentsChange }
           </div>
         </div>
       </div>
-    </DndContext>
+    </div>
   );
 };
 

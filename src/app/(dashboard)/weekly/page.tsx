@@ -39,8 +39,23 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar,
+  AlertCircle,
+  History,
+  Link2,
+  Loader2,
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { LinkResultDialog, LinkResultData } from '@/components/weekly/LinkResultDialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
+import { isCurrentWeek } from '@/lib/utils/weekly-date';
 import dayjs from 'dayjs';
 
 interface WeeklyIssue {
@@ -59,10 +74,10 @@ interface WeeklyIssue {
   updated_at: string;
 }
 
-const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  draft: { label: '草稿', variant: 'outline' },
-  published: { label: '已发布', variant: 'default' },
-  archived: { label: '已归档', variant: 'secondary' },
+const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; className?: string }> = {
+  draft: { label: '草稿', variant: 'outline', className: 'border-slate-300 text-slate-600' },
+  published: { label: '已发布', variant: 'default', className: 'bg-emerald-500 hover:bg-emerald-600' },
+  archived: { label: '已归档', variant: 'secondary', className: 'bg-slate-200 text-slate-600' },
 };
 
 const focusRingClass = 'focus-visible:ring-1 focus-visible:ring-offset-1 focus:ring-1 focus:ring-offset-1';
@@ -89,6 +104,20 @@ export default function WeeklyManagePage() {
     total: 0,
     totalPages: 0,
   });
+
+  // 自动化操作状态
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    type: 'backfill' | 'create' | 'link' | null;
+    title: string;
+    description: string;
+  }>({ open: false, type: null, title: '', description: '' });
+  const [operationLoading, setOperationLoading] = useState(false);
+  const [resultDialog, setResultDialog] = useState<{
+    open: boolean;
+    data: LinkResultData | null;
+    title: string;
+  }>({ open: false, data: null, title: '' });
 
   // 获取周刊列表
   React.useEffect(() => {
@@ -155,6 +184,134 @@ export default function WeeklyManagePage() {
     });
   };
 
+  // 打开确认对话框
+  const openConfirmDialog = (type: 'backfill' | 'create' | 'link') => {
+    const configs = {
+      backfill: {
+        title: '回填历史周刊',
+        description: '将根据内容的创建时间，自动将未关联的内容匹配到对应时间范围的空周刊中。每期最多关联 15 篇内容。此操作不可撤销，是否继续？',
+      },
+      create: {
+        title: '创建本周周刊',
+        description: '将自动创建本周的周刊草稿，期号为当前最大期号 + 1。如果本周周刊已存在，将不会重复创建。是否继续？',
+      },
+      link: {
+        title: '关联本周内容',
+        description: '将本周创建的未关联内容自动关联到本周周刊中。每期最多关联 15 篇内容。是否继续？',
+      },
+    };
+    setConfirmDialog({ open: true, type, ...configs[type] });
+  };
+
+  // 执行自动化操作
+  const executeOperation = async () => {
+    if (!confirmDialog.type) return;
+
+    setOperationLoading(true);
+    try {
+      let response;
+      let resultTitle = '';
+
+      switch (confirmDialog.type) {
+        case 'backfill':
+          response = await fetch('/api/weekly/backfill', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dryRun: false, maxItemsPerIssue: 15 }),
+          });
+          resultTitle = '回填结果';
+          break;
+        case 'create':
+          response = await fetch('/api/weekly/auto-create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ forceCreate: false }),
+          });
+          break;
+        case 'link':
+          response = await fetch('/api/weekly/auto-link', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ maxItems: 15, weekOffset: 0 }),
+          });
+          resultTitle = '关联结果';
+          break;
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error?.message || '操作失败');
+      }
+
+      // 关闭确认对话框
+      setConfirmDialog({ open: false, type: null, title: '', description: '' });
+
+      // 处理不同类型的结果
+      if (confirmDialog.type === 'create') {
+        const data = result.data;
+        if (data.alreadyExists) {
+          toast({
+            title: '周刊已存在',
+            description: `第 ${data.existingIssue.issue_number} 期周刊已存在`,
+          });
+        } else {
+          toast({
+            title: '创建成功',
+            description: `已创建第 ${data.issue.issue_number} 期周刊`,
+          });
+        }
+        fetchWeeklyIssues();
+      } else if (confirmDialog.type === 'backfill') {
+        // 回填结果 - 汇总所有周刊的关联结果
+        const data = result.data;
+        const allLinked: { id: number; title: string }[] = [];
+        const allSkipped: { id: number; title: string; reason: string }[] = [];
+
+        data.results?.forEach((r: { linkedContents?: { id: number; title: string }[]; skippedContents?: { id: number; title: string; reason: string }[] }) => {
+          if (r.linkedContents) allLinked.push(...r.linkedContents);
+          if (r.skippedContents) allSkipped.push(...r.skippedContents);
+        });
+
+        setResultDialog({
+          open: true,
+          title: resultTitle,
+          data: {
+            linkedCount: data.totalLinked || 0,
+            skippedCount: allSkipped.length,
+            linkedContents: allLinked,
+            skippedContents: allSkipped,
+          },
+        });
+        fetchWeeklyIssues();
+      } else if (confirmDialog.type === 'link') {
+        // 关联结果
+        const data = result.data;
+        setResultDialog({
+          open: true,
+          title: resultTitle,
+          data: {
+            linkedCount: data.linkedCount || 0,
+            skippedCount: data.skippedCount || 0,
+            linkedContents: data.linkedContents || [],
+            skippedContents: data.skippedContents || [],
+            issueNumber: data.issue?.issue_number,
+            issueTitle: data.issue?.title,
+          },
+        });
+        fetchWeeklyIssues();
+      }
+    } catch (error) {
+      toast({
+        title: '操作失败',
+        description: error instanceof Error ? error.message : '操作失败',
+        variant: 'destructive',
+      });
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+
   return (
     <div className="flex-1 space-y-6">
       <div className="flex items-center justify-between">
@@ -164,6 +321,30 @@ export default function WeeklyManagePage() {
           <p className="text-sm text-muted-foreground">管理周刊期号和内容</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => openConfirmDialog('backfill')}
+          >
+            <History className="mr-2 h-4 w-4" />
+            回填历史
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => openConfirmDialog('create')}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            创建本周
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => openConfirmDialog('link')}
+          >
+            <Link2 className="mr-2 h-4 w-4" />
+            关联本周
+          </Button>
           <Button variant="outline" size="lg" onClick={() => router.push('/weekly/generate')}>
             AI 组织
           </Button>
@@ -259,19 +440,43 @@ export default function WeeklyManagePage() {
                     ) : (
                       issues.map((issue) => {
                         const status = statusMap[issue.status] || statusMap.draft;
+                        const isEmpty = !issue.total_items || issue.total_items === 0;
+                        const isCurrent = isCurrentWeek(issue.start_date, issue.end_date);
                         return (
-                          <TableRow key={issue.id} className="border-slate-100 hover:bg-slate-50">
+                          <TableRow
+                            key={issue.id}
+                            className={cn(
+                              'border-slate-100 hover:bg-slate-50',
+                              isCurrent && 'bg-blue-50/50 hover:bg-blue-50'
+                            )}
+                          >
                             <TableCell className="font-medium text-slate-900">
-                              第 {issue.issue_number} 期
+                              <div className="flex items-center gap-2">
+                                第 {issue.issue_number} 期
+                                {isCurrent && (
+                                  <Badge variant="outline" className="border-blue-300 bg-blue-50 text-blue-600 text-xs">
+                                    本周
+                                  </Badge>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell className="font-medium">
                               {issue.title}
                             </TableCell>
                             <TableCell>
-                              <Badge variant={status.variant}>{status.label}</Badge>
+                              <Badge variant={status.variant} className={status.className}>
+                                {status.label}
+                              </Badge>
                             </TableCell>
                             <TableCell>
-                              {issue.total_items || 0} 篇
+                              {isEmpty ? (
+                                <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-600">
+                                  <AlertCircle className="mr-1 h-3 w-3" />
+                                  空
+                                </Badge>
+                              ) : (
+                                <span className="text-slate-700">{issue.total_items} 篇</span>
+                              )}
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-1 text-sm text-slate-700">
@@ -358,6 +563,37 @@ export default function WeeklyManagePage() {
           )}
         </CardContent>
       </Card>
+
+      {/* 确认对话框 */}
+      <Dialog open={confirmDialog.open} onOpenChange={(open) => !operationLoading && setConfirmDialog({ ...confirmDialog, open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{confirmDialog.title}</DialogTitle>
+            <DialogDescription>{confirmDialog.description}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmDialog({ open: false, type: null, title: '', description: '' })}
+              disabled={operationLoading}
+            >
+              取消
+            </Button>
+            <Button onClick={executeOperation} disabled={operationLoading}>
+              {operationLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              确认执行
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 结果对话框 */}
+      <LinkResultDialog
+        open={resultDialog.open}
+        onOpenChange={(open) => setResultDialog({ ...resultDialog, open })}
+        data={resultDialog.data}
+        title={resultDialog.title}
+      />
     </div>
   );
 }

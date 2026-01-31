@@ -41,6 +41,7 @@ import ScreenshotPasteUploader from '@/components/content/ScreenshotPasteUploade
 import { apiClient } from '@/lib/api-client';
 import { AIScoreDisplay } from '@/components/content/AIScoreDisplay';
 import { AIScoreButton } from '@/components/content/AIScoreButton';
+import { WeeklyLinkCard } from '@/components/content/WeeklyLinkCard';
 
 // 表单验证 schema
 const contentSchema = z.object({
@@ -812,6 +813,11 @@ export default function SimplifiedEditor({
                 </div>
               </CardContent>
             </Card>
+
+                {/* 周刊关联卡片 - 仅 Weekly 类型且已保存时显示 */}
+                {contentTypeId === 3 && contentId && (
+                  <WeeklyLinkCard contentId={contentId} />
+                )}
               </div>
             </div>
             <div className="flex-1 space-y-4 overflow-y-auto pr-4">

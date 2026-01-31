@@ -28,7 +28,7 @@
     - `findWeeklyIssueForDate(date)`: 根据日期查找对应周刊
     - `isCurrentWeek(startDate, endDate)`: 判断是否为当前周
   - 依赖: dayjs
-  - 状态: `pending`
+  - 状态: `complete` ✓
 
 #### 1.2 历史回填 API
 - **Task 1.2.1**: 实现回填服务层
@@ -39,14 +39,14 @@
     - 按 `created_at` 匹配周刊时间范围
     - 每期最多 15 篇，按时间顺序
     - 支持 dry-run 模式
-  - 状态: `pending`
+  - 状态: `complete` ✓
 
 - **Task 1.2.2**: 实现回填 API 路由
   - 文件: `src/app/api/weekly/backfill/route.ts`
   - 方法: `POST`
   - 参数: `{ dryRun: boolean, maxItemsPerIssue: number }`
   - 返回: 回填统计结果
-  - 状态: `pending`
+  - 状态: `complete` ✓
 
 #### 1.3 周刊自动创建 API
 - **Task 1.3.1**: 实现自动创建服务
@@ -56,14 +56,14 @@
     - 检查是否已存在
     - 计算期号（最大期号 + 1）
     - 生成标题和 slug
-  - 状态: `pending`
+  - 状态: `complete` ✓
 
 - **Task 1.3.2**: 实现自动创建 API 路由
   - 文件: `src/app/api/weekly/auto-create/route.ts`
   - 方法: `POST`
   - 参数: `{ forceCreate: boolean }`
   - 返回: 创建结果或已存在信息
-  - 状态: `pending`
+  - 状态: `complete` ✓
 
 #### 1.4 内容自动关联 API
 - **Task 1.4.1**: 实现自动关联服务
@@ -73,35 +73,35 @@
     - 查询本周未关联内容
     - 按时间顺序关联
     - 更新周刊统计信息
-  - 状态: `pending`
+  - 状态: `complete` ✓
 
 - **Task 1.4.2**: 实现自动关联 API 路由
   - 文件: `src/app/api/weekly/auto-link/route.ts`
   - 方法: `POST`
   - 参数: `{ maxItems: number, weekOffset: number }`
   - 返回: 关联结果（含跳过原因）
-  - 状态: `pending`
+  - 状态: `complete` ✓
 
 #### 1.5 内容周刊关联 API
 - **Task 1.5.1**: 实现内容关联查询 API
   - 文件: `src/app/api/contents/[id]/weekly/route.ts`
   - 方法: `GET`
   - 返回: 已关联周刊 + 推荐周刊
-  - 状态: `pending`
+  - 状态: `complete` ✓
 
 - **Task 1.5.2**: 实现内容关联操作 API
   - 文件: `src/app/api/contents/[id]/weekly/route.ts` (追加 POST)
   - 方法: `POST`
   - 参数: `{ action: 'link' | 'unlink', weeklyIssueId?: number }`
   - 返回: 操作结果
-  - 状态: `pending`
+  - 状态: `complete` ✓
 
 #### 1.6 待关联内容 API
 - **Task 1.6.1**: 实现待关联内容查询 API
   - 文件: `src/app/api/weekly/[id]/pending-contents/route.ts`
   - 方法: `GET`
   - 返回: 周刊时间范围内的未关联内容列表
-  - 状态: `pending`
+  - 状态: `complete` ✓
 
 ---
 
@@ -113,7 +113,7 @@
   - 修改:
     - 内容数量列：空周刊显示警告色 `空` 徽章
     - 状态列：使用不同颜色区分（草稿灰、已发布绿、待审核橙）
-  - 状态: `pending`
+  - 状态: `complete` ✓
 
 - **Task 2.1.2**: 添加当前周高亮
   - 文件: `src/app/(dashboard)/weekly/page.tsx`
@@ -121,7 +121,7 @@
     - 判断周刊是否为当前周
     - 当前周行添加特殊背景色/边框
   - 依赖: Task 1.1.1 (周刊时间工具)
-  - 状态: `pending`
+  - 状态: `complete` ✓
 
 - **Task 2.1.3**: 添加自动化操作按钮
   - 文件: `src/app/(dashboard)/weekly/page.tsx`
@@ -132,7 +132,7 @@
     - 操作前确认对话框
     - 操作后结果摘要弹窗
   - 依赖: Phase 1 所有 API
-  - 状态: `pending`
+  - 状态: `complete` ✓
 
 ---
 
@@ -145,7 +145,7 @@
     - `useContentWeekly(contentId)`: 获取关联信息
     - `useLinkContentToWeekly()`: 关联操作
     - `useUnlinkContentFromWeekly()`: 取消关联
-  - 状态: `pending`
+  - 状态: `complete` ✓
 
 #### 3.2 周刊关联卡片组件
 - **Task 3.2.1**: 创建周刊关联卡片组件
@@ -155,7 +155,7 @@
     - 显示推荐周刊（未关联时）
     - 关联/取消关联按钮
     - 更换周刊下拉选择
-  - 状态: `pending`
+  - 状态: `complete` ✓
 
 #### 3.3 集成到内容详情页
 - **Task 3.3.1**: 在内容编辑器中集成周刊关联卡片
@@ -164,7 +164,7 @@
     - 在右侧边栏或底部添加 WeeklyLinkCard
     - 传入 contentId
   - 依赖: Task 3.1.1, Task 3.2.1
-  - 状态: `pending`
+  - 状态: `complete` ✓
 
 ---
 
@@ -176,7 +176,7 @@
   - 功能:
     - `usePendingContents(weeklyId)`: 获取待关联内容
     - `useBatchLinkContents()`: 批量关联
-  - 状态: `pending`
+  - 状态: `complete` ✓
 
 #### 4.2 待关联提示栏组件
 - **Task 4.2.1**: 创建待关联提示栏组件
@@ -185,7 +185,7 @@
     - 显示"本周有 X 篇未关联内容"
     - "批量关联"按钮
     - 点击展开待关联内容列表
-  - 状态: `pending`
+  - 状态: `complete` ✓
 
 #### 4.3 完整度指示器组件
 - **Task 4.3.1**: 创建完整度指示器组件
@@ -194,7 +194,7 @@
     - 进度条显示 "8/15 篇"
     - 颜色：< 10 篇黄色，10-15 篇绿色，> 15 篇蓝色
     - 提示文字："建议 10-15 篇内容"
-  - 状态: `pending`
+  - 状态: `complete` ✓
 
 #### 4.4 结果摘要弹窗组件
 - **Task 4.4.1**: 创建结果摘要弹窗组件
@@ -203,7 +203,7 @@
     - 显示关联成功的内容列表
     - 显示跳过的内容及原因
     - 关闭按钮
-  - 状态: `pending`
+  - 状态: `complete` ✓
 
 #### 4.5 集成到周刊编辑页
 - **Task 4.5.1**: 在周刊编辑器中集成增强组件
@@ -213,7 +213,7 @@
     - 添加 CompletenessIndicator
     - 批量关联后显示 LinkResultDialog
   - 依赖: Task 4.1.1 ~ 4.4.1
-  - 状态: `pending`
+  - 状态: `complete` ✓
 
 #### 4.6 拖拽体验优化
 - **Task 4.6.1**: 优化拖拽排序体验
@@ -222,7 +222,7 @@
     - 检查当前拖拽库实现
     - 优化拖拽动画和视觉反馈
     - 添加拖拽占位符样式
-  - 状态: `pending`
+  - 状态: `complete` ✓
 
 ---
 
@@ -235,7 +235,7 @@
     - API Key 认证说明
     - 日志监控建议
     - 故障排查指南
-  - 状态: `pending`
+  - 状态: `complete` ✓
 
 ---
 
@@ -248,7 +248,7 @@
     - 自动创建测试
     - 自动关联测试
     - 边界情况测试
-  - 状态: `pending`
+  - 状态: `complete` ✓ (测试文件已创建，需安装 jsdom 依赖运行)
 
 - **Task 6.2.1**: 端到端测试
   - 手动测试:
@@ -256,7 +256,7 @@
     - 自动创建 API
     - 自动关联 API
     - 前端交互流程
-  - 状态: `pending`
+  - 状态: `pending` (需手动验证)
 
 ---
 
@@ -339,13 +339,13 @@ Phase 6 (测试) ──> 依赖所有 Phase
 
 | Phase | 总任务 | 完成 | 进度 |
 |-------|--------|------|------|
-| Phase 1 | 9 | 0 | 0% |
-| Phase 2 | 3 | 0 | 0% |
-| Phase 3 | 3 | 0 | 0% |
-| Phase 4 | 6 | 0 | 0% |
-| Phase 5 | 1 | 0 | 0% |
-| Phase 6 | 2 | 0 | 0% |
-| **总计** | **24** | **0** | **0%** |
+| Phase 1 | 9 | 9 | 100% |
+| Phase 2 | 3 | 3 | 100% |
+| Phase 3 | 3 | 3 | 100% |
+| Phase 4 | 6 | 6 | 100% |
+| Phase 5 | 1 | 1 | 100% |
+| Phase 6 | 2 | 1 | 50% |
+| **总计** | **24** | **23** | **96%** |
 
 ---
 
