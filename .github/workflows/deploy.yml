@@ -213,7 +213,7 @@ jobs:
             fi
 
       - name: Send WeChat Work notification
-        if: always() && secrets.WECOM_WEBHOOK_URL != ''
+        if: always()
         env:
           WECOM_WEBHOOK_URL: ${{ secrets.WECOM_WEBHOOK_URL }}
         run: |
@@ -237,12 +237,16 @@ jobs:
           MESSAGE+="**触发者**: ${{ github.actor }}\n"
           MESSAGE+="**时间**: $(date '+%Y-%m-%d %H:%M:%S')"
 
-          # 发送通知
-          curl -s -X POST "$WECOM_WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"msgtype\": \"markdown\",
-              \"markdown\": {
-                \"content\": \"$MESSAGE\"
-              }
-            }" || echo "⚠️ 企业微信通知发送失败"
+          # 发送通知（仅当 WECOM_WEBHOOK_URL 已配置时）
+          if [ -n "$WECOM_WEBHOOK_URL" ]; then
+            curl -s -X POST "$WECOM_WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"msgtype\": \"markdown\",
+                \"markdown\": {
+                  \"content\": \"$MESSAGE\"
+                }
+              }" || echo "⚠️ 企业微信通知发送失败"
+          else
+            echo "⚠️ WECOM_WEBHOOK_URL 未配置，跳过通知"
+          fi
