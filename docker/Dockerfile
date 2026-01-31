@@ -4,7 +4,7 @@ FROM node:20-alpine AS base
 # Install system dependencies and enable corepack for pnpm
 RUN apk add --no-cache libc6-compat curl && \
     corepack enable && \
-    corepack prepare pnpm@8.14.1 --activate
+    corepack prepare pnpm@9 --activate
 
 # Dependencies stage
 FROM base AS deps
