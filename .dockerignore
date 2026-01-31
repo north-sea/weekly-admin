@@ -39,7 +39,7 @@ Thumbs.db
 
 # Documentation
 README.md
-*.md
+docs/
 
 # Test files
 **/*.test.ts
@@ -56,12 +56,11 @@ eslint.config.mjs
 prisma/prisma/dev.db*
 database/*.sql
 
-# Scripts (except healthcheck)
-scripts/
-!healthcheck.js
-
 # Kiro specs
 .kiro/
+
+# Claude
+.claude/
 
 # Logs
 logs

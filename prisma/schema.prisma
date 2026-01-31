@@ -9,15 +9,16 @@ datasource db {
 }
 
 model categories {
-  id          Int        @id @default(autoincrement())
-  name        String     @db.VarChar(100)
-  slug        String     @db.VarChar(100)
-  parent_id   Int?
-  sort_order  Int?       @default(0)
-  description String?    @db.Text
-  created_at  DateTime?  @default(now()) @db.Timestamp(0)
-  updated_at  DateTime?  @default(now()) @db.Timestamp(0)
-  contents    contents[]
+  id           Int            @id @default(autoincrement())
+  name         String         @db.VarChar(100)
+  slug         String         @db.VarChar(100)
+  parent_id    Int?
+  sort_order   Int?           @default(0)
+  description  String?        @db.Text
+  archived     Boolean?       @default(false)
+  created_at   DateTime?      @default(now()) @db.Timestamp(0)
+  updated_at   DateTime?      @default(now()) @db.Timestamp(0)
+  contents     contents[]
   data_sources data_sources[]
 }
 
@@ -156,14 +157,31 @@ model operation_logs {
   @@index([resource_id], map: "idx_resource_id")
 }
 
+model tag_groups {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique @db.VarChar(50)
+  slug        String    @unique @db.VarChar(50)
+  description String?   @db.Text
+  color       String?   @db.VarChar(20)
+  sort_order  Int       @default(0)
+  created_at  DateTime? @default(now()) @db.Timestamp(0)
+  updated_at  DateTime? @default(now()) @db.Timestamp(0)
+  tags        tags[]
+}
+
 model tags {
   id           Int            @id @default(autoincrement())
   name         String         @unique(map: "name") @db.VarChar(100)
   slug         String         @unique(map: "slug") @db.VarChar(100)
+  group_id     Int?
+  aliases      String?        @db.Text
   count        Int?           @default(0)
   created_at   DateTime?      @default(now()) @db.Timestamp(0)
   updated_at   DateTime?      @default(now()) @db.Timestamp(0)
   content_tags content_tags[]
+  group        tag_groups?    @relation(fields: [group_id], references: [id], onDelete: SetNull)
+
+  @@index([group_id])
 }
 
 model users {

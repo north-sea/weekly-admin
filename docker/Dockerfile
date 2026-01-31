@@ -1,34 +1,31 @@
 # Multi-stage production Dockerfile for Next.js application
 FROM node:20-alpine AS base
 
-# Install system dependencies
-RUN apk add --no-cache libc6-compat curl
+# Install system dependencies and enable corepack for pnpm
+RUN apk add --no-cache libc6-compat curl && \
+    corepack enable && \
+    corepack prepare pnpm@latest --activate
 
 # Dependencies stage
 FROM base AS deps
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
-
-# Copy package files
+# Copy package files first (for better cache utilization)
 COPY package.json pnpm-lock.yaml ./
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile || pnpm install
+RUN pnpm install --frozen-lockfile
 
 # Builder stage
 FROM base AS builder
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
-
-# Copy dependencies
+# Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
 
-# Copy application code
-COPY . .
+# Copy package files and prisma schema first (changes less frequently)
+COPY package.json pnpm-lock.yaml ./
+COPY prisma ./prisma/
 
 # 设置构建时数据库连接参数
 ARG DATABASE_URL="mysql://user:password@localhost:3306/temp_db"
@@ -37,37 +34,34 @@ ENV DATABASE_URL=${DATABASE_URL}
 # Generate Prisma client
 RUN pnpm prisma generate
 
+# Copy application source code (changes most frequently)
+COPY . .
+
 # Build the application with production optimizations
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 RUN pnpm build:production
 
-# Production runner stage
-FROM base AS runner
+# Production runner stage (no pnpm needed for standalone mode)
+FROM node:20-alpine AS runner
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install only curl for health checks and create non-root user
+RUN apk add --no-cache curl && \
+    addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
 
 # Production environment variables
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-
-# Monitoring and logging configuration
-ENV LOG_LEVEL=info
-ENV SERVICE_NAME=weekly-content-management
-ENV ENABLE_RESOURCE_MONITORING=true
-ENV RESOURCE_MONITORING_INTERVAL=30000
-
-# Performance monitoring thresholds
-ENV MEMORY_WARNING_THRESHOLD=80
-ENV MEMORY_CRITICAL_THRESHOLD=90
-ENV CPU_WARNING_THRESHOLD=80
-ENV CPU_CRITICAL_THRESHOLD=90
-
-# Create non-root user for security
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    LOG_LEVEL=info \
+    SERVICE_NAME=weekly-content-management \
+    ENABLE_RESOURCE_MONITORING=true \
+    RESOURCE_MONITORING_INTERVAL=30000 \
+    MEMORY_WARNING_THRESHOLD=80 \
+    MEMORY_CRITICAL_THRESHOLD=90 \
+    CPU_WARNING_THRESHOLD=80 \
+    CPU_CRITICAL_THRESHOLD=90
 
 # Copy built application
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./

@@ -24,10 +24,11 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { useTagList, useCreateTag, useUpdateTag, useDeleteTag, useAllTags } from '@/hooks/queries/useTagQueries';
+import { useAllTagGroups } from '@/hooks/queries/useTagGroupQueries';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { Plus, Edit, Trash2, Search, GitMerge, ChevronLeft, ChevronRight, Cloud, LayoutList, Sparkles } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, GitMerge, ChevronLeft, ChevronRight, Cloud, LayoutList, Sparkles, FolderOpen } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TagCloud, TagStatsCard, UnusedTagsCleanupDialog, TagMergeWizard } from '@/components/tags';
+import { TagCloud, TagStatsCard, UnusedTagsCleanupDialog, TagMergeWizard, TagGroupManager, TagAliasEditor, SimilarTagWarning } from '@/components/tags';
 
 const slugify = (value: string) =>
   value
@@ -43,17 +44,21 @@ export default function TagsSettingsPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isMergeDialogOpen, setIsMergeDialogOpen] = useState(false);
   const [isCleanupDialogOpen, setIsCleanupDialogOpen] = useState(false);
+  const [isGroupManagerOpen, setIsGroupManagerOpen] = useState(false);
   const [editingTag, setEditingTag] = useState<any>(null);
-  const [formData, setFormData] = useState({ name: '', slug: '' });
+  const [formData, setFormData] = useState({ name: '', slug: '', group_id: '', aliases: [] as string[] });
   const [slugEdited, setSlugEdited] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [viewMode, setViewMode] = useState<'list' | 'cloud'>('list');
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
 
+  const { data: tagGroups = [] } = useAllTagGroups();
   const { data: tagsData, isLoading } = useTagList({
     search: debouncedSearchQuery || undefined,
+    group_id: selectedGroupId !== 'all' ? Number(selectedGroupId) : undefined,
     page,
     pageSize,
     sort_by: 'count',
@@ -104,14 +109,17 @@ export default function TagsSettingsPage() {
         (formData.slug && formData.slug.trim()) ||
         slugify(formData.name) ||
         `tag-${Date.now()}`;
-      const payload = {
+      const payload: any = {
         name: formData.name.trim(),
         slug,
       };
+      if (formData.group_id && formData.group_id !== 'none') {
+        payload.group_id = Number(formData.group_id);
+      }
       await createTag.mutateAsync(payload);
       toast({ title: '创建成功', description: '标签已成功创建' });
       setIsCreateDialogOpen(false);
-      setFormData({ name: '', slug: '' });
+      setFormData({ name: '', slug: '', group_id: '', aliases: [] });
       setSlugEdited(false);
     } catch (error: any) {
       toast({
@@ -129,11 +137,22 @@ export default function TagsSettingsPage() {
         (formData.slug && formData.slug.trim()) ||
         slugify(formData.name) ||
         editingTag.slug;
-      await updateTag.mutateAsync({ id: editingTag.id, name: formData.name.trim(), slug });
+      const payload: any = {
+        id: editingTag.id,
+        name: formData.name.trim(),
+        slug,
+        aliases: formData.aliases,
+      };
+      if (formData.group_id === 'none') {
+        payload.group_id = null;
+      } else if (formData.group_id) {
+        payload.group_id = Number(formData.group_id);
+      }
+      await updateTag.mutateAsync(payload);
       toast({ title: '更新成功', description: '标签已成功更新' });
       setIsEditDialogOpen(false);
       setEditingTag(null);
-      setFormData({ name: '', slug: '' });
+      setFormData({ name: '', slug: '', group_id: '', aliases: [] });
       setSlugEdited(false);
     } catch (error: any) {
       toast({
@@ -167,6 +186,8 @@ export default function TagsSettingsPage() {
     setFormData({
       name: tag.name,
       slug: tag.slug,
+      group_id: tag.group_id ? String(tag.group_id) : 'none',
+      aliases: tag.aliases || [],
     });
     setSlugEdited(false);
     setIsEditDialogOpen(true);
@@ -181,6 +202,10 @@ export default function TagsSettingsPage() {
           <p className="text-sm text-muted-foreground">管理内容标签</p>
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
+          <Button variant="outline" onClick={() => setIsGroupManagerOpen(true)}>
+            <FolderOpen className="h-4 w-4 mr-2" />
+            标签组
+          </Button>
           <Button variant="outline" onClick={() => setIsCleanupDialogOpen(true)}>
             <Sparkles className="h-4 w-4 mr-2" />
             清理未使用
@@ -222,6 +247,31 @@ export default function TagsSettingsPage() {
                   className="pl-10"
                 />
               </div>
+              <Select
+                value={selectedGroupId}
+                onValueChange={(val) => {
+                  setSelectedGroupId(val);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger className="w-full sm:w-40">
+                  <SelectValue placeholder="全部分组" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部分组</SelectItem>
+                  {tagGroups.map((group) => (
+                    <SelectItem key={group.id} value={String(group.id)}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: group.color || '#3b82f6' }}
+                        />
+                        {group.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <div className="flex rounded border border-border">
                 <Button
                   variant={viewMode === 'list' ? 'secondary' : 'ghost'}
@@ -268,14 +318,32 @@ export default function TagsSettingsPage() {
                       key={tag.id}
                       className="flex items-center justify-between p-4 border rounded hover:bg-accent/50 transition-colors"
                     >
-                      <div className="flex items-center gap-3">
-                        <Badge variant="secondary">{tag.name}</Badge>
-                        <div>
-                          <p className="text-sm text-muted-foreground">Slug: {tag.slug}</p>
-                          <p className="text-xs text-muted-foreground">使用次数: {tag.count ?? tag.content_count ?? 0}</p>
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <Badge variant="secondary" className="shrink-0">{tag.name}</Badge>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm text-muted-foreground">Slug: {tag.slug}</p>
+                            {tag.group && (
+                              <Badge
+                                variant="outline"
+                                className="text-xs"
+                                style={{ borderColor: tag.group.color || '#3b82f6' }}
+                              >
+                                {tag.group.name}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-xs text-muted-foreground">使用次数: {tag.count ?? tag.content_count ?? 0}</p>
+                            {tag.aliases && tag.aliases.length > 0 && (
+                              <p className="text-xs text-muted-foreground">
+                                别名: {tag.aliases.slice(0, 3).join(', ')}{tag.aliases.length > 3 ? ` +${tag.aliases.length - 3}` : ''}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 shrink-0">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -401,6 +469,13 @@ export default function TagsSettingsPage() {
                 }}
                 placeholder="输入标签名称"
               />
+              {formData.name.trim().length >= 2 && (
+                <SimilarTagWarning
+                  name={formData.name}
+                  threshold={0.7}
+                  className="mt-2"
+                />
+              )}
             </div>
             <div>
               <Label htmlFor="slug">Slug *</Label>
@@ -413,6 +488,31 @@ export default function TagsSettingsPage() {
                 }}
                 placeholder="URL 别名，仅包含小写字母、数字、连字符"
               />
+            </div>
+            <div>
+              <Label htmlFor="group">标签组</Label>
+              <Select
+                value={formData.group_id}
+                onValueChange={(val) => setFormData({ ...formData, group_id: val })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="选择标签组（可选）" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">无分组</SelectItem>
+                  {tagGroups.map((group) => (
+                    <SelectItem key={group.id} value={String(group.id)}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: group.color || '#3b82f6' }}
+                        />
+                        {group.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
@@ -434,7 +534,7 @@ export default function TagsSettingsPage() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="p-6 space-y-6">
+        <DialogContent className="p-6 space-y-6 max-w-lg">
           <DialogHeader>
             <DialogTitle>编辑标签</DialogTitle>
             <DialogDescription>修改标签信息</DialogDescription>
@@ -455,6 +555,14 @@ export default function TagsSettingsPage() {
                 }}
                 placeholder="输入标签名称"
               />
+              {formData.name.trim().length >= 2 && editingTag && formData.name !== editingTag.name && (
+                <SimilarTagWarning
+                  name={formData.name}
+                  excludeId={editingTag.id}
+                  threshold={0.7}
+                  className="mt-2"
+                />
+              )}
             </div>
             <div>
               <Label htmlFor="edit-slug">Slug *</Label>
@@ -468,6 +576,41 @@ export default function TagsSettingsPage() {
                 placeholder="URL 别名，仅包含小写字母、数字、连字符"
               />
             </div>
+            <div>
+              <Label htmlFor="edit-group">标签组</Label>
+              <Select
+                value={formData.group_id}
+                onValueChange={(val) => setFormData({ ...formData, group_id: val })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="选择标签组（可选）" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">无分组</SelectItem>
+                  {tagGroups.map((group) => (
+                    <SelectItem key={group.id} value={String(group.id)}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: group.color || '#3b82f6' }}
+                        />
+                        {group.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>别名</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                添加别名后，搜索这些名称时也能匹配到此标签
+              </p>
+              <TagAliasEditor
+                aliases={formData.aliases}
+                onChange={(aliases) => setFormData({ ...formData, aliases })}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
@@ -479,6 +622,9 @@ export default function TagsSettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Tag Group Manager */}
+      <TagGroupManager open={isGroupManagerOpen} onOpenChange={setIsGroupManagerOpen} />
     </div>
   );
 }

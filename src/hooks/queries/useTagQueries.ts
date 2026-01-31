@@ -1,10 +1,10 @@
 'use client';
 
-import { 
-  useGet, 
-  usePaginatedQuery, 
-  usePost, 
-  usePut, 
+import {
+  useGet,
+  usePaginatedQuery,
+  usePost,
+  usePut,
   useDelete,
   useOptimisticUpdate,
   useInvalidateQueries,
@@ -16,11 +16,15 @@ import { TagWithStats } from '@/types/tag';
 export interface TagInput {
   name: string;
   slug?: string;
+  group_id?: number | null;
+  aliases?: string[];
 }
 
 export interface TagUpdate {
   name?: string;
   slug?: string;
+  group_id?: number | null;
+  aliases?: string[];
 }
 
 export interface TagMergeParams {
@@ -41,6 +45,7 @@ export interface TagListResponse {
 
 export function useTagList(params?: PaginationParams & {
   search?: string;
+  group_id?: number;
   sort_by?: 'name' | 'count' | 'created_at';
   sort_order?: 'asc' | 'desc';
 }) {
@@ -52,12 +57,14 @@ export function useTagList(params?: PaginationParams & {
   queryParams.set('sort_order', params?.sort_order ?? 'desc');
 
   if (params?.search) queryParams.set('keyword', params.search);
+  if (params?.group_id !== undefined) queryParams.set('group_id', String(params.group_id));
 
   const url = `/api/tags?${queryParams.toString()}`;
 
   return useGet<TagListResponse | TagWithStats[]>(url, {
     queryKey: queryKeys.tags.list({
       keyword: params?.search,
+      group_id: params?.group_id,
       sort_by: params?.sort_by ?? 'count',
       sort_order: params?.sort_order ?? 'desc',
       page: params?.page ?? 1,
@@ -335,8 +342,8 @@ export function useBatchDeleteTags() {
 // 导入标签
 export function useImportTags() {
   const invalidate = useInvalidateQueries();
-  
-  return usePost<{ imported: number; skipped: number }, { 
+
+  return usePost<{ imported: number; skipped: number }, {
     tags: TagInput[];
     merge_duplicates?: boolean;
   }>('/api/tags/import', {
@@ -345,4 +352,49 @@ export function useImportTags() {
       invalidate.invalidateTags();
     },
   });
+}
+
+// 更新标签别名
+export function useUpdateTagAliases() {
+  const invalidate = useInvalidateQueries();
+
+  return usePut<TagWithStats, { id: number; aliases: string[] }>(
+    ({ id }) => `/api/tags/${id}/aliases`,
+    {
+      onSuccess: (data, variables) => {
+        invalidate.setQueryData(queryKeys.tags.detail(variables.id), data);
+        invalidate.invalidateTags(variables.id);
+      },
+    }
+  );
+}
+
+// 添加单个别名
+export function useAddTagAlias() {
+  const invalidate = useInvalidateQueries();
+
+  return usePost<TagWithStats, { id: number; alias: string }>(
+    ({ id }) => `/api/tags/${id}/aliases`,
+    {
+      onSuccess: (data, variables) => {
+        invalidate.setQueryData(queryKeys.tags.detail(variables.id), data);
+        invalidate.invalidateTags(variables.id);
+      },
+    }
+  );
+}
+
+// 删除单个别名
+export function useRemoveTagAlias() {
+  const invalidate = useInvalidateQueries();
+
+  return useDelete<TagWithStats, { id: number; alias: string }>(
+    ({ id, alias }) => `/api/tags/${id}/aliases?alias=${encodeURIComponent(alias)}`,
+    {
+      onSuccess: (data, variables) => {
+        invalidate.setQueryData(queryKeys.tags.detail(variables.id), data);
+        invalidate.invalidateTags(variables.id);
+      },
+    }
+  );
 }

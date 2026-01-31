@@ -55,8 +55,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest
-            type=raw,value=${{ steps.version.outputs.version }}
-            type=sha,prefix=
+            type=sha,format=short
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -66,8 +65,11 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          provenance: false
+          sbom: false
           build-args: |
             DATABASE_URL=mysql://temp:temp@localhost:3306/temp
 
@@ -78,6 +80,7 @@ jobs:
 
     steps:
       - name: Deploy to NAS via SSH
+        id: deploy
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.NAS_HOST }}
@@ -89,6 +92,8 @@ jobs:
             CONTAINER_NAME="weekly-admin"
             IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
             DEPLOY_DIR="${{ secrets.NAS_DEPLOY_DIR || '/volume1/docker/weekly-admin' }}"
+            DEPLOY_STATUS="success"
+            DEPLOY_MESSAGE=""
 
             echo "🚀 开始部署 Weekly Admin..."
             echo "📦 镜像: $IMAGE"
@@ -96,9 +101,16 @@ jobs:
             # 登录 GitHub Container Registry
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-            # 拉取最新镜像
+            # 记录旧镜像 ID（用于回滚）
+            OLD_IMAGE=$(docker inspect --format='{{.Image}}' $CONTAINER_NAME 2>/dev/null || echo "")
+            echo "📋 旧镜像 ID: ${OLD_IMAGE:-无}"
+
+            # 先拉取新镜像（服务仍在运行）
             echo "📥 拉取最新镜像..."
-            docker pull $IMAGE
+            if ! docker pull $IMAGE; then
+              echo "❌ 镜像拉取失败"
+              exit 1
+            fi
 
             # 停止并删除旧容器
             echo "🛑 停止旧容器..."
@@ -111,8 +123,7 @@ jobs:
 
             # 使用 docker-compose 或直接 docker run
             if [ -f "docker-compose.yml" ]; then
-              docker compose pull
-              docker compose up -d
+              docker compose up -d --force-recreate --remove-orphans
             else
               docker run -d \
                 --name $CONTAINER_NAME \
@@ -123,31 +134,115 @@ jobs:
                 $IMAGE
             fi
 
-            # 等待容器启动
-            echo "⏳ 等待容器启动..."
-            sleep 10
-
             # 健康检查
             echo "🔍 执行健康检查..."
-            for i in {1..6}; do
+            HEALTH_OK=false
+            for i in {1..12}; do
               if curl -sf http://localhost:3000/api/health > /dev/null; then
-                echo "✅ 部署成功！应用已启动"
-                docker ps | grep $CONTAINER_NAME
-                exit 0
+                HEALTH_OK=true
+                echo "✅ 健康检查通过"
+                break
               fi
-              echo "等待应用启动... ($i/6)"
-              sleep 10
+              echo "等待应用启动... ($i/12)"
+              sleep 5
             done
 
-            echo "❌ 健康检查失败"
-            docker logs --tail 50 $CONTAINER_NAME
-            exit 1
+            if [ "$HEALTH_OK" = true ]; then
+              echo "✅ 部署成功！"
+              docker ps | grep $CONTAINER_NAME
 
-      - name: Notify deployment status
-        if: always()
+              # 清理悬空镜像
+              echo "🧹 清理旧镜像..."
+              docker image prune -f
+
+              DEPLOY_STATUS="success"
+              DEPLOY_MESSAGE="部署成功"
+            else
+              echo "❌ 健康检查失败，尝试回滚..."
+              docker logs --tail 50 $CONTAINER_NAME
+
+              # 尝试回滚
+              if [ -n "$OLD_IMAGE" ]; then
+                echo "🔄 回滚到上一版本..."
+                docker stop $CONTAINER_NAME 2>/dev/null || true
+                docker rm $CONTAINER_NAME 2>/dev/null || true
+
+                if [ -f "docker-compose.yml" ]; then
+                  # 使用旧镜像重新启动
+                  docker run -d \
+                    --name $CONTAINER_NAME \
+                    --restart unless-stopped \
+                    --env-file .env \
+                    -p 3000:3000 \
+                    --network bridge \
+                    $OLD_IMAGE
+                else
+                  docker run -d \
+                    --name $CONTAINER_NAME \
+                    --restart unless-stopped \
+                    --env-file .env \
+                    -p 3000:3000 \
+                    --network bridge \
+                    $OLD_IMAGE
+                fi
+
+                # 验证回滚
+                sleep 10
+                if curl -sf http://localhost:3000/api/health > /dev/null; then
+                  echo "✅ 回滚成功"
+                  DEPLOY_STATUS="rollback"
+                  DEPLOY_MESSAGE="部署失败，已回滚到上一版本"
+                else
+                  echo "❌ 回滚也失败了"
+                  DEPLOY_STATUS="failed"
+                  DEPLOY_MESSAGE="部署失败，回滚也失败"
+                fi
+              else
+                DEPLOY_STATUS="failed"
+                DEPLOY_MESSAGE="部署失败，无可用的回滚版本"
+              fi
+            fi
+
+            # 输出状态供后续步骤使用
+            echo "DEPLOY_STATUS=$DEPLOY_STATUS" >> /tmp/deploy_result
+            echo "DEPLOY_MESSAGE=$DEPLOY_MESSAGE" >> /tmp/deploy_result
+
+            # 如果最终状态是失败，返回错误码
+            if [ "$DEPLOY_STATUS" = "failed" ]; then
+              exit 1
+            fi
+
+      - name: Send WeChat Work notification
+        if: always() && secrets.WECOM_WEBHOOK_URL != ''
+        env:
+          WECOM_WEBHOOK_URL: ${{ secrets.WECOM_WEBHOOK_URL }}
         run: |
-          if [ "${{ job.status }}" == "success" ]; then
-            echo "✅ 部署成功"
+          # 确定状态和颜色
+          if [ "${{ steps.deploy.outcome }}" == "success" ]; then
+            STATUS="✅ 部署成功"
+            COLOR="info"
+          elif [ "${{ steps.deploy.outcome }}" == "failure" ]; then
+            STATUS="❌ 部署失败"
+            COLOR="warning"
           else
-            echo "❌ 部署失败"
+            STATUS="⚠️ 部署状态未知"
+            COLOR="comment"
           fi
+
+          # 构建消息
+          MESSAGE="### Weekly Admin 部署通知\n"
+          MESSAGE+="> 状态: <font color=\"$COLOR\">$STATUS</font>\n\n"
+          MESSAGE+="**分支**: main\n"
+          MESSAGE+="**提交**: ${{ github.sha }}\n"
+          MESSAGE+="**触发者**: ${{ github.actor }}\n"
+          MESSAGE+="**时间**: $(date '+%Y-%m-%d %H:%M:%S')"
+
+          # 发送通知
+          curl -s -X POST "$WECOM_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"msgtype\": \"markdown\",
+              \"markdown\": {
+                \"content\": \"$MESSAGE\"
+              }
+            }" || echo "⚠️ 企业微信通知发送失败"

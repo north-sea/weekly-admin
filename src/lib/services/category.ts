@@ -1,7 +1,8 @@
-import { CategoryInput, CategoryUpdate, CategoryQuery, CategoryMerge } from '@/lib/validations/category';
+import { CategoryInput, CategoryUpdate, CategoryQuery, CategoryMerge, CategoryMove, CategoryArchive, CategoryMigrate } from '@/lib/validations/category';
 import { prisma } from '@/lib/db';
 import { OperationLogger } from '@/lib/middleware/operation-logger';
 import { NextRequest } from 'next/server';
+import { DEFAULT_MAX_DEPTH } from '@/lib/utils/category-helpers';
 
 export interface CategoryWithStats {
   id: number;
@@ -456,28 +457,405 @@ export class CategoryService {
         content_count: contentCount
       });
     }
-    
+
     // 按内容数量排序
     return result.sort((a, b) => b.content_count - a.content_count);
   }
-  
+
   // 检查循环引用
   private static async checkCircularReference(categoryId: number, parentId: number): Promise<boolean> {
     let currentParentId: number | undefined = parentId;
-    
+
     while (currentParentId) {
       if (currentParentId === categoryId) {
         return true;
       }
-      
+
       const parent: { parent_id: number | null } | null = await prisma.categories.findUnique({
         where: { id: currentParentId },
         select: { parent_id: true }
       });
-      
+
       currentParentId = parent?.parent_id || undefined;
     }
-    
+
     return false;
+  }
+
+  // 计算分类深度
+  private static async getCategoryDepth(categoryId: number): Promise<number> {
+    let depth = 0;
+    let currentId: number | undefined = categoryId;
+
+    while (currentId) {
+      const cat: { parent_id: number | null } | null = await prisma.categories.findUnique({
+        where: { id: currentId },
+        select: { parent_id: true },
+      });
+
+      if (!cat?.parent_id) break;
+      depth++;
+      currentId = cat.parent_id;
+
+      // 防止无限循环
+      if (depth > 100) break;
+    }
+
+    return depth;
+  }
+
+  // 获取子树最大深度
+  private static async getSubtreeMaxDepth(categoryId: number): Promise<number> {
+    const children = await prisma.categories.findMany({
+      where: { parent_id: categoryId },
+      select: { id: true },
+    });
+
+    if (children.length === 0) return 0;
+
+    let maxChildDepth = 0;
+    for (const child of children) {
+      const childDepth = await this.getSubtreeMaxDepth(child.id);
+      maxChildDepth = Math.max(maxChildDepth, childDepth);
+    }
+
+    return 1 + maxChildDepth;
+  }
+
+  // 移动分类（更改父级和排序）
+  static async moveCategory(
+    data: CategoryMove,
+    maxDepth: number = DEFAULT_MAX_DEPTH,
+    userId?: number,
+    request?: NextRequest
+  ): Promise<CategoryWithStats> {
+    const { id, parent_id, sort_order } = data;
+
+    // 检查分类是否存在
+    const category = await prisma.categories.findUnique({
+      where: { id },
+    });
+
+    if (!category) {
+      throw new Error('分类不存在');
+    }
+
+    // 不能将自己设为父分类
+    if (parent_id === id) {
+      throw new Error('不能将自己设为父分类');
+    }
+
+    // 检查新父分类是否存在
+    if (parent_id !== null) {
+      const parentCategory = await prisma.categories.findUnique({
+        where: { id: parent_id },
+      });
+
+      if (!parentCategory) {
+        throw new Error('目标父分类不存在');
+      }
+
+      // 检查循环引用
+      const isCircular = await this.checkCircularReference(id, parent_id);
+      if (isCircular) {
+        throw new Error('不能形成循环引用');
+      }
+
+      // 检查深度限制
+      const targetDepth = await this.getCategoryDepth(parent_id);
+      const subtreeDepth = await this.getSubtreeMaxDepth(id);
+
+      if (targetDepth + subtreeDepth + 1 >= maxDepth) {
+        throw new Error(`移动后将超过最大层级深度限制 (${maxDepth} 层)`);
+      }
+    }
+
+    // 更新分类
+    const updated = await prisma.categories.update({
+      where: { id },
+      data: {
+        parent_id,
+        sort_order,
+        updated_at: new Date(),
+      },
+    });
+
+    // 获取内容数量
+    const contentCount = await prisma.contents.count({
+      where: { category_id: id },
+    });
+
+    const result: CategoryWithStats = {
+      id: updated.id,
+      name: updated.name,
+      slug: updated.slug,
+      parent_id: updated.parent_id || undefined,
+      description: updated.description || undefined,
+      sort_order: updated.sort_order || 0,
+      created_at: updated.created_at || undefined,
+      updated_at: updated.updated_at || undefined,
+      content_count: contentCount,
+    };
+
+    if (userId) {
+      await OperationLogger.logTaxonomyOperation(
+        userId,
+        'UPDATE',
+        'category',
+        id,
+        {
+          name: updated.name,
+          action: 'move',
+          changes: { parent_id, sort_order },
+        },
+        request
+      );
+    }
+
+    return result;
+  }
+
+  // 归档/取消归档分类
+  static async archiveCategory(
+    data: CategoryArchive,
+    userId?: number,
+    request?: NextRequest
+  ): Promise<CategoryWithStats> {
+    const { id, archived } = data;
+
+    // 检查分类是否存在
+    const category = await prisma.categories.findUnique({
+      where: { id },
+    });
+
+    if (!category) {
+      throw new Error('分类不存在');
+    }
+
+    // 更新归档状态
+    const updated = await prisma.categories.update({
+      where: { id },
+      data: {
+        archived,
+        updated_at: new Date(),
+      },
+    });
+
+    // 获取内容数量
+    const contentCount = await prisma.contents.count({
+      where: { category_id: id },
+    });
+
+    const result: CategoryWithStats = {
+      id: updated.id,
+      name: updated.name,
+      slug: updated.slug,
+      parent_id: updated.parent_id || undefined,
+      description: updated.description || undefined,
+      sort_order: updated.sort_order || 0,
+      created_at: updated.created_at || undefined,
+      updated_at: updated.updated_at || undefined,
+      content_count: contentCount,
+    };
+
+    if (userId) {
+      await OperationLogger.logTaxonomyOperation(
+        userId,
+        'UPDATE',
+        'category',
+        id,
+        {
+          name: updated.name,
+          action: archived ? 'archive' : 'unarchive',
+        },
+        request
+      );
+    }
+
+    return result;
+  }
+
+  // 检查是否可以在指定父分类下创建子分类
+  static async canCreateChild(
+    parentId: number | null,
+    maxDepth: number = DEFAULT_MAX_DEPTH
+  ): Promise<boolean> {
+    if (parentId === null) {
+      return true; // 根级分类总是可以创建
+    }
+
+    const parentDepth = await this.getCategoryDepth(parentId);
+    return parentDepth < maxDepth - 1;
+  }
+
+  // 获取分类迁移预览信息
+  static async getMigrationPreview(sourceId: number): Promise<{
+    category: CategoryWithStats;
+    contentCount: number;
+    childrenCount: number;
+    children: Array<{ id: number; name: string; contentCount: number }>;
+  }> {
+    const category = await this.getCategoryById(sourceId);
+    if (!category) {
+      throw new Error('分类不存在');
+    }
+
+    // 获取直接子分类
+    const children = await prisma.categories.findMany({
+      where: { parent_id: sourceId },
+      select: { id: true, name: true },
+    });
+
+    // 获取每个子分类的内容数量
+    const childrenWithCount = await Promise.all(
+      children.map(async (child) => {
+        const count = await prisma.contents.count({
+          where: { category_id: child.id },
+        });
+        return { id: child.id, name: child.name, contentCount: count };
+      })
+    );
+
+    return {
+      category,
+      contentCount: category.content_count,
+      childrenCount: children.length,
+      children: childrenWithCount,
+    };
+  }
+
+  // 迁移分类内容并删除分类
+  static async migrateAndDelete(
+    data: CategoryMigrate,
+    userId?: number,
+    request?: NextRequest
+  ): Promise<{
+    migratedContentCount: number;
+    migratedChildrenCount: number;
+    deletedCategoryId: number;
+  }> {
+    const { source_id, target_id, migrate_children } = data;
+
+    // 检查源分类是否存在
+    const sourceCategory = await prisma.categories.findUnique({
+      where: { id: source_id },
+    });
+
+    if (!sourceCategory) {
+      throw new Error('源分类不存在');
+    }
+
+    // 如果指定了目标分类，检查是否存在
+    if (target_id !== null) {
+      const targetCategory = await prisma.categories.findUnique({
+        where: { id: target_id },
+      });
+
+      if (!targetCategory) {
+        throw new Error('目标分类不存在');
+      }
+
+      if (target_id === source_id) {
+        throw new Error('目标分类不能与源分类相同');
+      }
+    }
+
+    // 获取源分类的内容数量
+    const contentCount = await prisma.contents.count({
+      where: { category_id: source_id },
+    });
+
+    // 获取子分类数量
+    const childrenCount = await prisma.categories.count({
+      where: { parent_id: source_id },
+    });
+
+    // 执行迁移
+    await prisma.$transaction(async (tx) => {
+      // 迁移内容到目标分类
+      if (target_id !== null) {
+        await tx.contents.updateMany({
+          where: { category_id: source_id },
+          data: { category_id: target_id },
+        });
+      } else {
+        // 如果没有目标分类，将内容的分类置空
+        await tx.contents.updateMany({
+          where: { category_id: source_id },
+          data: { category_id: null },
+        });
+      }
+
+      // 处理子分类
+      if (migrate_children && target_id !== null) {
+        // 将子分类迁移到目标分类下
+        await tx.categories.updateMany({
+          where: { parent_id: source_id },
+          data: { parent_id: target_id, updated_at: new Date() },
+        });
+      } else {
+        // 将子分类提升到根级
+        await tx.categories.updateMany({
+          where: { parent_id: source_id },
+          data: { parent_id: null, updated_at: new Date() },
+        });
+      }
+
+      // 删除源分类
+      await tx.categories.delete({
+        where: { id: source_id },
+      });
+    });
+
+    // 记录操作日志
+    if (userId) {
+      await OperationLogger.logTaxonomyOperation(
+        userId,
+        'DELETE',
+        'category',
+        source_id,
+        {
+          name: sourceCategory.name,
+          action: 'migrate_and_delete',
+          affectedContentCount: contentCount,
+          changes: {
+            migratedTo: target_id,
+            migratedChildrenCount: migrate_children ? childrenCount : 0,
+          },
+        },
+        request
+      );
+    }
+
+    return {
+      migratedContentCount: contentCount,
+      migratedChildrenCount: migrate_children ? childrenCount : 0,
+      deletedCategoryId: source_id,
+    };
+  }
+
+  // 获取可作为迁移目标的分类列表
+  static async getAvailableMigrationTargets(
+    sourceId: number
+  ): Promise<CategoryWithStats[]> {
+    // 获取所有分类
+    const allCategories = await this.getAllCategories();
+
+    // 获取源分类的所有子孙 ID
+    const descendantIds = new Set<number>();
+    const collectDescendants = (parentId: number) => {
+      allCategories.forEach((cat) => {
+        if (cat.parent_id === parentId && !descendantIds.has(cat.id)) {
+          descendantIds.add(cat.id);
+          collectDescendants(cat.id);
+        }
+      });
+    };
+    collectDescendants(sourceId);
+
+    // 排除源分类及其子孙
+    return allCategories.filter(
+      (cat) => cat.id !== sourceId && !descendantIds.has(cat.id)
+    );
   }
 }

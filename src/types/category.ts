@@ -5,6 +5,7 @@ export interface CategoryWithStats {
   parent_id?: number;
   description?: string;
   sort_order: number;
+  archived?: boolean;
   created_at?: string;
   updated_at?: string;
   content_count: number;
@@ -14,4 +15,5 @@ export interface CategoryWithStats {
     name: string;
     slug: string;
   };
+  depth?: number;
 }

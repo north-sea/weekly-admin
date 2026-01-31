@@ -9,7 +9,9 @@ export type AiPromptScene =
   | 'summary_score'
   | 'weekly_organize'
   | 'weekly_desc'
-  | 'weekly_cover';
+  | 'weekly_cover'
+  | 'tag_recommend'
+  | 'category_recommend';
 
 export type AiPromptDefinition = {
   scene: AiPromptScene;
@@ -149,6 +151,83 @@ export const DEFAULT_AI_PROMPTS: Record<AiPromptScene, AiPromptDefinition> = {
     variables: ['title', 'contents_summary'],
     prompt:
       'Design a sleek, modern cover image for a Chinese tech/design weekly digest. Title: "{{title}}". Topics: {{contents_summary}}. Tone: dark elegant, subtle gradient, clean typography.',
+  },
+  tag_recommend: {
+    scene: 'tag_recommend',
+    name: '标签推荐',
+    variables: ['title', 'summary', 'content', 'existing_tags'],
+    prompt: [
+      '你是一个内容标签推荐助手。根据以下内容，推荐最合适的标签。',
+      '',
+      '## 内容信息',
+      '标题：{{title}}',
+      '{{#summary}}',
+      '摘要：{{summary}}',
+      '{{/summary}}',
+      '{{#content}}',
+      '正文：{{content}}',
+      '{{/content}}',
+      '',
+      '## 现有标签库',
+      '{{existing_tags}}',
+      '',
+      '## 要求',
+      '1. 优先从现有标签库中选择匹配的标签',
+      '2. 如果现有标签不足以描述内容，可以建议新标签',
+      '3. 推荐 3-8 个最相关的标签',
+      '4. 每个标签给出置信度（0-1）和推荐理由',
+      '5. 标签应该具体、有意义，避免过于宽泛',
+      '',
+      '## 输出格式',
+      '返回 JSON 格式：',
+      '{',
+      '  "recommendations": [',
+      '    {',
+      '      "tag_name": "标签名称",',
+      '      "confidence": 0.95,',
+      '      "reason": "推荐理由"',
+      '    }',
+      '  ]',
+      '}',
+    ].join('\n'),
+  },
+  category_recommend: {
+    scene: 'category_recommend',
+    name: '分类推荐',
+    variables: ['title', 'summary', 'content', 'existing_categories'],
+    prompt: [
+      '你是一个内容分类推荐助手。根据以下内容，推荐最合适的分类。',
+      '',
+      '## 内容信息',
+      '标题：{{title}}',
+      '{{#summary}}',
+      '摘要：{{summary}}',
+      '{{/summary}}',
+      '{{#content}}',
+      '正文：{{content}}',
+      '{{/content}}',
+      '',
+      '## 现有分类',
+      '{{existing_categories}}',
+      '',
+      '## 要求',
+      '1. 从现有分类中选择最匹配的分类',
+      '2. 只推荐 1-3 个最相关的分类',
+      '3. 每个分类给出置信度（0-1）和推荐理由',
+      '4. 优先推荐叶子节点分类',
+      '',
+      '## 输出格式',
+      '返回 JSON 格式：',
+      '{',
+      '  "recommendations": [',
+      '    {',
+      '      "category_name": "分类名称",',
+      '      "confidence": 0.95,',
+      '      "reason": "推荐理由"',
+      '    }',
+      '  ]',
+      '}',
+    ].join('\n'),
   },
 };
 
