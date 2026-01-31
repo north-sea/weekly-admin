@@ -3,7 +3,7 @@ FROM node:20-alpine AS base
 
 # Install system dependencies and pnpm
 RUN apk add --no-cache libc6-compat curl && \
-    npm install -g pnpm@9.15.0
+    npm install -g pnpm@10
 
 # Dependencies stage
 FROM base AS deps
