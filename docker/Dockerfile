@@ -1,8 +1,9 @@
 # Multi-stage production Dockerfile for Next.js application
-FROM node:20-alpine AS base
+# Use full node image for builder to avoid Alpine compatibility issues
+FROM node:20 AS base
 
 # Install system dependencies and pnpm
-RUN apk add --no-cache libc6-compat curl && \
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/* && \
     npm install -g pnpm@10
 
 # Dependencies stage
