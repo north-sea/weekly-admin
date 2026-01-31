@@ -39,6 +39,7 @@ COPY . .
 # Build the application with production optimizations
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN pnpm build:production
 
 # Production runner stage (no pnpm needed for standalone mode)
