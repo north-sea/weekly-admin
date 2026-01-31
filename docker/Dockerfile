@@ -1,10 +1,9 @@
 # Multi-stage production Dockerfile for Next.js application
 FROM node:20-alpine AS base
 
-# Install system dependencies and enable corepack for pnpm
+# Install system dependencies and pnpm
 RUN apk add --no-cache libc6-compat curl && \
-    corepack enable && \
-    corepack prepare pnpm@9 --activate
+    npm install -g pnpm@9.15.0
 
 # Dependencies stage
 FROM base AS deps
