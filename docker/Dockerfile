@@ -40,7 +40,7 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 ENV NODE_OPTIONS="--max-old-space-size=4096"
-RUN pnpm build:production
+RUN pnpm build:production 2>&1 || (echo "=== Build failed, showing error details ===" && cat /app/.next/trace 2>/dev/null || true && exit 1)
 
 # Production runner stage (no pnpm needed for standalone mode)
 FROM node:20-alpine AS runner
