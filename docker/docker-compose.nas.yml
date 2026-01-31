@@ -1,0 +1,55 @@
+# NAS 部署配置模板
+# 复制此文件到 NAS 的部署目录，并根据实际情况修改
+
+version: '3.8'
+
+services:
+  weekly-admin:
+    image: ghcr.io/${GITHUB_USERNAME}/weekly-admin:latest
+    container_name: weekly-admin
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    networks:
+      - weekly-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  # 可选: Watchtower 自动更新
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: unless-stopped
+    profiles:
+      - auto-update  # 使用 docker compose --profile auto-update up -d 启用
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ~/.docker/config.json:/config.json:ro
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=300
+      - WATCHTOWER_LABEL_ENABLE=true
+      - WATCHTOWER_INCLUDE_STOPPED=false
+    command: --interval 300 weekly-admin
+
+networks:
+  weekly-network:
+    driver: bridge
+    # 如果需要连接到已有网络，取消下面的注释
+    # external: true
+    # name: your-existing-network
