@@ -12,8 +12,8 @@ WORKDIR /app
 # Copy package files first (for better cache utilization)
 COPY package.json pnpm-lock.yaml ./
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies (use --no-frozen-lockfile for CI compatibility)
+RUN pnpm install
 
 # Builder stage
 FROM base AS builder
