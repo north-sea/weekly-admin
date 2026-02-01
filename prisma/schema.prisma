@@ -107,7 +107,7 @@ model contents {
   original_score       Float?
   summary_score        Float?
   ai_metadata          Json?
-  content              String                   @db.LongText
+  content              String?                  @db.LongText
   content_format       contents_content_format? @default(mdx)
   status               contents_status?         @default(draft)
   published_at         DateTime?                @db.Timestamp(0)
@@ -282,7 +282,7 @@ model inbox_items {
   image_url           String?     @db.VarChar(2048)
   favicon_url         String?     @db.VarChar(500)
   slug                String?     @db.VarChar(255)
-  source_name         String?     @db.VarChar(100)
+  source_name         String?     @db.VarChar(255)
   ai_score            Float?
   ai_score_details    Json?
   category_suggestion String?     @db.VarChar(100)

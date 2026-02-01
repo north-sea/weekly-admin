@@ -8,7 +8,7 @@ const CoverImageSchema = z.preprocess(
 // Base content schema
 export const BaseContentSchema = z.object({
   title: z.string().min(1, '标题不能为空').max(500, '标题长度不能超过500字符'),
-  content: z.string().min(1, '内容不能为空'),
+  content: z.string().optional(),
   summary: z.string().max(2000, '摘要长度不能超过2000字符').optional(),
   image_url: z.string().url('主图必须是有效的URL').optional().or(z.literal('')),
   description: z.string().max(1000, '描述长度不能超过1000字符').optional(),
@@ -68,7 +68,7 @@ export const ContentQuerySchema = z.object({
 export const ContentUpdateSchema = z.object({
   id: z.number().int().positive(),
   title: z.string().min(1, '标题不能为空').max(500, '标题长度不能超过500字符').optional(),
-  content: z.string().min(1, '内容不能为空').optional(),
+  content: z.string().optional(),
   summary: z.string().max(2000, '摘要长度不能超过2000字符').optional(),
   image_url: z.string().url('主图必须是有效的URL').optional().or(z.literal('')),
   description: z.string().max(1000, '描述长度不能超过1000字符').optional(),

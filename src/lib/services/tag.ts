@@ -347,6 +347,7 @@ export class TagService {
   // 合并标签（增强版：将源标签名转为目标标签的别名）
   static async mergeTags(data: TagMerge): Promise<void> {
     const { source_tag_ids, target_tag_id } = data;
+    const uniqueSourceIds = Array.from(new Set(source_tag_ids));
 
     // 检查目标标签是否存在
     const targetTag = await prisma.tags.findUnique({
@@ -359,15 +360,17 @@ export class TagService {
 
     // 检查源标签是否都存在
     const sourceTags = await prisma.tags.findMany({
-      where: { id: { in: source_tag_ids } }
+      where: { id: { in: uniqueSourceIds } }
     });
 
-    if (sourceTags.length !== source_tag_ids.length) {
+    const existingSourceIds = new Set(sourceTags.map((tag) => tag.id));
+    const missingSourceIds = uniqueSourceIds.filter((id) => !existingSourceIds.has(id));
+    if (sourceTags.length === 0) {
       throw new Error('部分源标签不存在');
     }
 
     // 确保目标标签不在源标签列表中
-    if (source_tag_ids.includes(target_tag_id)) {
+    if (uniqueSourceIds.includes(target_tag_id)) {
       throw new Error('目标标签不能在源标签列表中');
     }
 
@@ -375,17 +378,18 @@ export class TagService {
     const sourceTagNames = sourceTags.map(t => t.name);
     const existingAliases = parseAliases(targetTag.aliases);
     const newAliases = [...new Set([...existingAliases, ...sourceTagNames])];
+    const sourceTagIds = sourceTags.map((tag) => tag.id);
 
     // 开始事务处理
     await prisma.$transaction(async (tx) => {
       // 获取所有需要更新的内容标签关联
       const contentTags = await tx.content_tags.findMany({
-        where: { tag_id: { in: source_tag_ids } }
+        where: { tag_id: { in: sourceTagIds } }
       });
 
       // 删除原有的内容标签关联
       await tx.content_tags.deleteMany({
-        where: { tag_id: { in: source_tag_ids } }
+        where: { tag_id: { in: sourceTagIds } }
       });
 
       // 为每个内容创建与目标标签的关联（避免重复）
@@ -426,9 +430,13 @@ export class TagService {
 
       // 删除源标签
       await tx.tags.deleteMany({
-        where: { id: { in: source_tag_ids } }
+        where: { id: { in: sourceTagIds } }
       });
     });
+
+    if (missingSourceIds.length > 0) {
+      console.warn('合并标签时发现不存在的源标签:', missingSourceIds);
+    }
   }
 
   // 更新标签使用计数

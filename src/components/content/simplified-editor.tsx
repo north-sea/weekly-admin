@@ -22,19 +22,9 @@ import {
   ArrowLeft, 
   Loader2,
   Clock,
-  Bold,
-  Italic,
-  Code,
-  Link,
-  Image as ImageIcon,
-  List,
-  ListOrdered,
-  Heading2,
   ChevronDown
 } from 'lucide-react';
 import { ContentWithRelations } from '@/types/content';
-import MDEditor from '@uiw/react-md-editor';
-import MarkdownPreview from './MarkdownPreview';
 import StructuredPreview from './StructuredPreview';
 import { debounce } from 'lodash-es';
 import ScreenshotPasteUploader from '@/components/content/ScreenshotPasteUploader';
@@ -46,7 +36,7 @@ import { WeeklyLinkCard } from '@/components/content/WeeklyLinkCard';
 // 表单验证 schema
 const contentSchema = z.object({
   title: z.string().min(1, '标题不能为空').max(500, '标题长度不能超过500字符'),
-  content: z.string().min(1, '内容不能为空'),
+  content: z.string().optional(),
   summary: z.string().max(2000, '摘要长度不能超过2000字符').optional(),
   image_url: z.string().url('主图必须是有效的URL').optional().or(z.literal('')),
   content_type_id: z.number(),
@@ -67,7 +57,6 @@ const contentSchema = z.object({
 });
 
 type ContentFormData = z.infer<typeof contentSchema>;
-type PreviewMode = 'markdown' | 'structured';
 type ResyncPhase = 'updating' | 'waiting' | 'applying' | 'success' | 'failed';
 
 interface ResyncJobState {
@@ -109,9 +98,6 @@ export default function SimplifiedEditor({
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
-  const [previewMode, setPreviewMode] = useState<PreviewMode>(
-    initialValues?.content_type?.id === 3 ? 'structured' : 'markdown'
-  );
   const [tagSearch, setTagSearch] = useState('');
   const [refreshScreenshot, setRefreshScreenshot] = useState(
     initialValues?.screenshot_api !== 'manual'
@@ -150,7 +136,7 @@ export default function SimplifiedEditor({
   });
 
   const contentTypeId = watch('content_type_id');
-  const currentContent = watch('content');
+  const currentContent = watch('content') ?? initialValues?.content ?? '';
   const currentTitle = watch('title');
   const currentSummary = watch('summary');
   const currentImage = watch('image_url');
@@ -159,7 +145,6 @@ export default function SimplifiedEditor({
   const currentRecommendation = watch('recommendation_reason');
   const selectedTagIds = watch('tag_ids') || [];
   const selectedCategoryId = watch('category_id');
-  const shouldUseStructuredPreview = contentTypeId === 3;
   const screenshotLocked = watch('screenshot_api') === 'manual';
   const karakeepId = useMemo(
     () => initialValues?.attributes?.find(attr => attr.attribute_name === 'karakeep_id')?.attribute_value || '',
@@ -202,12 +187,6 @@ export default function SimplifiedEditor({
     return categories.find((cat) => cat.id === selectedCategoryId) || null;
   }, [categories, contentTypeId, selectedCategoryId]);
 
-  useEffect(() => {
-    if (shouldUseStructuredPreview && previewMode !== 'structured') {
-      setPreviewMode('structured');
-    }
-  }, [previewMode, shouldUseStructuredPreview]);
-  
   // 自动保存
   const autoSave = useCallback(
     debounce(async (data: ContentFormData) => {
@@ -407,20 +386,6 @@ export default function SimplifiedEditor({
       });
     }
   });
-
-  // Markdown 工具栏操作
-  const insertMarkdown = (before: string, after = '', placeholder = '') => {
-    const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selectedText = currentContent.substring(start, end) || placeholder;
-    const newText = currentContent.substring(0, start) + before + selectedText + after + currentContent.substring(end);
-    
-    setValue('content', newText, { shouldDirty: true });
-    setHasUnsavedChanges(true);
-  };
 
   const contentId = useMemo(() => {
     const raw = initialValues?.id;
@@ -821,111 +786,6 @@ export default function SimplifiedEditor({
               </div>
             </div>
             <div className="flex-1 space-y-4 overflow-y-auto pr-4">
-              <Card className="shadow-sm">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Markdown 内容</CardTitle>
-                    <CardDescription>编辑完整正文，支持 Markdown 语法</CardDescription>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => insertMarkdown('**', '**', '粗体文本')}
-                      title="粗体"
-                    >
-                      <Bold className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => insertMarkdown('*', '*', '斜体文本')}
-                      title="斜体"
-                    >
-                      <Italic className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => insertMarkdown('`', '`', '代码')}
-                      title="代码"
-                    >
-                      <Code className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => insertMarkdown('\n## ', '', '标题')}
-                      title="标题"
-                    >
-                      <Heading2 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => insertMarkdown('[', '](https://)', '链接文本')}
-                      title="链接"
-                    >
-                      <Link className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => insertMarkdown('![', '](https://)', '图片描述')}
-                      title="图片"
-                    >
-                      <ImageIcon className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => insertMarkdown('\n- ', '', '列表项')}
-                      title="无序列表"
-                    >
-                      <List className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => insertMarkdown('\n1. ', '', '列表项')}
-                      title="有序列表"
-                    >
-                      <ListOrdered className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Controller
-                  name="content"
-                  control={control}
-                  render={({ field }) => (
-                    <MDEditor
-                      value={field.value}
-                      onChange={(val) => field.onChange(val || '')}
-                      preview="edit"
-                      height={500}
-                      data-color-mode="light"
-                      hideToolbar
-                      textareaProps={{
-                        placeholder: contentTypeId === 4 
-                          ? '请输入 Blog 内容（支持 Markdown 语法）' 
-                          : '请输入 Weekly 内容（旧版 Markdown 格式）',
-                        style: { 
-                          fontSize: '14px', 
-                          lineHeight: '1.6',
-                        },
-                      }}
-                    />
-                  )}
-                />
-                {errors.content && (
-                  <p className="text-sm text-destructive mt-2">{errors.content.message}</p>
-                )}
-              </CardContent>
-            </Card>
-
             {contentTypeId === 3 && (
               <Card className="shadow-sm">
                 <CardHeader>
@@ -1290,41 +1150,30 @@ export default function SimplifiedEditor({
               </CardHeader>
               <CardContent className="flex-1 overflow-auto">
                 {(currentContent || currentSummary) ? (
-                  shouldUseStructuredPreview ? (
-                    <StructuredPreview
-                      data={{
-                        title: currentTitle || '未命名',
-                        url: currentSourceUrl || undefined,
-                        image_url: currentImage || undefined,
-                        summary: currentSummary || currentContent,
-                        description: currentRecommendation,
-                        source: currentSource || '未知来源',
-                        source_url: currentSourceUrl || undefined,
-                        tags: previewTags,
-                        category: (previewCategory || initialValues?.category)
-                          ? { id: (previewCategory || initialValues?.category)?.id!, name: (previewCategory || initialValues?.category)?.name! }
-                          : undefined,
-                        created_at: initialValues?.created_at || new Date().toISOString(),
-                        content: currentContent,
-                      }}
-                      mode="desktop"
-                      showMeta={true}
-                    />
-                  ) : (
-                    <MarkdownPreview
-                      content={{
-                        title: currentTitle || '未命名',
-                        content: currentContent || currentSummary || '',
-                        content_type: { 
-                          id: contentTypeId, 
-                          name: contentTypeId === 3 ? 'Weekly' : 'Blog' 
-                        },
-                        created_at: initialValues?.created_at || new Date().toISOString(),
-                      }}
-                      mode="desktop"
-                      showMeta={false}
-                    />
-                  )
+                  <StructuredPreview
+                    data={{
+                      title: currentTitle || '未命名',
+                      url: currentSourceUrl || undefined,
+                      image_url: currentImage || undefined,
+                      summary: currentSummary || currentContent,
+                      description: currentRecommendation,
+                      source: currentSource || '未知来源',
+                      source_url: currentSourceUrl || undefined,
+                      tags: previewTags,
+                      category: (previewCategory || initialValues?.category)
+                        ? { id: (previewCategory || initialValues?.category)?.id!, name: (previewCategory || initialValues?.category)?.name! }
+                        : undefined,
+                      created_at: initialValues?.created_at || new Date().toISOString(),
+                      content: currentContent,
+                      content_type: {
+                        id: contentTypeId,
+                        name: contentTypeId === 3 ? 'Weekly' : 'Blog',
+                      },
+                      featured: Boolean(watch('featured')),
+                    }}
+                    mode="desktop"
+                    showMeta={true}
+                  />
                 ) : (
                   <div className="flex items-center justify-center h-full text-muted-foreground">
                     <p>开始编辑以查看预览</p>

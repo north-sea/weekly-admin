@@ -6,6 +6,8 @@ import type { ParsedFeedItem, RssSourceConfig, RssSourceType } from '@/lib/rss/t
 import { fetchKarakeepBookmarks, type KarakeepBookmark } from '@/lib/services/karakeep-api';
 import type { Prisma } from '@prisma/client';
 
+const SOURCE_NAME_MAX = 255;
+
 export type SyncOptions = {
   max_items?: number;
   similarity_check?: boolean;
@@ -63,6 +65,13 @@ function hostnameFromUrl(url: string) {
   } catch {
     return null;
   }
+}
+
+function normalizeSourceName(value: string | null | undefined) {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.length > SOURCE_NAME_MAX ? trimmed.slice(0, SOURCE_NAME_MAX) : trimmed;
 }
 
 async function batchCheckDuplicateUrlsUnified(urls: string[]) {
@@ -239,7 +248,7 @@ async function syncRssToInbox(sourceId: number, options?: SyncOptions): Promise<
     }
 
     const publishedAt = safeDate(entry.item?.publishedAt);
-    const sourceName = hostnameFromUrl(entry.url) ?? feed.title ?? source.name;
+    const sourceName = normalizeSourceName(hostnameFromUrl(entry.url) ?? feed.title ?? source.name);
 
     toUpsert.push({
       source_id: source.id,
@@ -335,7 +344,7 @@ function karakeepBookmarkToInboxCreate(sourceId: number, bookmark: KarakeepBookm
     image_url: imageUrl,
     favicon_url: bookmark.content?.favicon ?? null,
     slug: null,
-    source_name: bookmark.content?.publisher ?? hostnameFromUrl(url),
+    source_name: normalizeSourceName(bookmark.content?.publisher ?? hostnameFromUrl(url)),
     ai_score: null,
     category_suggestion: null,
     tags_suggestion: bookmark.tags ?? null,
@@ -346,7 +355,7 @@ function karakeepBookmarkToInboxCreate(sourceId: number, bookmark: KarakeepBookm
     auto_promoted: false,
     content_id: null,
     duplicate_of_id: null,
-    source_published_at: safeDate(bookmark.content?.datePublished) ?? safeDate(bookmark.createdAt) ?? null,
+    source_published_at: safeDate(bookmark.createdAt) ?? safeDate(bookmark.content?.datePublished) ?? null,
     synced_at: new Date(),
   } as const;
 }

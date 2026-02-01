@@ -14,7 +14,7 @@ export interface ContentWithRelations {
   image_width?: number | null;
   image_height?: number | null;
   cover_image?: string | null;
-  content: string;
+  content?: string | null;
   content_format?: string | null;
   source?: string | null;
   source_url?: string | null;

@@ -15,6 +15,40 @@ const KARAKEEP_HOST = process.env.KARAKEEP_HOST || '';
 const KARAKEEP_KEY = process.env.KARAKEEP_KEY || '';
 const KARAKEEP_DRAFT_LIST_ID = process.env.KARAKEEP_DRAFT_LIST_ID || ''; // Draft 列表的 ID
 
+let karakeepApiInstance: KarakeepApiClient | null = null;
+let karakeepConfigWarned = false;
+
+function getMissingKarakeepConfig(): string[] {
+  const missing: string[] = [];
+  if (!KARAKEEP_HOST) missing.push('KARAKEEP_HOST');
+  if (!KARAKEEP_KEY) missing.push('KARAKEEP_KEY');
+  return missing;
+}
+
+function warnKarakeepConfigOnce(context?: string) {
+  if (karakeepConfigWarned) return;
+  const missing = getMissingKarakeepConfig();
+  if (missing.length === 0) return;
+  const suffix = context ? `，跳过 ${context}` : '，跳过相关操作';
+  console.warn(`Karakeep 未配置${suffix}。缺少: ${missing.join(', ')}`);
+  karakeepConfigWarned = true;
+}
+
+export function isKarakeepConfigured(): boolean {
+  return getMissingKarakeepConfig().length === 0;
+}
+
+export function getKarakeepApi(context?: string): KarakeepApiClient | null {
+  if (!isKarakeepConfigured()) {
+    warnKarakeepConfigOnce(context);
+    return null;
+  }
+  if (!karakeepApiInstance) {
+    karakeepApiInstance = new KarakeepApiClient();
+  }
+  return karakeepApiInstance;
+}
+
 // Karakeep 书签数据类型（根据官方 API 文档）
 export interface KarakeepBookmark {
   id: string;
@@ -567,9 +601,6 @@ export class KarakeepApiClient {
   }
 }
 
-// 导出单例实例
-export const karakeepApi = new KarakeepApiClient();
-
 // 导出便捷方法
 export async function fetchKarakeepBookmarks(options?: {
   archived?: boolean;
@@ -577,7 +608,9 @@ export async function fetchKarakeepBookmarks(options?: {
   limit?: number;
   includeContent?: boolean;
 }): Promise<KarakeepBookmark[]> {
-  return karakeepApi.getAllBookmarks(options);
+  const api = getKarakeepApi('获取书签');
+  if (!api) return [];
+  return api.getAllBookmarks(options);
 }
 
 export async function fetchAllKarakeepBookmarks(options?: {
@@ -586,41 +619,59 @@ export async function fetchAllKarakeepBookmarks(options?: {
   limit?: number;
   includeContent?: boolean;
 }): Promise<KarakeepBookmark[]> {
-  return karakeepApi.getBookmarks(options);
+  const api = getKarakeepApi('获取书签');
+  if (!api) return [];
+  return api.getBookmarks(options);
 }
 
 export async function updateKarakeepBookmark(bookmarkId: string, data: {
   archived?: boolean;
   favourited?: boolean;
   note?: string;
-}): Promise<KarakeepBookmark> {
-  return karakeepApi.updateBookmark(bookmarkId, data);
+}): Promise<KarakeepBookmark | null> {
+  const api = getKarakeepApi('更新书签');
+  if (!api) return null;
+  return api.updateBookmark(bookmarkId, data);
 }
 
-export async function archiveKarakeepBookmark(bookmarkId: string): Promise<KarakeepBookmark> {
-  return karakeepApi.archiveBookmark(bookmarkId);
+export async function archiveKarakeepBookmark(bookmarkId: string): Promise<void> {
+  const api = getKarakeepApi('归档书签');
+  if (!api) return;
+  await api.archiveBookmark(bookmarkId);
 }
 
 export async function addBookmarkToKarakeepList(listId: string, bookmarkId: string): Promise<void> {
-  return karakeepApi.addBookmarkToList(listId, bookmarkId);
+  const api = getKarakeepApi('添加书签到列表');
+  if (!api) return;
+  return api.addBookmarkToList(listId, bookmarkId);
 }
 
 export async function removeBookmarkFromKarakeepList(listId: string, bookmarkId: string): Promise<void> {
-  return karakeepApi.removeBookmarkFromList(listId, bookmarkId);
+  const api = getKarakeepApi('从列表移除书签');
+  if (!api) return;
+  return api.removeBookmarkFromList(listId, bookmarkId);
 }
 
 export async function testKarakeepConnection(): Promise<boolean> {
-  return karakeepApi.testConnection();
+  const api = getKarakeepApi('连接测试');
+  if (!api) return false;
+  return api.testConnection();
 }
 
-export async function createKarakeepBookmark(data: { url: string; title?: string; description?: string }): Promise<KarakeepBookmark> {
-  return karakeepApi.createBookmark(data);
+export async function createKarakeepBookmark(data: { url: string; title?: string; description?: string }): Promise<KarakeepBookmark | null> {
+  const api = getKarakeepApi('创建书签');
+  if (!api) return null;
+  return api.createBookmark(data);
 }
 
-export async function getKarakeepBookmarkV1(bookmarkId: string): Promise<KarakeepBookmark> {
-  return karakeepApi.getBookmarkV1(bookmarkId);
+export async function getKarakeepBookmarkV1(bookmarkId: string): Promise<KarakeepBookmark | null> {
+  const api = getKarakeepApi('获取书签');
+  if (!api) return null;
+  return api.getBookmarkV1(bookmarkId);
 }
 
 export async function addBookmarkToKarakeepListV1(listId: string, bookmarkId: string): Promise<void> {
-  return karakeepApi.addBookmarkToListV1(listId, bookmarkId);
+  const api = getKarakeepApi('添加书签到列表');
+  if (!api) return;
+  return api.addBookmarkToListV1(listId, bookmarkId);
 }

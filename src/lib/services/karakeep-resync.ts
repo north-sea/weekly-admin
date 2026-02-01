@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { karakeepApi } from '@/lib/services/karakeep-api';
+import { getKarakeepApi } from '@/lib/services/karakeep-api';
 import { prisma } from '@/lib/db';
 import { KarakeepBookmark } from './karakeep-api';
 
@@ -64,7 +64,17 @@ export async function createResyncJob(params: CreateJobParams): Promise<Karakeep
 
   try {
     // 通知 Karakeep 更新 URL，触发重新 summary/截图
-    await karakeepApi.updateBookmark(karakeepId, {
+    const api = getKarakeepApi('重跑任务');
+    if (!api) {
+      const job = jobs.get(jobId)!;
+      job.phase = 'failed';
+      job.message = 'Karakeep 未配置，已跳过重跑任务';
+      job.updatedAt = nowIso();
+      jobs.set(jobId, job);
+      return job;
+    }
+
+    await api.updateBookmark(karakeepId, {
       url: sourceUrl,
       archived: false,
     });
@@ -178,8 +188,20 @@ export async function progressResyncJob(jobId: string): Promise<KarakeepResyncJo
   }
 
   try {
+    const api = getKarakeepApi('重跑任务轮询');
+    if (!api) {
+      const failed: KarakeepResyncJob = {
+        ...job,
+        phase: 'failed',
+        message: 'Karakeep 未配置，无法轮询',
+        updatedAt: nowIso(),
+      };
+      jobs.set(jobId, failed);
+      return failed;
+    }
+
     const nextAttempt = job.attempt + 1;
-    const bookmark = await karakeepApi.getBookmark(job.karakeepId);
+    const bookmark = await api.getBookmark(job.karakeepId);
 
     const nextJob: KarakeepResyncJob = {
       ...job,

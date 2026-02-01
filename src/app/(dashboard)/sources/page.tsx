@@ -246,6 +246,7 @@ export default function SourcesPage() {
                     const promotionRate = calculatePromotionRate(source);
                     const publishRate = calculatePublishRate(source);
                     const isLowPromotion = promotionRate !== null && promotionRate < 0.1;
+                    const lastError = source.last_error ? source.last_error.replace(/\s+/g, ' ').trim() : null;
                     return (
                       <TableRow key={source.id}>
                         <TableCell className="font-mono text-xs">{source.id}</TableCell>
@@ -265,8 +266,8 @@ export default function SourcesPage() {
                           ) : (
                             <span className="text-sm text-muted-foreground">-</span>
                           )}
-                          {source.last_error ? (
-                            <p className="mt-1 truncate text-xs text-destructive">{source.last_error}</p>
+                          {lastError ? (
+                            <p className="mt-1 truncate text-xs text-destructive">{lastError}</p>
                           ) : null}
                         </TableCell>
                         <TableCell>
@@ -342,4 +343,3 @@ export default function SourcesPage() {
     </div>
   );
 }
-

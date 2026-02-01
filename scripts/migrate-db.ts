@@ -87,6 +87,85 @@ async function migrateDatabase() {
     `;
     console.log('✅ 内容版本表创建完成');
 
+    // 标签分组表
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS tag_groups (
+          id INT PRIMARY KEY AUTO_INCREMENT,
+          name VARCHAR(50) NOT NULL UNIQUE,
+          slug VARCHAR(50) NOT NULL UNIQUE,
+          description TEXT NULL,
+          color VARCHAR(20) NULL,
+          sort_order INT DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `;
+    console.log('✅ tag_groups 表创建完成');
+
+    // tags 表补齐 group_id 与 aliases 字段
+    const tagGroupIdColumn = await prisma.$queryRaw`
+      SHOW COLUMNS FROM tags LIKE 'group_id'
+    `;
+    if (Array.isArray(tagGroupIdColumn) && tagGroupIdColumn.length === 0) {
+      await prisma.$executeRaw`
+        ALTER TABLE tags ADD COLUMN group_id INT NULL
+      `;
+      console.log('✅ tags 表添加 group_id 字段');
+    }
+
+    const tagAliasesColumn = await prisma.$queryRaw`
+      SHOW COLUMNS FROM tags LIKE 'aliases'
+    `;
+    if (Array.isArray(tagAliasesColumn) && tagAliasesColumn.length === 0) {
+      await prisma.$executeRaw`
+        ALTER TABLE tags ADD COLUMN aliases TEXT NULL
+      `;
+      console.log('✅ tags 表添加 aliases 字段');
+    }
+
+    // tags.group_id 索引
+    const tagGroupIdIndex = await prisma.$queryRaw`
+      SHOW INDEX FROM tags WHERE Key_name = 'idx_tags_group_id'
+    `;
+    if (Array.isArray(tagGroupIdIndex) && tagGroupIdIndex.length === 0) {
+      await prisma.$executeRaw`
+        CREATE INDEX idx_tags_group_id ON tags(group_id)
+      `;
+      console.log('✅ tags 表创建 group_id 索引');
+    }
+
+    // tags.group_id 外键
+    const tagGroupFk = await prisma.$queryRaw`
+      SELECT CONSTRAINT_NAME
+      FROM information_schema.KEY_COLUMN_USAGE
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'tags'
+        AND COLUMN_NAME = 'group_id'
+        AND REFERENCED_TABLE_NAME = 'tag_groups'
+        AND REFERENCED_COLUMN_NAME = 'id'
+      LIMIT 1
+    `;
+    if (Array.isArray(tagGroupFk) && tagGroupFk.length === 0) {
+      await prisma.$executeRaw`
+        ALTER TABLE tags
+        ADD CONSTRAINT fk_tags_group_id
+        FOREIGN KEY (group_id) REFERENCES tag_groups(id)
+        ON DELETE SET NULL
+      `;
+      console.log('✅ tags 表添加 group_id 外键');
+    }
+
+    // categories.archived 字段
+    const categoriesArchivedColumn = await prisma.$queryRaw`
+      SHOW COLUMNS FROM categories LIKE 'archived'
+    `;
+    if (Array.isArray(categoriesArchivedColumn) && categoriesArchivedColumn.length === 0) {
+      await prisma.$executeRaw`
+        ALTER TABLE categories ADD COLUMN archived BOOLEAN DEFAULT false
+      `;
+      console.log('✅ categories 表添加 archived 字段');
+    }
+
     // 检查 contents 表是否有 user_id 字段
     const contentsColumns = await prisma.$queryRaw`
       SHOW COLUMNS FROM contents LIKE 'user_id'
@@ -97,6 +176,20 @@ async function migrateDatabase() {
         ALTER TABLE contents ADD COLUMN user_id INT
       `;
       console.log('✅ contents 表添加 user_id 字段');
+    }
+
+    // contents.content 允许为空（结构化数据模式）
+    const contentsContentColumn = (await prisma.$queryRaw`
+      SHOW COLUMNS FROM contents LIKE 'content'
+    `) as Array<{ Null?: string; Type?: string }>;
+    if (Array.isArray(contentsContentColumn) && contentsContentColumn.length > 0) {
+      const isNullable = String(contentsContentColumn[0].Null ?? '').toUpperCase() === 'YES';
+      if (!isNullable) {
+        await prisma.$executeRaw`
+          ALTER TABLE contents MODIFY COLUMN content LONGTEXT NULL
+        `;
+        console.log('✅ contents 表 content 字段允许为空');
+      }
     }
 
     // AI 字段（contents）
@@ -235,7 +328,7 @@ async function migrateDatabase() {
           image_url VARCHAR(2048) NULL,
           favicon_url VARCHAR(500) NULL,
           slug VARCHAR(255) NULL,
-          source_name VARCHAR(100) NULL,
+          source_name VARCHAR(255) NULL,
           ai_score FLOAT NULL,
           category_suggestion VARCHAR(100) NULL,
           tags_suggestion JSON NULL,
@@ -261,6 +354,19 @@ async function migrateDatabase() {
       )
     `;
     console.log('✅ inbox_items 表创建完成');
+
+    // inbox_items.source_name 字段长度
+    const inboxSourceNameColumn = (await prisma.$queryRaw`
+      SHOW COLUMNS FROM inbox_items LIKE 'source_name'
+    `) as Array<{ Type?: string }>;
+    const inboxSourceNameType = String(inboxSourceNameColumn?.[0]?.Type ?? '');
+    const inboxSourceNameLength = Number(inboxSourceNameType.match(/varchar\((\d+)\)/i)?.[1] ?? 0);
+    if (inboxSourceNameLength > 0 && inboxSourceNameLength < 255) {
+      await prisma.$executeRaw`
+        ALTER TABLE inbox_items MODIFY COLUMN source_name VARCHAR(255) NULL
+      `;
+      console.log('✅ inbox_items 表扩展 source_name 长度');
+    }
 
     // AI 配置表（支持多组配置）
     await prisma.$executeRaw`

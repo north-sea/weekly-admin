@@ -16,7 +16,7 @@ interface ContentPreviewProps {
   content: {
     id?: number | bigint | string;
     title: string;
-    content: string;
+    content?: string | null;
     description?: string | null;
     source?: string | null;
     source_url?: string | null;
@@ -42,23 +42,25 @@ export default function ContentPreview({
   const isBlog = content.content_type?.id === 4;
   const isWeekly = content.content_type?.id === 3;
   const isMobile = mode === 'mobile';
+  const contentBody = content.content ?? '';
 
   // Blog 的元数据（阅读时长等）
   const metadata = useMemo(() => {
     if (!isBlog) return null;
-    return ContentFormatAdapter.extractMetadata(content.content);
-  }, [content.content, isBlog]);
+    return ContentFormatAdapter.extractMetadata(contentBody);
+  }, [contentBody, isBlog]);
 
   // Weekly 的结构化数据（Weekly 内容现在全部为结构化）
   const structuredContent = useMemo<StructuredContent | null>(() => {
     if (!isWeekly) return null;
     try {
-      const parsed = JSON.parse(content.content);
+      if (!contentBody) return null;
+      const parsed = JSON.parse(contentBody);
       return ContentFormatAdapter.isValidStructured(parsed) ? parsed : null;
     } catch {
       return null;
     }
-  }, [content.content, isWeekly]);
+  }, [contentBody, isWeekly]);
 
   // 格式化日期
   const formatDate = (date?: string | Date) => {
@@ -260,7 +262,7 @@ export default function ContentPreview({
           rehypePlugins={[rehypeHighlight, rehypeRaw]}
           components={markdownComponents}
         >
-          {content.content}
+          {contentBody}
         </ReactMarkdown>
       </div>
     </article>

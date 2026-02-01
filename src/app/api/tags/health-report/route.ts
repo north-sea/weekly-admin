@@ -58,18 +58,27 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         name: true,
-        count: true,
         aliases: true,
         created_at: true,
       },
       orderBy: { name: 'asc' },
     });
 
-    const totalTags = tags.length;
+    const counts = await prisma.content_tags.groupBy({
+      by: ['tag_id'],
+      _count: { _all: true },
+    });
+    const countMap = new Map(counts.map((row) => [row.tag_id, row._count._all]));
+    const tagsWithCount = tags.map((tag) => ({
+      ...tag,
+      count: countMap.get(tag.id) ?? 0,
+    }));
+
+    const totalTags = tagsWithCount.length;
 
     // 未使用的标签
-    const unusedTags = tags
-      .filter((t) => !t.count || t.count === 0)
+    const unusedTags = tagsWithCount
+      .filter((t) => t.count === 0)
       .map((t) => ({
         id: t.id,
         name: t.name,
@@ -77,12 +86,12 @@ export async function GET(request: NextRequest) {
       }));
 
     // 低使用率标签（count <= 2）
-    const lowUsageTags = tags
-      .filter((t) => t.count && t.count > 0 && t.count <= 2)
+    const lowUsageTags = tagsWithCount
+      .filter((t) => t.count > 0 && t.count <= 2)
       .map((t) => ({
         id: t.id,
         name: t.name,
-        count: t.count!,
+        count: t.count,
       }))
       .sort((a, b) => a.count - b.count);
 
@@ -93,10 +102,10 @@ export async function GET(request: NextRequest) {
     }> = [];
     const processedIds = new Set<number>();
 
-    for (const tag of tags) {
+    for (const tag of tagsWithCount) {
       if (processedIds.has(tag.id)) continue;
 
-      const similarTags = tags.filter((other) => {
+      const similarTags = tagsWithCount.filter((other) => {
         if (other.id === tag.id || processedIds.has(other.id)) return false;
         const result = calculateTagSimilarity(
           tag.name,

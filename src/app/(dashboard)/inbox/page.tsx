@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useToast } from '@/components/ui/use-toast';
 import { Camera, CheckCircle, ChevronDown, ChevronRight, Crop, ExternalLink, ImageOff, Loader2, RefreshCw, Sparkles, ThumbsUp, Wand2, XCircle } from 'lucide-react';
 import {
@@ -361,8 +360,8 @@ export default function InboxPage() {
             <SelectContent>
               <SelectItem value="ai_score-desc">评分 高→低</SelectItem>
               <SelectItem value="ai_score-asc">评分 低→高</SelectItem>
-              <SelectItem value="created_at-desc">时间 新→旧</SelectItem>
-              <SelectItem value="created_at-asc">时间 旧→新</SelectItem>
+              <SelectItem value="source_published_at-desc">时间 新→旧</SelectItem>
+              <SelectItem value="source_published_at-asc">时间 旧→新</SelectItem>
             </SelectContent>
           </Select>
           <Button
@@ -471,133 +470,150 @@ export default function InboxPage() {
                     const tagsSuggestion = Array.isArray(item.tags_suggestion) ? item.tags_suggestion : [];
                     const imageStatusInfo = getImageStatusIcon(item.image_status as ImageStatus);
                     const ImageStatusIcon = imageStatusInfo.icon;
+                    const detailsId = `inbox-details-${item.id}`;
 
                     return (
-                      <Collapsible key={item.id} asChild open={isExpanded} onOpenChange={() => toggleExpand(item.id)}>
-                        <>
-                          <TableRow className={checked ? 'bg-muted/50' : undefined}>
-                            <TableCell>
-                              <Checkbox checked={checked} onCheckedChange={(v) => toggleSelect(item, Boolean(v))} />
-                            </TableCell>
-                            <TableCell>
-                              <CollapsibleTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-6 w-6">
-                                  {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                                </Button>
-                              </CollapsibleTrigger>
-                            </TableCell>
-                            <TableCell className="max-w-[420px]">
-                              <div className="space-y-1">
-                                <p className="line-clamp-2 font-medium">{item.title || item.url}</p>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  <span className="truncate">{hostnameFromUrl(item.url)}</span>
-                                  <a href={item.url} target="_blank" rel="noreferrer" className="hover:text-foreground">
-                                    <ExternalLink className="h-3.5 w-3.5" />
-                                  </a>
-                                </div>
+                      <Fragment key={item.id}>
+                        <TableRow className={checked ? 'bg-muted/50' : undefined}>
+                          <TableCell>
+                            <Checkbox checked={checked} onCheckedChange={(v) => toggleSelect(item, Boolean(v))} />
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              aria-expanded={isExpanded}
+                              aria-controls={detailsId}
+                              onClick={() => toggleExpand(item.id)}
+                            >
+                              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            </Button>
+                          </TableCell>
+                          <TableCell className="max-w-[420px]">
+                            <div className="space-y-1">
+                              <p className="line-clamp-2 font-medium">{item.title || item.url}</p>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span className="truncate">{hostnameFromUrl(item.url)}</span>
+                                <a href={item.url} target="_blank" rel="noreferrer" className="hover:text-foreground">
+                                  <ExternalLink className="h-3.5 w-3.5" />
+                                </a>
                               </div>
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {item.data_source?.name || item.source_name || '-'}
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              {item.ai_score !== null && item.ai_score !== undefined ? (
-                                <span className={item.ai_score >= 70 ? 'text-green-600 font-medium' : item.ai_score >= 50 ? 'text-yellow-600' : 'text-muted-foreground'}>
-                                  {item.ai_score}
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground">-</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {item.data_source?.name || item.source_name || '-'}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {item.ai_score !== null && item.ai_score !== undefined ? (
+                              <span className={item.ai_score >= 70 ? 'text-green-600 font-medium' : item.ai_score >= 50 ? 'text-yellow-600' : 'text-muted-foreground'}>
+                                {item.ai_score}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1" title={imageStatusInfo.title}>
+                              <ImageStatusIcon className={`h-4 w-4 ${imageStatusInfo.color}`} />
+                              {item.image_status === 'needs_crop' && item.image_url && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() => openCropDialog(item)}
+                                  title="裁剪图片"
+                                >
+                                  <Crop className="h-3.5 w-3.5" />
+                                </Button>
                               )}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1" title={imageStatusInfo.title}>
-                                <ImageStatusIcon className={`h-4 w-4 ${imageStatusInfo.color}`} />
-                                {item.image_status === 'needs_crop' && item.image_url && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6"
-                                    onClick={() => openCropDialog(item)}
-                                    title="裁剪图片"
-                                  >
-                                    <Crop className="h-3.5 w-3.5" />
-                                  </Button>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={label.variant}>{label.label}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              onClick={() => handlePromote(item)}
+                              disabled={promote.isPending || item.status === 'promoted'}
+                            >
+                              晋升
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                        {isExpanded ? (
+                          <TableRow id={detailsId} className="bg-muted/30 hover:bg-muted/30">
+                            <TableCell colSpan={8} className="p-4">
+                              <div className="space-y-3">
+                                {item.image_url ? (
+                                  <div className="flex items-center gap-3">
+                                    <a href={item.image_url} target="_blank" rel="noreferrer">
+                                      <img
+                                        src={item.image_url}
+                                        alt={item.title ?? '收件箱图片'}
+                                        className="h-20 w-28 rounded border object-cover"
+                                        loading="lazy"
+                                      />
+                                    </a>
+                                    <span className="text-xs text-muted-foreground">点击查看原图</span>
+                                  </div>
+                                ) : null}
+                                {/* AI 建议 */}
+                                {aiSuggestion && (
+                                  <div className="flex items-center gap-2">
+                                    <Sparkles className="h-4 w-4 text-muted-foreground" />
+                                    <span className={`text-sm font-medium ${aiSuggestion.color}`}>
+                                      AI 建议: {aiSuggestion.text}
+                                    </span>
+                                  </div>
+                                )}
+
+                                {/* 分类建议 */}
+                                {item.category_suggestion && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm text-muted-foreground">建议分类:</span>
+                                    <Badge variant="outline">{item.category_suggestion}</Badge>
+                                  </div>
+                                )}
+
+                                {/* 标签建议 */}
+                                {tagsSuggestion.length > 0 && (
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-sm text-muted-foreground">建议标签:</span>
+                                    {tagsSuggestion.map((tag: { name?: string }, idx: number) => (
+                                      tag.name && <Badge key={idx} variant="secondary">{tag.name}</Badge>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* 摘要 */}
+                                {item.summary && (
+                                  <div className="space-y-1">
+                                    <span className="text-sm text-muted-foreground">摘要:</span>
+                                    <p className="text-sm text-foreground/80 line-clamp-4">{item.summary}</p>
+                                  </div>
+                                )}
+
+                                {/* 笔记 */}
+                                {item.note && (
+                                  <div className="space-y-1">
+                                    <span className="text-sm text-muted-foreground">笔记:</span>
+                                    <p className="text-sm text-foreground/80">{item.note}</p>
+                                  </div>
+                                )}
+
+                                {/* 疑似重复提示 */}
+                                {item.duplicate_of_id && (
+                                  <div className="flex items-center gap-2 text-orange-500">
+                                    <span className="text-sm">⚠️ 疑似与 #{item.duplicate_of_id} 重复</span>
+                                  </div>
                                 )}
                               </div>
                             </TableCell>
-                            <TableCell>
-                              <Badge variant={label.variant}>{label.label}</Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                size="sm"
-                                onClick={() => handlePromote(item)}
-                                disabled={promote.isPending || item.status === 'promoted'}
-                              >
-                                晋升
-                              </Button>
-                            </TableCell>
                           </TableRow>
-                          <CollapsibleContent asChild>
-                            <TableRow className="bg-muted/30 hover:bg-muted/30">
-                              <TableCell colSpan={8} className="p-4">
-                                <div className="space-y-3">
-                                  {/* AI 建议 */}
-                                  {aiSuggestion && (
-                                    <div className="flex items-center gap-2">
-                                      <Sparkles className="h-4 w-4 text-muted-foreground" />
-                                      <span className={`text-sm font-medium ${aiSuggestion.color}`}>
-                                        AI 建议: {aiSuggestion.text}
-                                      </span>
-                                    </div>
-                                  )}
-
-                                  {/* 分类建议 */}
-                                  {item.category_suggestion && (
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-sm text-muted-foreground">建议分类:</span>
-                                      <Badge variant="outline">{item.category_suggestion}</Badge>
-                                    </div>
-                                  )}
-
-                                  {/* 标签建议 */}
-                                  {tagsSuggestion.length > 0 && (
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="text-sm text-muted-foreground">建议标签:</span>
-                                      {tagsSuggestion.map((tag: { name?: string }, idx: number) => (
-                                        tag.name && <Badge key={idx} variant="secondary">{tag.name}</Badge>
-                                      ))}
-                                    </div>
-                                  )}
-
-                                  {/* 摘要 */}
-                                  {item.summary && (
-                                    <div className="space-y-1">
-                                      <span className="text-sm text-muted-foreground">摘要:</span>
-                                      <p className="text-sm text-foreground/80 line-clamp-4">{item.summary}</p>
-                                    </div>
-                                  )}
-
-                                  {/* 笔记 */}
-                                  {item.note && (
-                                    <div className="space-y-1">
-                                      <span className="text-sm text-muted-foreground">笔记:</span>
-                                      <p className="text-sm text-foreground/80">{item.note}</p>
-                                    </div>
-                                  )}
-
-                                  {/* 疑似重复提示 */}
-                                  {item.duplicate_of_id && (
-                                    <div className="flex items-center gap-2 text-orange-500">
-                                      <span className="text-sm">⚠️ 疑似与 #{item.duplicate_of_id} 重复</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          </CollapsibleContent>
-                        </>
-                      </Collapsible>
+                        ) : null}
+                      </Fragment>
                     );
                   })
                 )}

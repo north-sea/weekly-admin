@@ -112,7 +112,7 @@ async function ensureUnifiedTables() {
         image_url VARCHAR(2048) NULL,
         favicon_url VARCHAR(500) NULL,
         slug VARCHAR(255) NULL,
-        source_name VARCHAR(100) NULL,
+        source_name VARCHAR(255) NULL,
         ai_score FLOAT NULL,
         category_suggestion VARCHAR(100) NULL,
         tags_suggestion JSON NULL,

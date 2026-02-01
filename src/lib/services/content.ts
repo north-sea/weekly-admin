@@ -13,7 +13,7 @@ export interface ContentWithRelations {
   summary?: string | null;
   image_url?: string | null;
   cover_image?: string | null;
-  content: string;
+  content?: string | null;
   content_format?: string | null;
   source?: string | null;
   source_url?: string | null;
@@ -62,6 +62,12 @@ export interface ContentListResponse {
 }
 
 export class ContentService {
+  private static normalizeContent(value?: string | null) {
+    if (!value) return null;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
   // 获取内容列表
   static async getContentList(query: ContentQuery): Promise<ContentListResponse> {
     const { page, pageSize, contentType, status, category_id, tag_ids, keyword, original_score_min, summary_score_min, sortBy, sortOrder, featured } = query;
@@ -168,7 +174,7 @@ export class ContentService {
       ...content,
       status: content.status || 'draft',
       title: content.title || '',
-      content: content.content || ''
+      content: content.content ?? ''
     });
   }
   
@@ -180,7 +186,7 @@ export class ContentService {
     description?: string | null;
     summary?: string | null;
     image_url?: string | null;
-    content: string;
+    content?: string | null;
     content_format?: string | null;
     source?: string | null;
     source_url?: string | null;
@@ -278,12 +284,13 @@ export class ContentService {
   
   // 创建内容
   static async createContent(data: ContentInput, userId: number, request?: NextRequest): Promise<ContentWithRelations> {
-    const { tag_ids, cover_image, recommendation_reason, content_type_id, ...contentData } = data as ContentInput & {
+    const { tag_ids, cover_image, recommendation_reason, content_type_id, content: rawContent, ...contentData } = data as ContentInput & {
       cover_image?: string;
       recommendation_reason?: string;
     };
     const source = 'source' in data ? data.source : undefined;
     const sourceUrl = 'source_url' in data ? data.source_url : undefined;
+    const normalizedContent = this.normalizeContent(rawContent);
     
     // 生成slug
     const slug = this.generateSlug(data.title);
@@ -292,6 +299,7 @@ export class ContentService {
     const content = await prisma.contents.create({
       data: {
         ...contentData,
+        content: normalizedContent,
         content_type_id,
         slug,
         user_id: userId,
@@ -327,7 +335,7 @@ export class ContentService {
         content.id,
         {
           title: data.title,
-          content: data.content,
+          content: normalizedContent ?? undefined,
           description: data.description ?? undefined,
           source: source ?? undefined,
           source_url: sourceUrl ?? undefined,
@@ -368,11 +376,12 @@ export class ContentService {
   
   // 更新内容
   static async updateContent(data: ContentUpdate, userId: number, request?: NextRequest): Promise<ContentWithRelations> {
-    const { id, tag_ids, cover_image, recommendation_reason, content_type_id, ...updateData } = data as ContentUpdate & {
+    const { id, tag_ids, cover_image, recommendation_reason, content_type_id, content: rawContent, ...updateData } = data as ContentUpdate & {
       cover_image?: string;
       recommendation_reason?: string;
     };
     const contentId = BigInt(id);
+    const normalizedContent = rawContent === undefined ? undefined : this.normalizeContent(rawContent);
     
     // 获取更新前的内容以便比较变化
     const oldContent = await prisma.contents.findUnique({
@@ -388,6 +397,7 @@ export class ContentService {
       where: { id: contentId },
       data: {
         ...updateData,
+        ...(rawContent === undefined ? {} : { content: normalizedContent }),
         ...(content_type_id !== undefined ? { content_type_id } : {}),
         published_at: updateData.status === 'published' ? new Date() : undefined
       }
@@ -435,7 +445,7 @@ export class ContentService {
         contentId,
         {
           title: updateData.title || oldContent.title,
-          content: updateData.content || oldContent.content,
+          content: rawContent === undefined ? oldContent.content ?? undefined : normalizedContent ?? undefined,
           description: updateData.description ?? oldContent.description ?? undefined,
           source: (updateData as Partial<{ source?: string }>).source ?? oldContent.source ?? undefined,
           source_url: (updateData as Partial<{ source_url?: string }>).source_url ?? oldContent.source_url ?? undefined,
@@ -651,7 +661,7 @@ export class ContentService {
   ): Record<string, { old: any; new: any }> {
     const changes: Record<string, { old: any; new: any }> = {};
     
-    const fieldsToCheck = ['title', 'content', 'description', 'status', 'source', 'source_url'];
+    const fieldsToCheck = ['title', 'description', 'status', 'source', 'source_url'];
     
     fieldsToCheck.forEach(field => {
       if (newData[field as keyof ContentUpdate] !== undefined && 
@@ -674,9 +684,6 @@ export class ContentService {
       switch (field) {
         case 'title':
           changeDescriptions.push('修改了标题');
-          break;
-        case 'content':
-          changeDescriptions.push('修改了内容');
           break;
         case 'description':
           changeDescriptions.push('修改了描述');
