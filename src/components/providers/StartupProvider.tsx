@@ -15,6 +15,12 @@ interface StartupState {
 
 const StartupContext = createContext<StartupState | null>(null);
 
+let startupCheckPromise: Promise<void> | null = null;
+let startupCheckCache: {
+  initialized: boolean;
+  error: string | null;
+} | null = null;
+
 export function useStartup() {
   const context = useContext(StartupContext);
   if (!context) {
@@ -33,22 +39,35 @@ export default function StartupProvider({ children }: StartupProviderProps) {
   const [error, setError] = useState<string | null>(null);
 
   const checkStartup = async () => {
+    if (startupCheckCache) {
+      setInitialized(startupCheckCache.initialized);
+      setError(startupCheckCache.error);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
 
-      const response = await fetch('/api/health/startup', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
+      if (!startupCheckPromise) {
+        startupCheckPromise = (async () => {
+          const response = await fetch('/api/health/startup', {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
 
-      const data = await response.json();
+          const data = await response.json();
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || data.message || 'Startup validation failed');
+          if (!response.ok || !data.success) {
+            throw new Error(data.error || data.message || 'Startup validation failed');
+          }
+        })();
       }
+
+      await startupCheckPromise;
 
       if (process.env.NODE_ENV === 'production') {
         window.addEventListener('error', (event) => {
@@ -60,9 +79,18 @@ export default function StartupProvider({ children }: StartupProviderProps) {
         });
       }
 
+      startupCheckCache = {
+        initialized: true,
+        error: null,
+      };
       setInitialized(true);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown startup error';
+      startupCheckPromise = null;
+      startupCheckCache = {
+        initialized: false,
+        error: errorMessage,
+      };
       setError(errorMessage);
       console.error('Startup validation failed:', err);
     } finally {
@@ -71,6 +99,8 @@ export default function StartupProvider({ children }: StartupProviderProps) {
   };
 
   const retry = () => {
+    startupCheckPromise = null;
+    startupCheckCache = null;
     checkStartup();
   };
 

@@ -7,6 +7,8 @@ import { z } from 'zod';
 const SyncOptionsSchema = z.object({
   max_items: z.number().int().min(1).max(500).optional(),
   similarity_check: z.boolean().optional(),
+  incremental: z.boolean().optional(),
+  auto_preprocess: z.boolean().optional(),
 });
 
 // POST /api/sources/:id/sync - 同步单个数据源到 inbox_items
@@ -39,4 +41,3 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return createNextErrorResponse('SYNC_SOURCE_ERROR', '同步数据源失败', 500);
   }
 }
-

@@ -18,6 +18,7 @@ const publicRoutes = [
   '/login',
   '/api/auth/login',
   '/api/health',
+  '/api/upload/image',
 ];
 
 // Define admin-only routes
@@ -152,6 +153,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|public/).*)',
+    '/((?!_next/static|_next/image|favicon.ico|public/|api/upload/image).*)',
   ],
 };

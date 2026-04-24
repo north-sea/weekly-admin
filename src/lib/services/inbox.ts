@@ -59,6 +59,28 @@ function parseTagsSuggestion(value: unknown): Array<{ name?: string }> {
   return [];
 }
 
+async function moveKarakeepBookmarkToWeekly(karakeepId: string) {
+  if (!karakeepId) return;
+
+  if (KARAKEEP_WEEKLY_LIST_ID) {
+    try {
+      await addBookmarkToKarakeepList(KARAKEEP_WEEKLY_LIST_ID, karakeepId);
+      console.log(`已将书签添加到 Karakeep 周刊列表: ${KARAKEEP_WEEKLY_LIST_ID}`);
+    } catch (error) {
+      console.error('添加到 Karakeep 周刊列表失败:', error);
+    }
+  }
+
+  if (KARAKEEP_DRAFT_LIST_ID) {
+    try {
+      await removeBookmarkFromKarakeepList(KARAKEEP_DRAFT_LIST_ID, karakeepId);
+      console.log(`已从 Karakeep Draft 列表移除书签: ${KARAKEEP_DRAFT_LIST_ID}`);
+    } catch (error) {
+      console.error('从 Karakeep Draft 列表移除失败:', error);
+    }
+  }
+}
+
 export class InboxService {
   static async getInboxList(query: InboxListQuery): Promise<InboxListResponse> {
     const {
@@ -68,8 +90,8 @@ export class InboxService {
       source_id,
       keyword,
       showDuplicates = 'all',
-      sortBy = 'created_at',
-      sortOrder = 'desc',
+      sortBy = 'collected_at',
+      sortOrder = 'asc',
       ai_score_min,
     } = query;
 
@@ -102,10 +124,12 @@ export class InboxService {
           ? { priority: sortOrder }
           : sortBy === 'ai_score'
             ? { ai_score: sortOrder }
-            : sortBy === 'synced_at'
-              ? { synced_at: sortOrder }
-              : sortBy === 'source_published_at'
-                ? { source_published_at: sortOrder }
+          : sortBy === 'synced_at'
+            ? { synced_at: sortOrder }
+            : sortBy === 'source_published_at'
+              ? { source_published_at: sortOrder }
+              : sortBy === 'collected_at'
+                ? { collected_at: sortOrder }
                 : { created_at: sortOrder };
 
     const total = await prisma.inbox_items.count({ where });
@@ -328,10 +352,26 @@ export class InboxService {
     if (ids.length === 0) return { updated: 0 };
 
     if (input.action === 'reject') {
+      const items = await prisma.inbox_items.findMany({
+        where: { id: { in: ids } },
+        select: {
+          source_item_id: true,
+          data_source: { select: { type: true } },
+        },
+      });
       const result = await prisma.inbox_items.updateMany({
         where: { id: { in: ids } },
         data: { status: 'rejected' },
       });
+
+      const karakeepIds = items
+        .filter((item) => item.data_source?.type === 'karakeep' && item.source_item_id)
+        .map((item) => item.source_item_id as string);
+
+      for (const karakeepId of karakeepIds) {
+        await moveKarakeepBookmarkToWeekly(karakeepId);
+      }
+
       return { updated: result.count };
     }
 

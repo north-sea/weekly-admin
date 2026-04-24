@@ -259,6 +259,7 @@ model data_sources {
   error_count             Int?           @default(0)
   last_error              String?        @db.Text
   score_weight            Int?           @default(0)
+  auto_score_override     Boolean?
   total_synced            Int?           @default(0)
   total_promoted          Int?           @default(0)
   total_published         Int?           @default(0)
@@ -298,6 +299,7 @@ model inbox_items {
   content_id          BigInt?
   duplicate_of_id     BigInt?
   source_published_at DateTime?   @db.Timestamp(0)
+  collected_at        DateTime?   @db.Timestamp(0)
   synced_at           DateTime?   @db.Timestamp(0)
   created_at          DateTime?   @default(now()) @db.Timestamp(0)
   updated_at          DateTime?   @default(now()) @db.Timestamp(0)
@@ -317,6 +319,12 @@ model inbox_items {
   @@index([duplicate_of_id])
   @@index([similar_item_id])
   @@index([image_status])
+}
+
+model ai_settings {
+  key        String    @id @db.VarChar(100)
+  value      Json
+  updated_at DateTime? @default(now()) @db.Timestamp(0)
 }
 
 model ai_configs {

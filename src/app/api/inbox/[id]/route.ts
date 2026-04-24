@@ -2,7 +2,11 @@ import { NextRequest } from 'next/server';
 import { authenticateRequest } from '@/lib/auth';
 import { createNextErrorResponse, createNextSuccessResponse } from '@/lib/utils/serialization';
 import { prisma } from '@/lib/db';
+import { addBookmarkToKarakeepList, removeBookmarkFromKarakeepList } from '@/lib/services/karakeep-api';
 import { z } from 'zod';
+
+const KARAKEEP_WEEKLY_LIST_ID = process.env.KARAKEEP_WEEKLY_LIST_ID || '';
+const KARAKEEP_DRAFT_LIST_ID = process.env.KARAKEEP_DRAFT_LIST_ID || '';
 
 const InboxUpdateSchema = z.object({
   status: z.enum(['pending', 'promoted', 'rejected', 'duplicate']).optional(),
@@ -67,7 +71,28 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         priority: validated.priority,
         duplicate_of_id: duplicateOfId,
       },
+      include: { data_source: true },
     });
+
+    if (validated.status === 'rejected' && updated.data_source?.type === 'karakeep' && updated.source_item_id) {
+      const karakeepId = updated.source_item_id;
+      if (KARAKEEP_WEEKLY_LIST_ID) {
+        try {
+          await addBookmarkToKarakeepList(KARAKEEP_WEEKLY_LIST_ID, karakeepId);
+          console.log(`已将书签添加到 Karakeep 周刊列表: ${KARAKEEP_WEEKLY_LIST_ID}`);
+        } catch (error) {
+          console.error('添加到 Karakeep 周刊列表失败:', error);
+        }
+      }
+      if (KARAKEEP_DRAFT_LIST_ID) {
+        try {
+          await removeBookmarkFromKarakeepList(KARAKEEP_DRAFT_LIST_ID, karakeepId);
+          console.log(`已从 Karakeep Draft 列表移除书签: ${KARAKEEP_DRAFT_LIST_ID}`);
+        } catch (error) {
+          console.error('从 Karakeep Draft 列表移除失败:', error);
+        }
+      }
+    }
 
     return createNextSuccessResponse(updated);
   } catch (error) {
@@ -81,4 +106,3 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return createNextErrorResponse('UPDATE_INBOX_ITEM_ERROR', '更新收件箱条目失败', 500);
   }
 }
-

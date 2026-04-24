@@ -18,6 +18,8 @@ export type AggregatorConfig = {
 export type RssSourceConfig = {
   deduplication?: Partial<DeduplicationConfig>;
   aggregator?: Partial<AggregatorConfig>;
+  /** 增量同步安全窗口（天） */
+  sync_window_days?: number;
 };
 
 export type ParsedFeedItem = {

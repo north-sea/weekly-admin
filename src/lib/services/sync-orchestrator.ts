@@ -3,8 +3,10 @@ import { extractLinksFromHtml, isAggregatorItem, withAggregatorDefaults } from '
 import { normalizeUrl, calculateStringSimilarity, withDeduplicationDefaults } from '@/lib/rss/deduplicator';
 import { parseFeed } from '@/lib/rss/parser';
 import type { ParsedFeedItem, RssSourceConfig, RssSourceType } from '@/lib/rss/types';
-import { fetchKarakeepBookmarks, type KarakeepBookmark } from '@/lib/services/karakeep-api';
+import { fetchKarakeepBookmarks, isKarakeepConfigured, type KarakeepBookmark } from '@/lib/services/karakeep-api';
+import { AiSettingsService, AUTO_SCORE_SETTING_KEY, type AutoScoreSettingValue } from '@/lib/services/ai-settings';
 import type { Prisma } from '@prisma/client';
+import { computePreprocessSince, shouldAdvanceLastSyncedAtForIncrementalSync } from '@/lib/services/sync-orchestrator-utils';
 
 const SOURCE_NAME_MAX = 255;
 
@@ -13,6 +15,8 @@ export type SyncOptions = {
   similarity_check?: boolean;
   /** 是否在同步后自动执行 AI 预处理（评分、相似度检测），默认 false */
   auto_preprocess?: boolean;
+  /** 仅对 Karakeep 生效：仅同步上次同步之后新增的书签 */
+  incremental?: boolean;
 };
 
 type DuplicateSource = 'inbox_items' | 'contents';
@@ -139,6 +143,22 @@ function getRssConfig(source: { config: unknown | null }) {
   return cfg as RssSourceConfig & { feed_url?: string; source_type?: RssSourceType };
 }
 
+function getSyncWindowDays(config: RssSourceConfig) {
+  const raw = (config as { sync_window_days?: unknown }).sync_window_days;
+  const value = typeof raw === 'number' ? raw : Number(raw);
+  if (!Number.isFinite(value) || value < 0) return 1;
+  return value;
+}
+
+function filterItemsBySyncWindow(items: ParsedFeedItem[], windowStart?: Date | null) {
+  if (!windowStart) return items;
+  return items.filter((item) => {
+    const publishedAt = safeDate(item.publishedAt);
+    if (!publishedAt) return true;
+    return publishedAt >= windowStart;
+  });
+}
+
 function buildCandidates(items: ParsedFeedItem[], sourceType: RssSourceType, config: RssSourceConfig) {
   const aggConfig = withAggregatorDefaults(config.aggregator);
   const candidates: Array<{ url: string; title?: string; item?: ParsedFeedItem; parentUrl?: string }> = [];
@@ -198,8 +218,13 @@ async function syncRssToInbox(sourceId: number, options?: SyncOptions): Promise<
 
   const feed = parseFeed(xml);
   const items = feed.items.slice(0, options?.max_items ?? 20);
+  const syncWindowDays = getSyncWindowDays(cfg);
+  const windowStart = source.last_synced_at
+    ? new Date(source.last_synced_at.getTime() - syncWindowDays * 24 * 60 * 60 * 1000)
+    : null;
+  const windowedItems = filterItemsBySyncWindow(items, windowStart);
   const sourceType = (cfg.source_type ?? 'normal') as RssSourceType;
-  const candidates = buildCandidates(items, sourceType, cfg);
+  const candidates = buildCandidates(windowedItems, sourceType, cfg);
 
   const dedupConfig = withDeduplicationDefaults(cfg.deduplication);
   const enableSimilarity = options?.similarity_check ?? dedupConfig.check_similarity;
@@ -274,6 +299,7 @@ async function syncRssToInbox(sourceId: number, options?: SyncOptions): Promise<
       content_id: null,
       duplicate_of_id: null,
       source_published_at: publishedAt,
+      collected_at: new Date(),
       synced_at: new Date(),
     } as any);
   }
@@ -356,24 +382,35 @@ function karakeepBookmarkToInboxCreate(sourceId: number, bookmark: KarakeepBookm
     content_id: null,
     duplicate_of_id: null,
     source_published_at: safeDate(bookmark.createdAt) ?? safeDate(bookmark.content?.datePublished) ?? null,
+    collected_at: safeDate(bookmark.createdAt) ?? new Date(),
     synced_at: new Date(),
   } as const;
 }
 
-async function syncKarakeepToInbox(sourceId: number): Promise<SyncResult> {
+async function syncKarakeepToInbox(sourceId: number, options?: SyncOptions): Promise<SyncResult> {
   const source = await prisma.data_sources.findUnique({ where: { id: sourceId } });
   if (!source) throw new Error(`Data source not found: ${sourceId}`);
   if (source.type !== 'karakeep') throw new Error('数据源类型不是 karakeep');
   if (!source.enabled) throw new Error('数据源已禁用');
+  if (!isKarakeepConfigured({ requireDraftListId: true })) {
+    throw new Error('Karakeep 未配置：请设置 KARAKEEP_HOST / KARAKEEP_KEY / KARAKEEP_DRAFT_LIST_ID');
+  }
 
   const fetchedAt = new Date().toISOString();
   const errors: string[] = [];
 
   const bookmarks = await fetchKarakeepBookmarks({ includeContent: true });
+  let filteredBookmarks = bookmarks;
+  if (options?.incremental && source.last_synced_at) {
+    filteredBookmarks = bookmarks.filter((bookmark) => {
+      const createdAt = safeDate(bookmark.createdAt);
+      return createdAt ? createdAt > source.last_synced_at! : false;
+    });
+  }
   let upserted = 0;
   let skippedDuplicates = 0;
 
-  for (const bookmark of bookmarks) {
+  for (const bookmark of filteredBookmarks) {
     const create = karakeepBookmarkToInboxCreate(source.id, bookmark);
     if (!create) continue;
 
@@ -395,6 +432,7 @@ async function syncKarakeepToInbox(sourceId: number): Promise<SyncResult> {
           summarization_status: create.summarization_status,
           tagging_status: create.tagging_status,
           source_published_at: create.source_published_at,
+          collected_at: create.collected_at,
           synced_at: new Date(),
         },
       });
@@ -409,20 +447,20 @@ async function syncKarakeepToInbox(sourceId: number): Promise<SyncResult> {
     }
   }
 
-  await prisma.data_sources.update({
-    where: { id: sourceId },
-    data: {
-      last_synced_at: new Date(),
-      sync_count: (source.sync_count ?? 0) + 1,
-      last_error: errors.length > 0 ? errors.slice(0, 3).join('; ') : null,
-      error_count: (source.error_count ?? 0) + (errors.length > 0 ? 1 : 0),
-    },
-  });
+  const shouldAdvanceLastSyncedAt = shouldAdvanceLastSyncedAtForIncrementalSync(options?.incremental, errors.length);
+  const patch: Prisma.data_sourcesUpdateInput = {
+    ...(shouldAdvanceLastSyncedAt ? { last_synced_at: new Date() } : {}),
+    sync_count: (source.sync_count ?? 0) + 1,
+    last_error: errors.length > 0 ? errors.slice(0, 3).join('; ') : null,
+    error_count: (source.error_count ?? 0) + (errors.length > 0 ? 1 : 0),
+  };
+
+  await prisma.data_sources.update({ where: { id: sourceId }, data: patch });
 
   return {
     source_id: sourceId,
     fetched_at: fetchedAt,
-    total_candidates: bookmarks.length,
+    total_candidates: filteredBookmarks.length,
     upserted,
     skipped_duplicates: skippedDuplicates,
     errors,
@@ -433,19 +471,36 @@ export class SyncOrchestrator {
   static async syncDataSource(sourceId: number, options?: SyncOptions): Promise<SyncResult> {
     const source = await prisma.data_sources.findUnique({ where: { id: sourceId } });
     if (!source) throw new Error(`Data source not found: ${sourceId}`);
+    const syncStartedAt = new Date();
 
     let result: SyncResult;
     if (source.type === 'rss') {
       result = await syncRssToInbox(sourceId, options);
     } else if (source.type === 'karakeep') {
-      result = await syncKarakeepToInbox(sourceId);
+      result = await syncKarakeepToInbox(sourceId, options);
     } else {
       throw new Error(`暂不支持的数据源类型: ${source.type}`);
     }
 
     // 如果启用了自动预处理，执行 AI 评分和相似度检测
-    if (options?.auto_preprocess && result.upserted > 0) {
-      result.preprocess_result = await this.preprocessNewItems(sourceId, result.upserted);
+    if (result.upserted > 0) {
+      let shouldAutoPreprocess: boolean;
+      if (typeof options?.auto_preprocess === 'boolean') {
+        shouldAutoPreprocess = options.auto_preprocess;
+      } else if (source.auto_score_override !== null && source.auto_score_override !== undefined) {
+        shouldAutoPreprocess = source.auto_score_override;
+      } else {
+        const setting = await AiSettingsService.get(AUTO_SCORE_SETTING_KEY);
+        const value = setting?.value as AutoScoreSettingValue | undefined;
+        shouldAutoPreprocess = value?.enabled ?? true;
+      }
+
+      if (shouldAutoPreprocess) {
+        result.preprocess_result = await this.preprocessNewItems(sourceId, {
+          limit: result.upserted,
+          since: syncStartedAt,
+        });
+      }
     }
 
     return result;
@@ -457,11 +512,15 @@ export class SyncOrchestrator {
    */
   static async preprocessNewItems(
     sourceId: number,
-    limit: number = 50
+    options?: { limit?: number; since?: Date }
   ): Promise<{ scored: number; similar_detected: number; errors: string[] }> {
     const errors: string[] = [];
     let scored = 0;
     let similarDetected = 0;
+    const limit = options?.limit ?? 50;
+    if (limit <= 0) return { scored, similar_detected: similarDetected, errors };
+
+    const since = options?.since ? computePreprocessSince(options.since) : undefined;
 
     // 获取该源最近同步的未评分条目
     const items = await prisma.inbox_items.findMany({
@@ -469,6 +528,7 @@ export class SyncOrchestrator {
         source_id: sourceId,
         status: 'pending',
         ai_score: null,
+        ...(since ? { synced_at: { gte: since } } : {}),
       },
       select: { id: true, title: true },
       orderBy: { synced_at: 'desc' },

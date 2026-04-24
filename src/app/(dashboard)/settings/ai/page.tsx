@@ -22,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
+import { useAiSettings, useUpdateAiSetting } from '@/hooks/queries/useAiSettingsQueries';
 import { Plus, Pencil, Trash2, PlugZap, Star, RotateCcw, Save } from 'lucide-react';
 
 type ApiResponse<T> = {
@@ -63,6 +64,7 @@ type AiPrompt = {
 };
 
 const focusRingClass = 'focus-visible:ring-1 focus-visible:ring-offset-1 focus:ring-1 focus:ring-offset-1';
+const AUTO_SCORE_SETTING_KEY = 'auto_score_on_sync';
 
 const SCENE_LABELS: Record<AiPromptScene, string> = {
   content_score: '内容评分',
@@ -76,6 +78,8 @@ const SCENE_LABELS: Record<AiPromptScene, string> = {
 
 export default function AiSettingsPage() {
   const { toast } = useToast();
+  const aiSettingsQuery = useAiSettings();
+  const updateAiSetting = useUpdateAiSetting();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [configs, setConfigs] = useState<AiConfig[]>([]);
@@ -100,6 +104,23 @@ export default function AiSettingsPage() {
     enabled: true,
     is_default: false,
   });
+
+  const autoScoreSetting = useMemo(
+    () => (aiSettingsQuery.data ?? []).find((item) => item.key === AUTO_SCORE_SETTING_KEY),
+    [aiSettingsQuery.data]
+  );
+  const resolvedAutoScoreEnabled = useMemo(() => {
+    const value = autoScoreSetting?.value as { enabled?: unknown } | boolean | undefined;
+    if (typeof value === 'boolean') return value;
+    if (value && typeof value === 'object' && typeof value.enabled === 'boolean') return value.enabled;
+    return true;
+  }, [autoScoreSetting]);
+  const [autoScoreOnSync, setAutoScoreOnSync] = useState(true);
+
+  useEffect(() => {
+    if (aiSettingsQuery.isLoading) return;
+    setAutoScoreOnSync(resolvedAutoScoreEnabled);
+  }, [aiSettingsQuery.isLoading, resolvedAutoScoreEnabled]);
 
   useEffect(() => {
     let canceled = false;
@@ -142,6 +163,25 @@ export default function AiSettingsPage() {
       canceled = true;
     };
   }, []);
+
+  const handleAutoScoreToggle = async (checked: boolean) => {
+    const previous = autoScoreOnSync;
+    setAutoScoreOnSync(checked);
+    try {
+      await updateAiSetting.mutateAsync({
+        key: AUTO_SCORE_SETTING_KEY,
+        value: { enabled: checked },
+      });
+      toast({
+        title: '已保存',
+        description: checked ? '新同步的条目将自动评分' : '已关闭同步自动评分',
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '保存失败';
+      setAutoScoreOnSync(previous);
+      toast({ title: '保存失败', description: message, variant: 'destructive' });
+    }
+  };
 
   const defaultConfig = useMemo(() => configs.find((c) => c.is_default), [configs]);
 
@@ -331,6 +371,40 @@ export default function AiSettingsPage() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>自动化设置</CardTitle>
+          <CardDescription>控制同步后自动评分的全局开关，可被数据源级别覆盖</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {aiSettingsQuery.error && (
+            <Alert variant="destructive">
+              <AlertTitle>获取失败</AlertTitle>
+              <AlertDescription>
+                {aiSettingsQuery.error instanceof Error ? aiSettingsQuery.error.message : '获取自动化设置失败'}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">同步后自动评分</p>
+              <p className="text-xs text-muted-foreground">
+                启用后，新同步的收件箱条目会自动执行 AI 评分；数据源可设置覆盖。
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {updateAiSetting.isPending && <Badge variant="secondary">保存中</Badge>}
+              <Switch
+                checked={autoScoreOnSync}
+                onCheckedChange={handleAutoScoreToggle}
+                disabled={aiSettingsQuery.isLoading || updateAiSetting.isPending}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

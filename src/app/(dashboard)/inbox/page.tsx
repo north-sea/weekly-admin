@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import dayjs from 'dayjs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,8 +69,8 @@ export default function InboxPage() {
     page: 1,
     pageSize: 20,
     status: 'pending',
-    sortBy: 'ai_score', // 默认按评分排序
-    sortOrder: 'desc',
+    sortBy: 'collected_at', // 默认按收集时间排序
+    sortOrder: 'asc',
   });
   const [keyword, setKeyword] = useState('');
   const [minScore, setMinScore] = useState<number | undefined>(undefined);
@@ -360,8 +361,8 @@ export default function InboxPage() {
             <SelectContent>
               <SelectItem value="ai_score-desc">评分 高→低</SelectItem>
               <SelectItem value="ai_score-asc">评分 低→高</SelectItem>
-              <SelectItem value="source_published_at-desc">时间 新→旧</SelectItem>
-              <SelectItem value="source_published_at-asc">时间 旧→新</SelectItem>
+              <SelectItem value="collected_at-desc">时间 新→旧</SelectItem>
+              <SelectItem value="collected_at-asc">时间 旧→新</SelectItem>
             </SelectContent>
           </Select>
           <Button
@@ -377,7 +378,7 @@ export default function InboxPage() {
               setMinScore(undefined);
               setSelected(new Set());
               setHasAutoSelected(false);
-              setFilters({ page: 1, pageSize: 20, status: 'pending', sortBy: 'ai_score', sortOrder: 'desc' });
+              setFilters({ page: 1, pageSize: 20, status: 'pending', sortBy: 'collected_at', sortOrder: 'asc' });
             }}
           >
             重置
@@ -442,6 +443,7 @@ export default function InboxPage() {
                   <TableHead className="w-[30px]"></TableHead>
                   <TableHead>标题</TableHead>
                   <TableHead>来源</TableHead>
+                  <TableHead>时间</TableHead>
                   <TableHead>评分</TableHead>
                   <TableHead className="w-[60px]">图片</TableHead>
                   <TableHead>状态</TableHead>
@@ -451,13 +453,13 @@ export default function InboxPage() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="py-12 text-center text-muted-foreground">
                       <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                     </TableCell>
                   </TableRow>
                 ) : rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="py-12 text-center text-muted-foreground">
                       暂无数据
                     </TableCell>
                   </TableRow>
@@ -504,6 +506,15 @@ export default function InboxPage() {
                           <TableCell className="text-sm text-muted-foreground">
                             {item.data_source?.name || item.source_name || '-'}
                           </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {item.collected_at
+                              ? dayjs(item.collected_at).format('YYYY-MM-DD HH:mm')
+                              : item.source_published_at
+                                ? dayjs(item.source_published_at).format('YYYY-MM-DD HH:mm')
+                                : item.created_at
+                                  ? dayjs(item.created_at).format('YYYY-MM-DD HH:mm')
+                                  : '-'}
+                          </TableCell>
                           <TableCell className="text-sm">
                             {item.ai_score !== null && item.ai_score !== undefined ? (
                               <span className={item.ai_score >= 70 ? 'text-green-600 font-medium' : item.ai_score >= 50 ? 'text-yellow-600' : 'text-muted-foreground'}>
@@ -544,7 +555,7 @@ export default function InboxPage() {
                         </TableRow>
                         {isExpanded ? (
                           <TableRow id={detailsId} className="bg-muted/30 hover:bg-muted/30">
-                            <TableCell colSpan={8} className="p-4">
+                            <TableCell colSpan={9} className="p-4">
                               <div className="space-y-3">
                                 {item.image_url ? (
                                   <div className="flex items-center gap-3">

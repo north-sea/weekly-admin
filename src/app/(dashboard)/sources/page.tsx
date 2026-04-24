@@ -13,6 +13,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ExternalLink, RefreshCw, Settings, Trash2, AlertTriangle } from 'lucide-react';
 import {
+  type SyncAllStartedResult,
+  type SyncAllWaitResult,
   useCreateDataSource,
   useDataSources,
   useDeleteDataSource,
@@ -55,6 +57,16 @@ function calculatePublishRate(source: { total_promoted?: number | null; total_pu
 function formatPercent(rate: number | null): string {
   if (rate === null) return '-';
   return `${(rate * 100).toFixed(1)}%`;
+}
+
+function getAutoScoreBadge(value: boolean | null | undefined) {
+  if (value === true) return { label: '开启', variant: 'default' as const };
+  if (value === false) return { label: '关闭', variant: 'destructive' as const };
+  return { label: '跟随全局', variant: 'secondary' as const };
+}
+
+function isSyncAllStartedResult(result: SyncAllStartedResult | SyncAllWaitResult): result is SyncAllStartedResult {
+  return 'total' in result;
 }
 
 export default function SourcesPage() {
@@ -114,12 +126,18 @@ export default function SourcesPage() {
     }
   }
 
-  async function handleSync(sourceId: number) {
+  async function handleSync(sourceId: number, options?: { incremental?: boolean }) {
     try {
-      const result = await syncSource.mutateAsync({ id: sourceId, options: { max_items: 50 } });
+      const result = await syncSource.mutateAsync({
+        id: sourceId,
+        options: { max_items: 50, ...options },
+      });
+      const scoreInfo = result.preprocess_result
+        ? `，评分 ${result.preprocess_result.scored}`
+        : '';
       toast({
         title: '同步完成',
-        description: `候选 ${result.total_candidates}，写入/更新 ${result.upserted}，跳过 ${result.skipped_duplicates}`,
+        description: `候选 ${result.total_candidates}，写入/更新 ${result.upserted}，跳过 ${result.skipped_duplicates}${scoreInfo}`,
       });
     } catch (error) {
       toast({ title: '同步失败', description: error instanceof Error ? error.message : String(error), variant: 'destructive' });
@@ -129,8 +147,12 @@ export default function SourcesPage() {
   async function handleSyncAll() {
     try {
       const result = await syncAll.mutateAsync({ max_items: 50 });
-      const ok = result.results.filter((r) => r.ok).length;
-      toast({ title: '同步完成', description: `共 ${result.total} 个数据源，成功 ${ok} 个` });
+      toast({
+        title: '已开始同步',
+        description: isSyncAllStartedResult(result)
+          ? result.message ?? `已开始同步 ${result.total} 个数据源，请稍后刷新查看结果`
+          : `同步完成：成功 ${result.ok_count} 个，失败 ${result.failed_count} 个`,
+      });
     } catch (error) {
       toast({ title: '同步失败', description: error instanceof Error ? error.message : String(error), variant: 'destructive' });
     }
@@ -150,7 +172,10 @@ export default function SourcesPage() {
     }
   }
 
-  async function handleSaveConfig(id: number, data: { score_weight?: number }) {
+  async function handleSaveConfig(
+    id: number,
+    data: { score_weight?: number; auto_score_override?: boolean | null; config?: Record<string, unknown> }
+  ) {
     await updateSource.mutateAsync({ id, data: data as any });
   }
 
@@ -218,6 +243,7 @@ export default function SourcesPage() {
                   <TableHead>ID</TableHead>
                   <TableHead>名称</TableHead>
                   <TableHead>类型</TableHead>
+                  <TableHead>自动评分</TableHead>
                   <TableHead>配置</TableHead>
                   <TableHead>入选率</TableHead>
                   <TableHead>入刊率</TableHead>
@@ -229,17 +255,17 @@ export default function SourcesPage() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
-                      加载中...
-                    </TableCell>
-                  </TableRow>
-                ) : sortedSources.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
-                      暂无数据源
-                    </TableCell>
-                  </TableRow>
-                ) : (
+                        <TableCell colSpan={10} className="py-10 text-center text-muted-foreground">
+                          加载中...
+                        </TableCell>
+                      </TableRow>
+                    ) : sortedSources.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={10} className="py-10 text-center text-muted-foreground">
+                          暂无数据源
+                        </TableCell>
+                      </TableRow>
+                    ) : (
                   sortedSources.map((source) => {
                     const feedUrl = source.type === 'rss' ? getFeedUrl(source.config) : null;
                     const rssType = source.type === 'rss' ? getRssSourceType(source.config) : null;
@@ -247,6 +273,7 @@ export default function SourcesPage() {
                     const publishRate = calculatePublishRate(source);
                     const isLowPromotion = promotionRate !== null && promotionRate < 0.1;
                     const lastError = source.last_error ? source.last_error.replace(/\s+/g, ' ').trim() : null;
+                    const autoScoreBadge = getAutoScoreBadge(source.auto_score_override);
                     return (
                       <TableRow key={source.id}>
                         <TableCell className="font-mono text-xs">{source.id}</TableCell>
@@ -254,6 +281,11 @@ export default function SourcesPage() {
                         <TableCell>
                           <Badge variant="secondary">{source.type}</Badge>
                           {rssType ? <Badge variant="outline" className="ml-2">{rssType}</Badge> : null}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={autoScoreBadge.variant}>
+                            {autoScoreBadge.label}
+                          </Badge>
                         </TableCell>
                         <TableCell className="max-w-[420px]">
                           {feedUrl ? (
@@ -294,15 +326,28 @@ export default function SourcesPage() {
                           />
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleSync(source.id)}
-                            disabled={syncSource.isPending}
-                          >
-                            <RefreshCw className="mr-2 h-4 w-4" />
-                            同步
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleSync(source.id)}
+                              disabled={syncSource.isPending}
+                            >
+                              <RefreshCw className="mr-2 h-4 w-4" />
+                              同步
+                            </Button>
+                            {source.type === 'karakeep' ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleSync(source.id, { incremental: true })}
+                                disabled={syncSource.isPending}
+                              >
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                                仅新增
+                              </Button>
+                            ) : null}
+                          </div>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">

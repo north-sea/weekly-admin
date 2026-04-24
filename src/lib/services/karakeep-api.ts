@@ -18,24 +18,25 @@ const KARAKEEP_DRAFT_LIST_ID = process.env.KARAKEEP_DRAFT_LIST_ID || ''; // Draf
 let karakeepApiInstance: KarakeepApiClient | null = null;
 let karakeepConfigWarned = false;
 
-function getMissingKarakeepConfig(): string[] {
+function getMissingKarakeepConfig(requireDraftListId = false): string[] {
   const missing: string[] = [];
   if (!KARAKEEP_HOST) missing.push('KARAKEEP_HOST');
   if (!KARAKEEP_KEY) missing.push('KARAKEEP_KEY');
+  if (requireDraftListId && !KARAKEEP_DRAFT_LIST_ID) missing.push('KARAKEEP_DRAFT_LIST_ID');
   return missing;
 }
 
-function warnKarakeepConfigOnce(context?: string) {
+function warnKarakeepConfigOnce(context?: string, requireDraftListId = false) {
   if (karakeepConfigWarned) return;
-  const missing = getMissingKarakeepConfig();
+  const missing = getMissingKarakeepConfig(requireDraftListId);
   if (missing.length === 0) return;
   const suffix = context ? `，跳过 ${context}` : '，跳过相关操作';
   console.warn(`Karakeep 未配置${suffix}。缺少: ${missing.join(', ')}`);
   karakeepConfigWarned = true;
 }
 
-export function isKarakeepConfigured(): boolean {
-  return getMissingKarakeepConfig().length === 0;
+export function isKarakeepConfigured(options?: { requireDraftListId?: boolean }): boolean {
+  return getMissingKarakeepConfig(options?.requireDraftListId ?? false).length === 0;
 }
 
 export function getKarakeepApi(context?: string): KarakeepApiClient | null {
@@ -168,6 +169,9 @@ export class KarakeepApiClient {
     limit?: number;
     includeContent?: boolean;
   }): Promise<KarakeepBookmark[]> {
+    if (!KARAKEEP_DRAFT_LIST_ID) {
+      throw new KarakeepApiError('KARAKEEP_DRAFT_LIST_ID 环境变量未配置');
+    }
     try {
       console.log('正在从 Karakeep Draft 列表获取书签...', options);
       

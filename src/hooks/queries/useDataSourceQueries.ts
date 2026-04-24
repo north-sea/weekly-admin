@@ -12,6 +12,7 @@ export type DataSource = {
   config?: unknown | null;
   enabled?: boolean | null;
   auto_promote_threshold?: number | null;
+  auto_score_override?: boolean | null;
   default_category_id?: number | null;
   default_content_type_id?: number | null;
   last_synced_at?: string | null;
@@ -32,6 +33,7 @@ export type DataSourceInput = {
   enabled?: boolean;
   config?: unknown;
   auto_promote_threshold?: number | null;
+  auto_score_override?: boolean | null;
   default_category_id?: number | null;
   default_content_type_id?: number | null;
 };
@@ -43,6 +45,35 @@ export type SyncResult = {
   upserted: number;
   skipped_duplicates: number;
   errors: string[];
+  preprocess_result?: {
+    scored: number;
+    similar_detected: number;
+    errors: string[];
+  };
+};
+
+export type SyncOptions = {
+  max_items?: number;
+  similarity_check?: boolean;
+  incremental?: boolean;
+  auto_preprocess?: boolean;
+};
+
+export type SyncAllStartedResult = {
+  started: boolean;
+  total: number;
+  started_at?: string;
+  message?: string;
+};
+
+export type SyncAllWaitResult = {
+  started: boolean;
+  started_at: string;
+  finished_at: string;
+  total_sources: number;
+  ok_count: number;
+  failed_count: number;
+  results: Array<{ source_id: number; name: string; ok: boolean; result?: SyncResult; error?: string }>;
 };
 
 export function useDataSources(params?: { type?: DataSourceType; enabled?: boolean }) {
@@ -90,7 +121,7 @@ export function useDeleteDataSource() {
 
 export function useSyncDataSource() {
   const invalidate = useInvalidateQueries();
-  return useApiMutation<SyncResult, { id: number; options?: { max_items?: number; similarity_check?: boolean } }>(
+  return useApiMutation<SyncResult, { id: number; options?: SyncOptions }>(
     ({ id, options }) => apiClient.post<SyncResult>(`/api/sources/${id}/sync`, options ?? {}),
     {
       onSuccess: async (_data, variables) => {
@@ -104,8 +135,16 @@ export function useSyncDataSource() {
 export function useSyncAllSources() {
   const invalidate = useInvalidateQueries();
   return useApiMutation<
-    { total: number; results: Array<{ source_id: number; ok: boolean; result?: SyncResult; error?: string }> },
-    { type?: DataSourceType; max_items?: number; similarity_check?: boolean }
+    SyncAllStartedResult | SyncAllWaitResult,
+    {
+      type?: DataSourceType;
+      max_items?: number;
+      similarity_check?: boolean;
+      incremental?: boolean;
+      auto_preprocess?: boolean;
+      only_due?: boolean;
+      wait?: boolean;
+    }
   >(
     (payload) => apiClient.post('/api/sources/sync-all', payload),
     {
@@ -116,4 +155,3 @@ export function useSyncAllSources() {
     }
   );
 }
-

@@ -1,0 +1,22 @@
+{
+  "../node_modules/.pnpm/@tanstack+query-devtools@5.93.0/node_modules/@tanstack/query-devtools/build/dev.js -> ./DevtoolsComponent/B5PP2USH.js": {
+    "id": "../node_modules/.pnpm/@tanstack+query-devtools@5.93.0/node_modules/@tanstack/query-devtools/build/dev.js -> ./DevtoolsComponent/B5PP2USH.js",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_pnpm_tanstack_query-devtools_5_93_0_node_modules_tanstack_que-bbcb4a.js"
+    ]
+  },
+  "../node_modules/.pnpm/@tanstack+query-devtools@5.93.0/node_modules/@tanstack/query-devtools/build/dev.js -> ./DevtoolsPanelComponent/WI32IQVE.js": {
+    "id": "../node_modules/.pnpm/@tanstack+query-devtools@5.93.0/node_modules/@tanstack/query-devtools/build/dev.js -> ./DevtoolsPanelComponent/WI32IQVE.js",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_pnpm_tanstack_query-devtools_5_93_0_node_modules_tanstack_que-23f076.js"
+    ]
+  },
+  "lib/services/operation-logs-api.ts -> @/lib/api-client": {
+    "id": "lib/services/operation-logs-api.ts -> @/lib/api-client",
+    "files": []
+  },
+  "lib/services/search-api.ts -> @/lib/api-client": {
+    "id": "lib/services/search-api.ts -> @/lib/api-client",
+    "files": []
+  }
+}

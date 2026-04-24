@@ -10,7 +10,7 @@ export const InboxListQuerySchema = z.object({
   keyword: z.string().min(1).optional(),
   showDuplicates: z.enum(['all', 'original', 'duplicate']).optional(),
   sortBy: z
-    .enum(['created_at', 'updated_at', 'priority', 'ai_score', 'source_published_at', 'synced_at'])
+    .enum(['created_at', 'updated_at', 'priority', 'ai_score', 'source_published_at', 'synced_at', 'collected_at'])
     .optional(),
   sortOrder: z.enum(['asc', 'desc']).optional(),
   ai_score_min: z.number().min(0).max(100).optional(),
@@ -41,4 +41,3 @@ export type InboxListQuery = z.infer<typeof InboxListQuerySchema>;
 export type InboxPromoteInput = z.infer<typeof InboxPromoteSchema>;
 export type InboxBatchInput = z.infer<typeof InboxBatchSchema>;
 export type InboxBatchPromoteInput = z.infer<typeof InboxBatchPromoteSchema>;
-

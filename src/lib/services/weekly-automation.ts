@@ -28,6 +28,15 @@ export interface BackfillResult {
   }>;
 }
 
+export interface FillOldOptions {
+  dryRun?: boolean;
+  maxItemsPerIssue?: number;
+  /**
+   * 安全护栏：只处理已结束的历史空周刊（end_date < 当前周周一）
+   */
+  historyOnly?: boolean;
+}
+
 export interface AutoCreateOptions {
   forceCreate?: boolean;
   weekOffset?: number;
@@ -53,6 +62,7 @@ export interface AutoLinkOptions {
 export interface AutoLinkResult {
   issueId: number;
   issueNumber: number;
+  issueTitle: string;
   linkedCount: number;
   skippedCount: number;
   linkedContents: Array<{ id: number; title: string }>;
@@ -191,6 +201,125 @@ export async function backfillWeeklyContents(
   // 计算跳过的内容数
   result.skippedContents = unlinkedContents.length - result.linkedContents;
 
+  return result;
+}
+
+// ============================================================================
+// Fast Fill-Old Service
+// ============================================================================
+
+/**
+ * 快速填满历史空周刊（不按 created_at 匹配周范围）
+ *
+ * 规则：
+ * - 只处理空周刊（没有任何关联内容）
+ * - 默认只处理已结束的历史周刊（end_date < 当前周周一），避免消耗新内容
+ * - 只关联未被任何周刊关联的内容，按 created_at 升序依次填充
+ * - 内容过滤：content_type_id=3 且 status in ('draft','ready','published')
+ */
+export async function fillOldWeeklyContents(
+  options: FillOldOptions = {}
+): Promise<BackfillResult> {
+  const { dryRun = false, maxItemsPerIssue = 15, historyOnly = true } = options;
+
+  const currentWeekStart = getWeekRangeByOffset(0).startDate;
+
+  const emptyIssues = await prisma.$queryRaw<
+    Array<{
+      id: number;
+      issue_number: number;
+      title: string;
+      start_date: Date;
+      end_date: Date;
+    }>
+  >`
+    SELECT wi.id, wi.issue_number, wi.title, wi.start_date, wi.end_date
+    FROM weekly_issues wi
+    LEFT JOIN weekly_content_items wci ON wi.id = wci.weekly_issue_id
+    WHERE (${historyOnly} = FALSE OR wi.end_date < ${currentWeekStart})
+    GROUP BY wi.id
+    HAVING COUNT(wci.id) = 0
+    ORDER BY wi.issue_number ASC
+  `;
+
+  if (emptyIssues.length === 0) {
+    return {
+      processedIssues: 0,
+      linkedContents: 0,
+      skippedContents: 0,
+      details: [],
+    };
+  }
+
+  const unlinkedContents = await prisma.contents.findMany({
+    where: {
+      content_type_id: 3,
+      status: { in: ['draft', 'ready', 'published'] },
+      created_at: historyOnly ? { lt: currentWeekStart } : undefined,
+      weekly_content_items: { none: {} },
+    },
+    select: {
+      id: true,
+      title: true,
+      created_at: true,
+    },
+    orderBy: [{ created_at: 'asc' }, { id: 'asc' }],
+  });
+
+  const result: BackfillResult = {
+    processedIssues: 0,
+    linkedContents: 0,
+    skippedContents: 0,
+    details: [],
+  };
+
+  // 使用指针按顺序分配，避免多次 filter
+  let cursor = 0;
+  for (const issue of emptyIssues) {
+    const matched = unlinkedContents.slice(cursor, cursor + maxItemsPerIssue);
+    if (matched.length === 0) break;
+
+    cursor += matched.length;
+
+    const detail = {
+      issueId: issue.id,
+      issueNumber: issue.issue_number,
+      linkedCount: matched.length,
+      linkedContents: matched.map((c) => ({ id: Number(c.id), title: c.title })),
+    };
+
+    result.details.push(detail);
+    result.processedIssues += 1;
+    result.linkedContents += matched.length;
+
+    if (!dryRun) {
+      await prisma.$transaction(async (tx) => {
+        await tx.weekly_content_items.createMany({
+          data: matched.map((content, index) => ({
+            weekly_issue_id: issue.id,
+            content_id: content.id,
+            sort_order: index,
+          })),
+        });
+
+        const stats = await tx.contents.aggregate({
+          where: { id: { in: matched.map((c) => c.id) } },
+          _sum: { word_count: true, reading_time: true },
+        });
+
+        await tx.weekly_issues.update({
+          where: { id: issue.id },
+          data: {
+            total_items: matched.length,
+            total_word_count: stats._sum.word_count || 0,
+            reading_time: stats._sum.reading_time || 0,
+          },
+        });
+      });
+    }
+  }
+
+  result.skippedContents = Math.max(0, unlinkedContents.length - result.linkedContents);
   return result;
 }
 
@@ -345,6 +474,7 @@ export async function autoLinkWeeklyContents(
   const result: AutoLinkResult = {
     issueId: issue.id,
     issueNumber: issue.issue_number,
+    issueTitle: issue.title,
     linkedCount: 0,
     skippedCount: alreadyLinked.length,
     linkedContents: [],

@@ -31,6 +31,7 @@ export type InboxItem = {
   content_id?: string | null;
   duplicate_of_id?: string | null;
   source_published_at?: string | null;
+  collected_at?: string | null;
   synced_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -45,7 +46,7 @@ export type InboxListParams = {
   source_id?: number;
   keyword?: string;
   showDuplicates?: 'all' | 'original' | 'duplicate';
-  sortBy?: 'created_at' | 'updated_at' | 'priority' | 'ai_score' | 'source_published_at' | 'synced_at';
+  sortBy?: 'created_at' | 'updated_at' | 'priority' | 'ai_score' | 'source_published_at' | 'synced_at' | 'collected_at';
   sortOrder?: 'asc' | 'desc';
   ai_score_min?: number;
 };
@@ -184,4 +185,3 @@ export function useInboxAutoPromote() {
     }
   );
 }
-

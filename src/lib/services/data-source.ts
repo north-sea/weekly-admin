@@ -52,6 +52,7 @@ export class DataSourceService {
         enabled: data.enabled ?? true,
         config: (data.config ?? {}) as Prisma.InputJsonValue,
         auto_promote_threshold: data.auto_promote_threshold ?? null,
+        auto_score_override: data.auto_score_override ?? null,
         sync_interval_minutes: data.sync_interval_minutes ?? 60,
         default_content_type_id: data.default_content_type_id ?? null,
         ...(data.default_category_id != null
@@ -69,6 +70,7 @@ export class DataSourceService {
     if (data.enabled !== undefined) patch.enabled = data.enabled;
     if (data.config !== undefined) patch.config = (data.config ?? {}) as Prisma.InputJsonValue;
     if (data.auto_promote_threshold !== undefined) patch.auto_promote_threshold = data.auto_promote_threshold;
+    if (data.auto_score_override !== undefined) patch.auto_score_override = data.auto_score_override;
     if (data.sync_interval_minutes !== undefined) patch.sync_interval_minutes = data.sync_interval_minutes;
     if (data.default_content_type_id !== undefined) patch.default_content_type_id = data.default_content_type_id;
     if (data.default_category_id !== undefined) {

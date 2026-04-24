@@ -1,6 +1,6 @@
 # Cron Job 配置指南
 
-本文档说明如何配置定时任务来自动化周刊管理流程。
+本文档说明如何配置定时任务来自动化周刊管理流程，以及每日 Karakeep → 收件箱的增量同步。
 
 ## 概述
 
@@ -8,6 +8,7 @@
 
 | API | 功能 | 建议执行时间 |
 |-----|------|-------------|
+| `/api/sources/sync-all` | 同步 Karakeep 新增并自动评分 | 每天 08:00 |
 | `/api/weekly/auto-create` | 自动创建本周周刊 | 每周一 00:05 |
 | `/api/weekly/auto-link` | 自动关联本周内容 | 每周日 23:00 |
 | `/api/weekly/backfill` | 回填历史空周刊 | 一次性执行 |
@@ -37,6 +38,13 @@ crontab -e
 # 环境变量
 WEEKLY_API_URL=https://your-domain.com
 CRON_API_TOKEN=your-api-token
+
+# 每天 08:00 同步 Karakeep 新增并自动评分
+0 8 * * * curl -X POST "${WEEKLY_API_URL}/api/sources/sync-all" \
+  -H "Authorization: Bearer ${CRON_API_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"karakeep","incremental":true,"auto_preprocess":true,"wait":true}' \
+  >> /var/log/weekly-cron.log 2>&1
 
 # 每周一 00:05 自动创建本周周刊
 5 0 * * 1 curl -X POST "${WEEKLY_API_URL}/api/weekly/auto-create" \
@@ -97,6 +105,9 @@ call_api() {
 
 # 主逻辑
 case "$1" in
+    sync-inbox)
+        call_api "/api/sources/sync-all" '{"type":"karakeep","incremental":true,"auto_preprocess":true,"wait":true}' "同步 Karakeep 新增并自动评分"
+        ;;
     create)
         call_api "/api/weekly/auto-create" '{"forceCreate": false}' "创建本周周刊"
         ;;
@@ -107,7 +118,7 @@ case "$1" in
         call_api "/api/weekly/backfill" '{"dryRun": false, "maxItemsPerIssue": 15}' "回填历史周刊"
         ;;
     *)
-        echo "用法: $0 {create|link|backfill}"
+        echo "用法: $0 {sync-inbox|create|link|backfill}"
         exit 1
         ;;
 esac
@@ -122,6 +133,9 @@ chmod +x /usr/local/bin/weekly-cron.sh
 Crontab 配置：
 
 ```crontab
+# 每天 08:00 同步 Karakeep 新增并自动评分
+0 8 * * * /usr/local/bin/weekly-cron.sh sync-inbox
+
 # 每周一 00:05 创建周刊
 5 0 * * 1 /usr/local/bin/weekly-cron.sh create
 
@@ -130,6 +144,62 @@ Crontab 配置：
 ```
 
 ## API 参数说明
+
+### `/api/sources/sync-all`
+
+用于同步数据源到收件箱。针对本项目的恢复方案，推荐只同步 `karakeep` 类型，并开启增量同步与自动预处理。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `type` | string | - | 数据源类型，恢复方案固定为 `karakeep` |
+| `incremental` | boolean | false | 只同步 `last_synced_at` 之后新增的书签 |
+| `auto_preprocess` | boolean | 跟随全局 | 同步后自动执行 AI 评分和相似度检测 |
+| `wait` | boolean | false | 等待同步完成再返回，便于 cron 直接记录结果 |
+| `max_items` | number | - | 可选，限制单次处理条数 |
+
+**推荐请求体：**
+
+```json
+{
+  "type": "karakeep",
+  "incremental": true,
+  "auto_preprocess": true,
+  "wait": true
+}
+```
+
+**响应示例：**
+
+```json
+{
+  "success": true,
+  "data": {
+    "started": true,
+    "started_at": "2026-03-09T00:00:00.000Z",
+    "finished_at": "2026-03-09T00:00:12.000Z",
+    "total_sources": 1,
+    "ok_count": 1,
+    "failed_count": 0,
+    "results": [
+      {
+        "source_id": 1,
+        "name": "Karakeep",
+        "ok": true,
+        "result": {
+          "total_candidates": 8,
+          "upserted": 8,
+          "skipped_duplicates": 0,
+          "preprocess_result": {
+            "scored": 8,
+            "similar_detected": 1,
+            "errors": []
+          }
+        }
+      }
+    ]
+  }
+}
+```
 
 ### `/api/weekly/auto-create`
 

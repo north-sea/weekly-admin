@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -19,7 +20,10 @@ type SourceConfigDialogProps = {
   source: DataSource | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (id: number, data: { score_weight?: number }) => Promise<void>;
+  onSave: (
+    id: number,
+    data: { score_weight?: number; auto_score_override?: boolean | null; config?: Record<string, unknown> }
+  ) => Promise<void>;
 };
 
 export function SourceConfigDialog({
@@ -30,12 +34,27 @@ export function SourceConfigDialog({
 }: SourceConfigDialogProps) {
   const { toast } = useToast();
   const [scoreWeight, setScoreWeight] = useState<string>('');
+  const [autoScoreOverride, setAutoScoreOverride] = useState<'inherit' | 'enabled' | 'disabled'>('inherit');
+  const [syncWindowDays, setSyncWindowDays] = useState<string>('1');
   const [isSaving, setIsSaving] = useState(false);
 
   // 当 source 变化时更新表单
   const handleOpenChange = (newOpen: boolean) => {
     if (newOpen && source) {
       setScoreWeight(String(source.score_weight ?? 0));
+      const override =
+        source.auto_score_override === true
+          ? 'enabled'
+          : source.auto_score_override === false
+          ? 'disabled'
+          : 'inherit';
+      setAutoScoreOverride(override);
+      if (source.type === 'rss') {
+        const config = (source.config && typeof source.config === 'object') ? (source.config as Record<string, unknown>) : {};
+        const raw = config.sync_window_days;
+        const value = typeof raw === 'number' ? raw : Number(raw);
+        setSyncWindowDays(Number.isFinite(value) ? String(value) : '1');
+      }
     }
     onOpenChange(newOpen);
   };
@@ -49,7 +68,23 @@ export function SourceConfigDialog({
         toast({ title: '加权值必须在 -50 到 50 之间', variant: 'destructive' });
         return;
       }
-      await onSave(source.id, { score_weight: weight });
+      const overrideValue = autoScoreOverride === 'inherit' ? null : autoScoreOverride === 'enabled';
+      const payload: { score_weight?: number; auto_score_override?: boolean | null; config?: Record<string, unknown> } = {
+        score_weight: weight,
+        auto_score_override: overrideValue,
+      };
+
+      if (source.type === 'rss') {
+        const windowDays = Number(syncWindowDays);
+        if (!Number.isFinite(windowDays) || windowDays < 0) {
+          toast({ title: '同步窗口必须是非负数字', variant: 'destructive' });
+          return;
+        }
+        const baseConfig = (source.config && typeof source.config === 'object') ? (source.config as Record<string, unknown>) : {};
+        payload.config = { ...baseConfig, sync_window_days: windowDays };
+      }
+
+      await onSave(source.id, payload);
       toast({ title: '配置已保存', variant: 'success' });
       onOpenChange(false);
     } catch (error) {
@@ -78,7 +113,7 @@ export function SourceConfigDialog({
         <DialogHeader>
           <DialogTitle>配置数据源: {source.name}</DialogTitle>
           <DialogDescription>
-            调整该数据源的 AI 评分加权值
+            调整该数据源的 AI 评分加权值与自动评分开关
           </DialogDescription>
         </DialogHeader>
 
@@ -115,6 +150,41 @@ export function SourceConfigDialog({
             />
             <p className="text-xs text-muted-foreground">
               正值提升该源内容的评分，负值降低评分。最终评分上限 100 分。
+            </p>
+          </div>
+
+          {source.type === 'rss' ? (
+            <div className="space-y-2">
+              <Label htmlFor="sync_window_days">增量同步窗口（天）</Label>
+              <Input
+                id="sync_window_days"
+                type="number"
+                min={0}
+                step={0.5}
+                value={syncWindowDays}
+                onChange={(e) => setSyncWindowDays(e.target.value)}
+                placeholder="1"
+              />
+              <p className="text-xs text-muted-foreground">
+                只同步发布时间在窗口内的条目；无发布时间的条目仍会尝试同步。
+              </p>
+            </div>
+          ) : null}
+
+          <div className="space-y-2">
+            <Label>同步后自动评分</Label>
+            <Select value={autoScoreOverride} onValueChange={(value) => setAutoScoreOverride(value as 'inherit' | 'enabled' | 'disabled')}>
+              <SelectTrigger>
+                <SelectValue placeholder="选择自动评分策略" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="inherit">跟随全局</SelectItem>
+                <SelectItem value="enabled">开启</SelectItem>
+                <SelectItem value="disabled">关闭</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              默认跟随全局开关；可以为单个数据源强制开启或关闭自动评分。
             </p>
           </div>
         </div>

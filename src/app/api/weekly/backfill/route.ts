@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authMiddleware } from '@/lib/auth-middleware';
-import { backfillWeeklyContents } from '@/lib/services/weekly-automation';
+import { backfillWeeklyContents, fillOldWeeklyContents } from '@/lib/services/weekly-automation';
 import { z } from 'zod';
 
 const BackfillSchema = z.object({
   dryRun: z.boolean().default(false),
   maxItemsPerIssue: z.number().int().positive().max(30).default(15),
+  strategy: z.enum(['byDate', 'fillOld']).default('byDate'),
+  historyOnly: z.boolean().default(true),
 });
 
 export async function POST(request: NextRequest) {
@@ -15,7 +17,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const options = BackfillSchema.parse(body);
 
-    const result = await backfillWeeklyContents(options);
+    const result =
+      options.strategy === 'fillOld'
+        ? await fillOldWeeklyContents(options)
+        : await backfillWeeklyContents(options);
 
     return NextResponse.json({
       success: true,

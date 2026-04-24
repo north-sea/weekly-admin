@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   backfillWeeklyContents,
+  fillOldWeeklyContents,
   autoCreateWeeklyIssue,
   autoLinkWeeklyContents,
   getContentWeeklyInfo,
@@ -147,6 +148,61 @@ describe('weekly-automation service', () => {
     });
   });
 
+  describe('fillOldWeeklyContents', () => {
+    it('should return empty result when no empty issues exist', async () => {
+      vi.mocked(prisma.$queryRaw).mockResolvedValue([]);
+
+      const result = await fillOldWeeklyContents();
+
+      expect(result.processedIssues).toBe(0);
+      expect(result.linkedContents).toBe(0);
+      expect(result.details).toHaveLength(0);
+    });
+
+    it('should fill empty issues sequentially without date matching', async () => {
+      const mockEmptyIssues = [
+        {
+          id: 1,
+          issue_number: 47,
+          title: '第 47 期',
+          start_date: new Date('2025-01-06'),
+          end_date: new Date('2025-01-12'),
+        },
+        {
+          id: 2,
+          issue_number: 48,
+          title: '第 48 期',
+          start_date: new Date('2025-01-13'),
+          end_date: new Date('2025-01-19'),
+        },
+      ];
+
+      const mockContents = [
+        { id: BigInt(101), title: '内容1', created_at: new Date('2025-01-01') },
+        { id: BigInt(102), title: '内容2', created_at: new Date('2025-01-02') },
+        { id: BigInt(103), title: '内容3', created_at: new Date('2025-01-03') },
+      ];
+
+      vi.mocked(prisma.$queryRaw).mockResolvedValue(mockEmptyIssues);
+      vi.mocked(prisma.contents.findMany).mockResolvedValue(mockContents as any);
+      vi.mocked(prisma.$transaction).mockImplementation(async (fn) => fn(prisma));
+      vi.mocked(prisma.weekly_content_items.createMany).mockResolvedValue({ count: 2 } as any);
+      vi.mocked(prisma.contents.aggregate).mockResolvedValue({
+        _sum: { word_count: 1000, reading_time: 5 },
+      } as any);
+      vi.mocked(prisma.weekly_issues.update).mockResolvedValue({} as any);
+
+      const result = await fillOldWeeklyContents({ dryRun: false, maxItemsPerIssue: 2 });
+
+      expect(result.processedIssues).toBe(2);
+      expect(result.linkedContents).toBe(3);
+      expect(result.details[0].issueNumber).toBe(47);
+      expect(result.details[0].linkedCount).toBe(2);
+      expect(result.details[1].issueNumber).toBe(48);
+      expect(result.details[1].linkedCount).toBe(1);
+    });
+  });
+
   describe('autoCreateWeeklyIssue', () => {
     it('should return existing issue when already exists', async () => {
       const mockExistingIssue = {
@@ -228,6 +284,7 @@ describe('weekly-automation service', () => {
 
       expect(result.linkedCount).toBe(2);
       expect(result.linkedContents).toHaveLength(2);
+      expect(result.issueTitle).toBe('第 78 期');
     });
   });
 

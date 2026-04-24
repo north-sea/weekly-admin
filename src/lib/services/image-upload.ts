@@ -17,6 +17,28 @@ export interface ImageUploadOptions {
   onProgress?: (progress: number) => void;
 }
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      const base64 = result.includes(',') ? result.split(',')[1] : result;
+      if (!base64) {
+        reject(new Error('图片读取失败'));
+        return;
+      }
+      resolve(base64);
+    };
+
+    reader.onerror = () => {
+      reject(new Error('图片读取失败'));
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
 // 图片上传服务
 export class ImageUploadService {
   /**
@@ -76,19 +98,18 @@ export class ImageUploadService {
         }
       }
 
-      const formData = new FormData();
-      formData.append('file', fileToUpload);
-
       const uploadUrl = this.getUploadUrl()!;
+      const contentBase64 = await fileToBase64(fileToUpload);
 
       const response = await ky.post(uploadUrl, {
-        body: formData,
-        onUploadProgress: onProgress ? (progress: any) => {
-          if (progress.loaded && progress.total) {
-            onProgress(Math.round((progress.loaded / progress.total) * 100));
-          }
-        } : undefined,
+        json: {
+          filename: fileToUpload.name,
+          type: fileToUpload.type,
+          contentBase64,
+        },
       }).json<ImageUploadResponse>();
+
+      onProgress?.(100);
 
       return response;
     } catch (error) {

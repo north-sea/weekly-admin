@@ -18,6 +18,8 @@ export interface TagWithStats {
   };
 }
 
+type TagRecordWithGroup = Awaited<ReturnType<typeof prisma.tags.findMany>>[number];
+
 // 解析 aliases JSON 字符串
 function parseAliases(aliasesJson: string | null): string[] {
   if (!aliasesJson) return [];
@@ -36,6 +38,38 @@ function serializeAliases(aliases: string[] | undefined): string | null {
 }
 
 export class TagService {
+  private static async mapTagsWithStats(tags: TagRecordWithGroup[]): Promise<TagWithStats[]> {
+    if (tags.length === 0) {
+      return [];
+    }
+
+    const counts = await prisma.content_tags.groupBy({
+      by: ['tag_id'],
+      where: {
+        tag_id: {
+          in: tags.map((tag) => tag.id),
+        },
+      },
+      _count: {
+        _all: true,
+      },
+    });
+
+    const countMap = new Map(counts.map((item) => [item.tag_id, item._count._all]));
+
+    return tags.map((tag) => ({
+      id: tag.id,
+      name: tag.name,
+      slug: tag.slug,
+      group_id: tag.group_id,
+      aliases: parseAliases(tag.aliases),
+      count: countMap.get(tag.id) ?? tag.count ?? 0,
+      created_at: tag.created_at || undefined,
+      updated_at: tag.updated_at || undefined,
+      group: tag.group || undefined,
+    }));
+  }
+
   // 获取标签列表（支持分页）
   static async getTagList(query: TagQuery): Promise<{
     data: TagWithStats[];
@@ -97,23 +131,7 @@ export class TagService {
       }),
     ]);
 
-    const mapped = await Promise.all(tags.map(async (tag) => {
-      const count = await prisma.content_tags.count({
-        where: { tag_id: tag.id }
-      });
-
-      return {
-        id: tag.id,
-        name: tag.name,
-        slug: tag.slug,
-        group_id: tag.group_id,
-        aliases: parseAliases(tag.aliases),
-        count: count || 0,
-        created_at: tag.created_at || undefined,
-        updated_at: tag.updated_at || undefined,
-        group: tag.group || undefined,
-      };
-    }));
+    const mapped = await this.mapTagsWithStats(tags);
 
     return {
       data: mapped,
@@ -124,6 +142,35 @@ export class TagService {
         totalPages: Math.max(1, Math.ceil(total / currentPageSize)),
       },
     };
+  }
+
+  static async getAllTags(options?: {
+    sort_by?: 'name' | 'count';
+    sort_order?: 'asc' | 'desc';
+    limit?: number;
+  }): Promise<TagWithStats[]> {
+    const sort_by = options?.sort_by ?? 'count';
+    const sort_order = options?.sort_order ?? 'desc';
+    const limit = options?.limit;
+
+    const tags = await prisma.tags.findMany({
+      orderBy: {
+        [sort_by]: sort_order,
+      },
+      take: limit,
+      include: {
+        group: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            color: true,
+          },
+        },
+      },
+    });
+
+    return this.mapTagsWithStats(tags);
   }
 
   // 获取单个标签
@@ -144,21 +191,8 @@ export class TagService {
 
     if (!tag) return null;
 
-    const count = await prisma.content_tags.count({
-      where: { tag_id: id }
-    });
-
-    return {
-      id: tag.id,
-      name: tag.name,
-      slug: tag.slug,
-      group_id: tag.group_id,
-      aliases: parseAliases(tag.aliases),
-      count: count || 0,
-      created_at: tag.created_at || undefined,
-      updated_at: tag.updated_at || undefined,
-      group: tag.group || undefined,
-    };
+    const [mapped] = await this.mapTagsWithStats([tag]);
+    return mapped ?? null;
   }
 
   // 创建标签

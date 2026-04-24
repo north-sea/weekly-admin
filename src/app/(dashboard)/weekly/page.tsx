@@ -108,10 +108,11 @@ export default function WeeklyManagePage() {
   // 自动化操作状态
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
-    type: 'backfill' | 'create' | 'link' | null;
+    type: 'fillOld' | 'backfillByDate' | 'create' | 'link' | null;
     title: string;
     description: string;
-  }>({ open: false, type: null, title: '', description: '' });
+    weekOffset: number;
+  }>({ open: false, type: null, title: '', description: '', weekOffset: 0 });
   const [operationLoading, setOperationLoading] = useState(false);
   const [resultDialog, setResultDialog] = useState<{
     open: boolean;
@@ -185,22 +186,33 @@ export default function WeeklyManagePage() {
   };
 
   // 打开确认对话框
-  const openConfirmDialog = (type: 'backfill' | 'create' | 'link') => {
+  const openConfirmDialog = (args: {
+    type: 'fillOld' | 'backfillByDate' | 'create' | 'link';
+    weekOffset?: number;
+  }) => {
+    const { type, weekOffset = 0 } = args;
     const configs = {
-      backfill: {
-        title: '回填历史周刊',
-        description: '将根据内容的创建时间，自动将未关联的内容匹配到对应时间范围的空周刊中。每期最多关联 15 篇内容。此操作不可撤销，是否继续？',
+      fillOld: {
+        title: '快速填满历史空周刊',
+        description:
+          '将按时间顺序把未关联内容依次填入“历史空周刊”（已结束且内容为空的周刊），每期最多关联 15 篇。不按创建时间匹配周范围，适合断更后快速补齐。是否继续？',
+      },
+      backfillByDate: {
+        title: '回填历史周刊（按时间匹配）',
+        description:
+          '将根据内容的创建时间，把未关联内容匹配到对应时间范围的空周刊中（每期最多 15 篇）。适合正常周期内的回填，但断更补历史时可能较慢或不符合预期。是否继续？',
       },
       create: {
-        title: '创建本周周刊',
-        description: '将自动创建本周的周刊草稿，期号为当前最大期号 + 1。如果本周周刊已存在，将不会重复创建。是否继续？',
+        title: weekOffset === 1 ? '创建下周周刊' : '创建本周周刊',
+        description:
+          '将自动创建目标周的周刊草稿，期号为当前最大期号 + 1。如果该周周刊已存在，将不会重复创建。是否继续？',
       },
       link: {
-        title: '关联本周内容',
-        description: '将本周创建的未关联内容自动关联到本周周刊中。每期最多关联 15 篇内容。是否继续？',
+        title: weekOffset === 1 ? '关联下周内容' : '关联本周内容',
+        description: '将目标周创建的未关联内容自动关联到目标周周刊中。每期最多关联 15 篇内容。是否继续？',
       },
     };
-    setConfirmDialog({ open: true, type, ...configs[type] });
+    setConfirmDialog({ open: true, type, weekOffset, ...configs[type] });
   };
 
   // 执行自动化操作
@@ -213,11 +225,28 @@ export default function WeeklyManagePage() {
       let resultTitle = '';
 
       switch (confirmDialog.type) {
-        case 'backfill':
+        case 'fillOld':
           response = await fetch('/api/weekly/backfill', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dryRun: false, maxItemsPerIssue: 15 }),
+            body: JSON.stringify({
+              dryRun: false,
+              maxItemsPerIssue: 15,
+              strategy: 'fillOld',
+              historyOnly: true,
+            }),
+          });
+          resultTitle = '填满结果';
+          break;
+        case 'backfillByDate':
+          response = await fetch('/api/weekly/backfill', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              dryRun: false,
+              maxItemsPerIssue: 15,
+              strategy: 'byDate',
+            }),
           });
           resultTitle = '回填结果';
           break;
@@ -225,14 +254,20 @@ export default function WeeklyManagePage() {
           response = await fetch('/api/weekly/auto-create', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ forceCreate: false }),
+            body: JSON.stringify({
+              forceCreate: false,
+              weekOffset: confirmDialog.weekOffset,
+            }),
           });
           break;
         case 'link':
           response = await fetch('/api/weekly/auto-link', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ maxItems: 15, weekOffset: 0 }),
+            body: JSON.stringify({
+              maxItems: 15,
+              weekOffset: confirmDialog.weekOffset,
+            }),
           });
           resultTitle = '关联结果';
           break;
@@ -245,42 +280,51 @@ export default function WeeklyManagePage() {
       }
 
       // 关闭确认对话框
-      setConfirmDialog({ open: false, type: null, title: '', description: '' });
+      setConfirmDialog({
+        open: false,
+        type: null,
+        title: '',
+        description: '',
+        weekOffset: 0,
+      });
 
       // 处理不同类型的结果
       if (confirmDialog.type === 'create') {
         const data = result.data;
-        if (data.alreadyExists) {
+        if (data.action === 'exists' && data.issue) {
           toast({
             title: '周刊已存在',
-            description: `第 ${data.existingIssue.issue_number} 期周刊已存在`,
+            description: `第 ${data.issue.issue_number} 期周刊已存在`,
           });
-        } else {
+        } else if (data.action === 'created' && data.issue) {
           toast({
             title: '创建成功',
             description: `已创建第 ${data.issue.issue_number} 期周刊`,
           });
+        } else {
+          toast({
+            title: '已跳过',
+            description: data.message || '本次创建已跳过',
+          });
         }
         fetchWeeklyIssues();
-      } else if (confirmDialog.type === 'backfill') {
+      } else if (confirmDialog.type === 'fillOld' || confirmDialog.type === 'backfillByDate') {
         // 回填结果 - 汇总所有周刊的关联结果
         const data = result.data;
         const allLinked: { id: number; title: string }[] = [];
-        const allSkipped: { id: number; title: string; reason: string }[] = [];
 
-        data.results?.forEach((r: { linkedContents?: { id: number; title: string }[]; skippedContents?: { id: number; title: string; reason: string }[] }) => {
-          if (r.linkedContents) allLinked.push(...r.linkedContents);
-          if (r.skippedContents) allSkipped.push(...r.skippedContents);
+        data.details?.forEach((d: { linkedContents?: { id: number; title: string }[] }) => {
+          if (d.linkedContents) allLinked.push(...d.linkedContents);
         });
 
         setResultDialog({
           open: true,
           title: resultTitle,
           data: {
-            linkedCount: data.totalLinked || 0,
-            skippedCount: allSkipped.length,
+            linkedCount: data.linkedContents || 0,
+            skippedCount: data.skippedContents || 0,
             linkedContents: allLinked,
-            skippedContents: allSkipped,
+            skippedContents: [],
           },
         });
         fetchWeeklyIssues();
@@ -295,8 +339,8 @@ export default function WeeklyManagePage() {
             skippedCount: data.skippedCount || 0,
             linkedContents: data.linkedContents || [],
             skippedContents: data.skippedContents || [],
-            issueNumber: data.issue?.issue_number,
-            issueTitle: data.issue?.title,
+            issueNumber: data.issueNumber,
+            issueTitle: data.issueTitle,
           },
         });
         fetchWeeklyIssues();
@@ -321,18 +365,27 @@ export default function WeeklyManagePage() {
           <p className="text-sm text-muted-foreground">管理周刊期号和内容</p>
         </div>
         <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="lg">
+                <History className="mr-2 h-4 w-4" />
+                历史回填
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={() => openConfirmDialog({ type: 'fillOld' })}>
+                快速填满（推荐）
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => openConfirmDialog({ type: 'backfillByDate' })}>
+                按时间匹配（谨慎）
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             variant="outline"
             size="lg"
-            onClick={() => openConfirmDialog('backfill')}
-          >
-            <History className="mr-2 h-4 w-4" />
-            回填历史
-          </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={() => openConfirmDialog('create')}
+            onClick={() => openConfirmDialog({ type: 'create', weekOffset: 0 })}
           >
             <Plus className="mr-2 h-4 w-4" />
             创建本周
@@ -340,10 +393,26 @@ export default function WeeklyManagePage() {
           <Button
             variant="outline"
             size="lg"
-            onClick={() => openConfirmDialog('link')}
+            onClick={() => openConfirmDialog({ type: 'create', weekOffset: 1 })}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            创建下周
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => openConfirmDialog({ type: 'link', weekOffset: 0 })}
           >
             <Link2 className="mr-2 h-4 w-4" />
             关联本周
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => openConfirmDialog({ type: 'link', weekOffset: 1 })}
+          >
+            <Link2 className="mr-2 h-4 w-4" />
+            关联下周
           </Button>
           <Button variant="outline" size="lg" onClick={() => router.push('/weekly/generate')}>
             AI 组织
@@ -572,13 +641,13 @@ export default function WeeklyManagePage() {
             <DialogDescription>{confirmDialog.description}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setConfirmDialog({ open: false, type: null, title: '', description: '' })}
-              disabled={operationLoading}
-            >
-              取消
-            </Button>
+              <Button
+                variant="outline"
+                onClick={() => setConfirmDialog({ open: false, type: null, title: '', description: '', weekOffset: 0 })}
+                disabled={operationLoading}
+              >
+                取消
+              </Button>
             <Button onClick={executeOperation} disabled={operationLoading}>
               {operationLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               确认执行

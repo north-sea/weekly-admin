@@ -297,6 +297,7 @@ async function migrateDatabase() {
           config JSON NULL,
           enabled BOOLEAN DEFAULT true,
           auto_promote_threshold FLOAT NULL,
+          auto_score_override BOOLEAN NULL,
           default_category_id INT NULL,
           default_content_type_id INT NULL,
           last_synced_at TIMESTAMP NULL,
@@ -312,6 +313,17 @@ async function migrateDatabase() {
       )
     `;
     console.log('✅ data_sources 表创建完成');
+
+    // data_sources.auto_score_override 字段
+    const dataSourcesAutoScoreOverrideColumn = await prisma.$queryRaw`
+      SHOW COLUMNS FROM data_sources LIKE 'auto_score_override'
+    `;
+    if (Array.isArray(dataSourcesAutoScoreOverrideColumn) && dataSourcesAutoScoreOverrideColumn.length === 0) {
+      await prisma.$executeRaw`
+        ALTER TABLE data_sources ADD COLUMN auto_score_override BOOLEAN NULL
+      `;
+      console.log('✅ data_sources 表添加 auto_score_override 字段');
+    }
 
     // 统一收件箱表
     await prisma.$executeRaw`
@@ -340,6 +352,7 @@ async function migrateDatabase() {
           content_id BIGINT NULL,
           duplicate_of_id BIGINT NULL,
           source_published_at TIMESTAMP NULL,
+          collected_at TIMESTAMP NULL,
           synced_at TIMESTAMP NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -355,6 +368,17 @@ async function migrateDatabase() {
     `;
     console.log('✅ inbox_items 表创建完成');
 
+    // inbox_items.collected_at 字段
+    const inboxCollectedAtColumn = await prisma.$queryRaw`
+      SHOW COLUMNS FROM inbox_items LIKE 'collected_at'
+    `;
+    if (Array.isArray(inboxCollectedAtColumn) && inboxCollectedAtColumn.length === 0) {
+      await prisma.$executeRaw`
+        ALTER TABLE inbox_items ADD COLUMN collected_at TIMESTAMP NULL
+      `;
+      console.log('✅ inbox_items 表添加 collected_at 字段');
+    }
+
     // inbox_items.source_name 字段长度
     const inboxSourceNameColumn = (await prisma.$queryRaw`
       SHOW COLUMNS FROM inbox_items LIKE 'source_name'
@@ -367,6 +391,42 @@ async function migrateDatabase() {
       `;
       console.log('✅ inbox_items 表扩展 source_name 长度');
     }
+
+    // inbox_items.collected_at 回填
+    await prisma.$executeRaw`
+      UPDATE inbox_items
+      SET collected_at = COALESCE(collected_at, created_at)
+      WHERE collected_at IS NULL
+    `;
+    console.log('✅ inbox_items 表回填 collected_at 字段');
+
+    // Karakeep 来源回填 collected_at 为收藏时间（source_published_at）
+    await prisma.$executeRaw`
+      UPDATE inbox_items i
+      JOIN data_sources s ON i.source_id = s.id
+      SET i.collected_at = i.source_published_at
+      WHERE s.type = 'karakeep'
+        AND i.source_published_at IS NOT NULL
+        AND (i.collected_at IS NULL OR i.collected_at <> i.source_published_at)
+    `;
+    console.log('✅ inbox_items 表回填 Karakeep collected_at');
+
+    // AI 设置表（key-value）
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS ai_settings (
+          \`key\` VARCHAR(100) PRIMARY KEY,
+          value JSON NOT NULL,
+          updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+    console.log('✅ ai_settings 表创建完成');
+
+    // 初始化默认 AI 设置（仅当不存在时写入）
+    await prisma.$executeRaw`
+      INSERT IGNORE INTO ai_settings (\`key\`, value)
+      VALUES ('auto_score_on_sync', '{"enabled": true}')
+    `;
+    console.log('✅ ai_settings 默认配置初始化完成');
 
     // AI 配置表（支持多组配置）
     await prisma.$executeRaw`

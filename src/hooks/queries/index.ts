@@ -12,6 +12,7 @@ export * from './useDataSourceQueries';
 export * from './useInboxQueries';
 export * from './useContentWeeklyQueries';
 export * from './useWeeklyQueries';
+export * from './useAiSettingsQueries';
 
 // 导出缓存配置和管理工具
 export * from '@/lib/cache-config';
