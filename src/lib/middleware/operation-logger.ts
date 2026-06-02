@@ -221,4 +221,41 @@ export class OperationLogger {
       }
     }, request);
   }
+
+  static async logInboxAction(params: {
+    userId?: number;
+    action: string;
+    inboxItemId: bigint;
+    contentId?: bigint | null;
+    aiScoreAtAction?: number | null;
+    reason?: string;
+    source?: string;
+  }): Promise<void> {
+    const SYSTEM_USER_ID = 1;
+    const actionToOpType: Record<string, OperationType> = {
+      promote: 'UPDATE',
+      demote: 'UPDATE',
+      feature: 'UPDATE',
+      unfeature: 'UPDATE',
+      reject: 'UPDATE',
+      manual_rescore: 'UPDATE',
+      delete: 'DELETE',
+    };
+    const operationType = actionToOpType[params.action] ?? 'UPDATE';
+
+    await this.logOperation({
+      userId: params.userId ?? SYSTEM_USER_ID,
+      operationType,
+      resourceType: 'inbox_item',
+      resourceId: params.inboxItemId,
+      operationDetails: {
+        action: params.action,
+        content_id: params.contentId ? Number(params.contentId) : undefined,
+        ai_score_at_action: params.aiScoreAtAction,
+        reason: params.reason,
+        source: params.source,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }
 }

@@ -1,4 +1,8 @@
-import type { NextConfig } from "next";
+import { dirname } from 'path';
+import { fileURLToPath } from 'url';
+import type { NextConfig } from 'next';
+
+const rootDir = dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
   // Enable standalone output for Docker deployment
@@ -7,15 +11,6 @@ const nextConfig: NextConfig = {
   // Production optimizations
   poweredByHeader: false, // Remove X-Powered-By header for security
   compress: true, // Enable gzip compression
-  
-  // Build optimizations - temporarily ignore ESLint during builds
-  eslint: {
-    ignoreDuringBuilds: true, // Temporarily ignore ESLint errors during build
-  },
-  
-  typescript: {
-    ignoreBuildErrors: true, // Temporarily ignore TypeScript errors for CI debugging
-  },
   
   // Image optimization for production
   images: {
@@ -36,6 +31,8 @@ const nextConfig: NextConfig = {
   
   // Turbopack configuration for optimal performance
   turbopack: {
+    root: rootDir,
+
     // Configure module resolution aliases
     resolveAlias: {
       // Optimize lodash imports for better tree shaking

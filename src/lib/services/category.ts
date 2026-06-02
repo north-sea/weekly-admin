@@ -39,7 +39,7 @@ export class CategoryService {
 
     // 保证 slug 唯一（忽略大小写）
     // 避免死循环，最多尝试 100 次
-    // eslint-disable-next-line no-constant-condition
+     
     while (true) {
       const existing = await prisma.categories.findFirst({
         where: {

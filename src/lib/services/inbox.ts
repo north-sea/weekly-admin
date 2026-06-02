@@ -59,6 +59,105 @@ function parseTagsSuggestion(value: unknown): Array<{ name?: string }> {
   return [];
 }
 
+type InboxItemForPromotion = {
+  title: string | null;
+  slug: string | null;
+  url: string;
+  summary: string | null;
+  description: string | null;
+  note: string | null;
+  content: string | null;
+  image_url: string | null;
+  source_name: string | null;
+  ai_score: number | null;
+  synced_at: Date | null;
+  created_at: Date | null;
+  category_suggestion: string | null;
+  data_source: { default_content_type_id: number | null; default_category_id: number | null } | null;
+};
+
+type PromotionOverrides = {
+  auto_promoted?: boolean;
+  original_score?: number | null;
+  category_id?: number | null;
+  content_type_id?: number | null;
+  content_format?: string;
+};
+
+export async function buildContentDataForPromotion(
+  item: InboxItemForPromotion,
+  overrides: PromotionOverrides = {},
+) {
+  const contentTypeId = overrides.content_type_id ?? item.data_source?.default_content_type_id ?? 3;
+  const contentFormat = overrides.content_format ?? 'markdown';
+
+  let resolvedCategoryId = overrides.category_id ?? item.data_source?.default_category_id ?? null;
+  if (!resolvedCategoryId && item.category_suggestion) {
+    const suggestedName = item.category_suggestion.trim();
+    if (suggestedName) {
+      const slugBase = generateSlug(suggestedName);
+      let category = await prisma.categories.findFirst({
+        where: { OR: [{ name: suggestedName }, { slug: slugBase }] },
+      });
+      if (!category) {
+        let uniqueSlug = slugBase || `category-${Date.now()}`;
+        let counter = 1;
+         
+        while (true) {
+          const exists = await prisma.categories.findFirst({ where: { slug: uniqueSlug } });
+          if (!exists) break;
+          uniqueSlug = `${slugBase}-${counter++}`;
+          if (counter > 50) {
+            uniqueSlug = `${slugBase}-${Date.now()}`;
+            break;
+          }
+        }
+        category = await prisma.categories.create({
+          data: { name: suggestedName, slug: uniqueSlug },
+        });
+      }
+      resolvedCategoryId = category.id;
+    }
+  }
+
+  const title = (item.title || '').trim() || item.url;
+  const slug = item.slug || `${generateSlug(title)}-${Date.now()}`;
+  const description = item.description || item.summary || item.note || '';
+  const summary = item.summary || item.description || item.note || null;
+  const sourceUrl = item.url;
+
+  return {
+    content_type_id: contentTypeId,
+    category_id: resolvedCategoryId,
+    title,
+    slug,
+    description,
+    summary,
+    image_url: item.image_url,
+    content:
+      item.content ||
+      [
+        `## ${title}`,
+        '',
+        summary ? summary.trim() : '',
+        '',
+        `**来源**: [${item.source_name || hostnameFromUrl(sourceUrl)}](${sourceUrl})`,
+        item.note ? `\n**笔记**\n${item.note}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n')
+        .trim(),
+    content_format: contentFormat as 'markdown' | 'html' | 'mdx',
+    status: 'draft' as const,
+    source: item.source_name,
+    source_url: sourceUrl,
+    word_count: 0,
+    original_score: overrides.original_score ?? item.ai_score ?? null,
+    collected_at: item.synced_at ?? item.created_at ?? new Date(),
+    auto_promoted: overrides.auto_promoted ?? false,
+  };
+}
+
 async function moveKarakeepBookmarkToWeekly(karakeepId: string) {
   if (!karakeepId) return;
 
@@ -209,7 +308,7 @@ export class InboxService {
         if (!category) {
           let uniqueSlug = slugBase || `category-${Date.now()}`;
           let counter = 1;
-          // eslint-disable-next-line no-constant-condition
+           
           while (true) {
             const exists = await prisma.categories.findFirst({ where: { slug: uniqueSlug } });
             if (!exists) break;

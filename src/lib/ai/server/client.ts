@@ -225,8 +225,10 @@ export async function serverGenerateJSON<T>(options: AiGenerateOptions): Promise
     temperature: 0,
   });
 
+  const jsonText = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
   try {
-    return JSON.parse(text) as T;
+    return JSON.parse(jsonText) as T;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Invalid JSON';
     throw new Error(`Failed to parse JSON: ${message}`);

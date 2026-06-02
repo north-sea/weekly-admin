@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 
 export type AiPromptScene =
   | 'content_score'
+  | 'inbox_scoring'
   | 'summary_generate'
   | 'summary_optimize'
   | 'summary_score'
@@ -42,6 +43,33 @@ export const DEFAULT_AI_PROMPTS: Record<AiPromptScene, AiPromptDefinition> = {
       '{{#summary}}摘要：{{summary}}{{/summary}}',
       '',
       '原文内容：',
+      '{{content}}',
+    ].join('\n'),
+  },
+  inbox_scoring: {
+    scene: 'inbox_scoring',
+    name: 'Inbox 评分',
+    variables: ['title', 'summary', 'content'],
+    prompt: [
+      '你是技术周刊编辑助手。请对下面的收件箱条目进行多维度评分。',
+      '',
+      '评分维度（每项 0-10 分）：',
+      '- topic：主题相关性（与技术/开发者社区的相关程度）',
+      '- content：内容质量（信息密度、准确性、深度）',
+      '- depth：深度（是否有独到见解、深入分析）',
+      '- practical：实用性（可操作性、可迁移性）',
+      '- innovation：创新性（新颖观点、前沿技术）',
+      '- expression：表达质量（结构清晰、易读性）',
+      '',
+      '同时给出 overall 综合分（0-10）和 reasons（1-8 条简短中文理由）。',
+      '',
+      '输出严格 JSON：',
+      '{ "dimensions": { "topic": N, "content": N, "depth": N, "practical": N, "innovation": N, "expression": N }, "overall": N, "reasons": ["..."] }',
+      '',
+      '标题：{{title}}',
+      '摘要：{{summary}}',
+      '',
+      '正文：',
       '{{content}}',
     ].join('\n'),
   },

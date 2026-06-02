@@ -112,8 +112,9 @@ async function main() {
         }
 
         // 提取结构化字段
-        const imageUrl = content.image_url || extractImageUrl(content.content);
-        const summary = content.summary || extractSummary(content.content);
+        const rawContent = content.content ?? '';
+        const imageUrl = content.image_url || extractImageUrl(rawContent);
+        const summary = content.summary || extractSummary(rawContent);
 
         if (isDryRun) {
           // 预览模式：只显示将要执行的操作
@@ -170,4 +171,3 @@ main().catch((error) => {
   console.error('脚本执行失败:', error);
   process.exit(1);
 });
-

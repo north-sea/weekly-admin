@@ -286,6 +286,7 @@ model inbox_items {
   source_name         String?     @db.VarChar(255)
   ai_score            Float?
   ai_score_details    Json?
+  scoring_status      String?     @default("pending") @db.VarChar(20)
   category_suggestion String?     @db.VarChar(100)
   tags_suggestion     Json?
   summarization_status String?    @db.VarChar(20)
@@ -313,6 +314,7 @@ model inbox_items {
 
   @@unique([source_id, source_item_id])
   @@index([status])
+  @@index([scoring_status, created_at])
   @@index([ai_score])
   @@index([source_id])
   @@index([content_id])

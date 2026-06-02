@@ -165,10 +165,10 @@ export class VersionService {
       contentId,
       {
         title: currentContent.title,
-        content: currentContent.content,
+        content: currentContent.content ?? undefined,
         description: currentContent.description || undefined,
         source: currentContent.source || undefined,
-        source_url: currentContent.source_url || undefined,
+        source_url: currentContent.source_url ?? undefined,
         changes_summary: `回滚前的版本快照 (回滚到版本 ${versionNumber})`
       },
       userId

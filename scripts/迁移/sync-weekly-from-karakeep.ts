@@ -208,6 +208,9 @@ async function main() {
     const karakeepId = idMap.get(item.id) as string;
     try {
       const bookmark = await getKarakeepBookmarkV1(karakeepId);
+      if (!bookmark) {
+        throw new Error('Karakeep 未返回书签');
+      }
       const newSummary = bookmark.summary || bookmark.content?.description || null;
 
       if (!newSummary) {

@@ -36,10 +36,10 @@ function maybeLog(message: string, data: Record<string, unknown>) {
   const now = Date.now();
   if (now - lastDebugLogAt < 1000) return;
   lastDebugLogAt = now;
-  console.log(`[middleware] ${message}`, data);
+  console.log(`[proxy] ${message}`, data);
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith('/login') || pathname.startsWith('/dashboard')) {
@@ -75,7 +75,7 @@ export async function middleware(request: NextRequest) {
 
   // Get token from Authorization header or cookie
   const authHeader = request.headers.get('authorization');
-  const token = authHeader?.startsWith('Bearer ') 
+  const token = authHeader?.startsWith('Bearer ')
     ? authHeader.substring(7)
     : request.cookies.get('auth-token')?.value;
 
@@ -102,7 +102,7 @@ export async function middleware(request: NextRequest) {
   try {
     // Verify token
     const payload = await verifyToken(token);
-    
+
     // Check admin routes
     if (adminRoutes.some(route => pathname.startsWith(route))) {
       if (payload.role !== 'ADMIN') {
@@ -112,7 +112,7 @@ export async function middleware(request: NextRequest) {
             { status: 403 }
           );
         }
-        
+
         // Redirect to dashboard
         return NextResponse.redirect(new URL('/dashboard', request.url));
       }
@@ -135,15 +135,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
 
   } catch (error) {
-    console.error('Middleware auth error:', error);
-    
+    console.error('Proxy auth error:', error);
+
     if (isApiRoute) {
       return NextResponse.json(
         { success: false, error: 'Invalid or expired token' },
         { status: 401 }
       );
     }
-    
+
     // Redirect to login page
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);

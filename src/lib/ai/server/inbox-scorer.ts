@@ -7,24 +7,55 @@ import { AiPromptService } from '@/lib/services/ai-prompt';
 import { renderPromptTemplate } from '@/lib/ai/server/prompt-template';
 
 const ScoreSchema = z.object({
+  dimensions: z.object({
+    topic: z.number().min(0).max(10),
+    content: z.number().min(0).max(10),
+    depth: z.number().min(0).max(10),
+    practical: z.number().min(0).max(10),
+    innovation: z.number().min(0).max(10),
+    expression: z.number().min(0).max(10),
+  }),
   overall: z.number().min(0).max(10),
-  clarity: z.number().min(0).max(10),
-  accuracy: z.number().min(0).max(10),
-  conciseness: z.number().min(0).max(10),
   reasons: z.array(z.string().min(1)).min(1).max(8),
 });
 
 export type InboxScore = z.infer<typeof ScoreSchema>;
 
-// AI 评分明细结构
-export type ScoreDetails = {
-  ai_quality: number;      // AI 内容质量分 (0-40)
-  source_trust: number;    // 来源可信度分 (0-30)
-  completeness: number;    // 内容完整度分 (0-20)
-  timeliness: number;      // 时效性分 (0-10)
-  score_weight: number;    // 数据源加权分
-  reasons?: string[];      // AI 评分理由
+export type Dimensions = {
+  topic: number;
+  content: number;
+  depth: number;
+  practical: number;
+  innovation: number;
+  expression: number;
 };
+
+export type AiScoreDetails = {
+  dimensions: Dimensions;
+  overall_llm: number;
+  ai_quality: number;
+  source_trust: number;
+  completeness: number;
+  timeliness: number;
+  score_weight: number;
+  retry_count: number;
+  error?: string;
+  last_scored_at?: string;
+  scored_at?: string;
+  model?: string;
+  prompt_version?: string;
+  weight_version: string;
+  reasons?: string[];
+};
+
+const WEIGHTS = { topic: 15, content: 25, depth: 20, practical: 20, innovation: 10, expression: 10 };
+
+export function aggregateAiQuality(d: Dimensions): number {
+  const weighted = (d.topic * WEIGHTS.topic + d.content * WEIGHTS.content
+    + d.depth * WEIGHTS.depth + d.practical * WEIGHTS.practical
+    + d.innovation * WEIGHTS.innovation + d.expression * WEIGHTS.expression) / 100;
+  return Math.round(weighted * 4);
+}
 
 const truncate = (value: string, maxChars: number) => {
   if (value.length <= maxChars) return value;
@@ -160,12 +191,16 @@ export async function scoreInboxItem(inboxId: bigint): Promise<InboxScore | null
   // Karakeep 爬取失败，直接返回 0 分
   const isKarakeep = item.data_source?.type === 'karakeep';
   if (isKarakeep && item.summarization_status && item.summarization_status !== 'success') {
-    const zeroDetails: ScoreDetails = {
+    const zeroDetails: AiScoreDetails = {
+      dimensions: { topic: 0, content: 0, depth: 0, practical: 0, innovation: 0, expression: 0 },
+      overall_llm: 0,
       ai_quality: 0,
       source_trust: 0,
       completeness: 0,
       timeliness: 0,
       score_weight: 0,
+      retry_count: 0,
+      weight_version: 'v1',
       reasons: ['Karakeep 爬取失败'],
     };
     await prisma.inbox_items.update({
@@ -180,12 +215,16 @@ export async function scoreInboxItem(inboxId: bigint): Promise<InboxScore | null
 
   // 无摘要，直接返回 0 分
   if (!item.summary || !item.summary.trim()) {
-    const zeroDetails: ScoreDetails = {
+    const zeroDetails: AiScoreDetails = {
+      dimensions: { topic: 0, content: 0, depth: 0, practical: 0, innovation: 0, expression: 0 },
+      overall_llm: 0,
       ai_quality: 0,
       source_trust: 0,
       completeness: 0,
       timeliness: 0,
       score_weight: 0,
+      retry_count: 0,
+      weight_version: 'v1',
       reasons: ['无摘要内容'],
     };
     await prisma.inbox_items.update({
@@ -203,8 +242,8 @@ export async function scoreInboxItem(inboxId: bigint): Promise<InboxScore | null
   const completeness = calculateCompletenessScore(item.title, item.summary, item.content);
   const timeliness = calculateTimelinessScore(item.source_published_at);
 
-  // 使用 summary_score prompt 进行评分
-  const template = (await AiPromptService.getByScene('summary_score')).prompt;
+  // 使用 inbox_scoring prompt 进行评分
+  const template = (await AiPromptService.getByScene('inbox_scoring')).prompt;
   const prompt = renderPromptTemplate(template, {
     title: item.title || '无标题',
     summary: truncate(item.summary, 2000),
@@ -224,22 +263,27 @@ export async function scoreInboxItem(inboxId: bigint): Promise<InboxScore | null
 
   const score = parsed.data;
 
-  // AI 质量分 (0-10 转为 0-40)
-  const aiQuality = Math.round(score.overall * 4);
+  // 6 维加权 → AI 质量分 (0-40)
+  const aiQuality = aggregateAiQuality(score.dimensions);
 
   // 构建评分明细
-  const scoreDetails: ScoreDetails = {
+  const scoreDetails: AiScoreDetails = {
+    dimensions: score.dimensions,
+    overall_llm: score.overall,
     ai_quality: aiQuality,
     source_trust: sourceTrust,
-    completeness: completeness,
-    timeliness: timeliness,
+    completeness,
+    timeliness,
     score_weight: scoreWeight,
+    retry_count: 0,
+    scored_at: new Date().toISOString(),
+    weight_version: 'v1',
     reasons: score.reasons,
   };
 
   // 计算总分 (0-100)，应用数据源加权
   const baseScore = aiQuality + sourceTrust + completeness + timeliness;
-  const totalScore = Math.min(100, baseScore + scoreWeight); // 上限 100 分
+  const totalScore = Math.min(100, baseScore + scoreWeight);
 
   // 存储评分和明细
   await prisma.inbox_items.update({

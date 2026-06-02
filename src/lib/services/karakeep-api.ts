@@ -175,7 +175,7 @@ export class KarakeepApiClient {
     try {
       console.log('正在从 Karakeep Draft 列表获取书签...', options);
       
-      let allBookmarks: KarakeepBookmark[] = [];
+      const allBookmarks: KarakeepBookmark[] = [];
       let cursor: string | null = null;
       let pageCount = 0;
       
@@ -291,7 +291,7 @@ export class KarakeepApiClient {
     try {
       console.log('正在获取 Karakeep 所有书签...', options);
       
-      let allBookmarks: KarakeepBookmark[] = [];
+      const allBookmarks: KarakeepBookmark[] = [];
       let cursor: string | null = null;
       let pageCount = 0;
       

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest } from '@/lib/auth';
 import { createNextErrorResponse, createNextSuccessResponse } from '@/lib/utils/serialization';
-import { batchScoreInboxItems } from '@/lib/ai/server/inbox-scorer';
+import { InboxScoringService } from '@/lib/services/inbox-scoring';
 import { z } from 'zod';
 
 const BatchScoreSchema = z.object({
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const { limit = 50, delay = 500 } = BatchScoreSchema.parse(body);
 
-    const result = await batchScoreInboxItems(limit, delay);
+    const result = await InboxScoringService.runBatch({ limit, delayMs: delay, source: 'api' });
     return createNextSuccessResponse(result);
   } catch (error) {
     console.error('批量评分失败:', error);

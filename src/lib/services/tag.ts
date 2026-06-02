@@ -1,5 +1,6 @@
 import { TagInput, TagUpdate, TagQuery, TagMerge } from '@/lib/validations/tag';
 import { prisma } from '@/lib/db';
+import type { Prisma } from '@prisma/client';
 
 export interface TagWithStats {
   id: number;
@@ -18,7 +19,18 @@ export interface TagWithStats {
   };
 }
 
-type TagRecordWithGroup = Awaited<ReturnType<typeof prisma.tags.findMany>>[number];
+type TagRecordWithGroup = Prisma.tagsGetPayload<{
+  include: {
+    group: {
+      select: {
+        id: true;
+        name: true;
+        slug: true;
+        color: true;
+      };
+    };
+  };
+}>;
 
 // 解析 aliases JSON 字符串
 function parseAliases(aliasesJson: string | null): string[] {

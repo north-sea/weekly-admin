@@ -351,11 +351,32 @@ async function syncRssToInbox(sourceId: number, options?: SyncOptions): Promise<
   };
 }
 
+function isTwitterUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    return host === 'x.com' || host === 'twitter.com';
+  } catch {
+    return false;
+  }
+}
+
+function deriveTwitterTitle(bookmark: KarakeepBookmark, rawTitle: string): string {
+  const summary = bookmark.summary?.trim();
+  if (!summary) return rawTitle;
+  const firstSentence = summary.split(/[。！？\n]/)[0]?.trim();
+  if (!firstSentence || firstSentence.length < 4) return rawTitle;
+  if (firstSentence.length <= 60) return firstSentence;
+  return firstSentence.slice(0, 57) + '...';
+}
+
 function karakeepBookmarkToInboxCreate(sourceId: number, bookmark: KarakeepBookmark) {
   const url = bookmark.content?.url ?? '';
   if (!url) return null;
 
-  const title = (bookmark.content?.title || bookmark.title || '').trim() || url;
+  let title = (bookmark.content?.title || bookmark.title || '').trim() || url;
+  if (isTwitterUrl(url)) {
+    title = deriveTwitterTitle(bookmark, title);
+  }
   const imageUrl = bookmark.content?.imageUrl || bookmark.content?.screenshotAssetId || bookmark.content?.imageAssetId || null;
 
   return {
@@ -536,13 +557,13 @@ export class SyncOrchestrator {
     });
 
     // 动态导入以避免循环依赖
-    const { scoreInboxItem } = await import('@/lib/ai/server/inbox-scorer');
+    const { InboxScoringService } = await import('@/lib/services/inbox-scoring');
     const { detectSimilarItem } = await import('@/lib/services/inbox-deduplicator');
 
     for (const item of items) {
       // AI 评分
       try {
-        await scoreInboxItem(item.id);
+        await InboxScoringService.runOne(item.id, { source: 'sync' });
         scored += 1;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
