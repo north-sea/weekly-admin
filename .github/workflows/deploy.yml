@@ -120,11 +120,26 @@ jobs:
               DATABASE_URL="$(grep -E '^DATABASE_URL=' "$DEPLOY_DIR/.env" | tail -n 1 | cut -d= -f2-)"
               export DATABASE_URL
             fi
+            DATABASE_URL="${DATABASE_URL%$'\r'}"
+            DATABASE_URL="${DATABASE_URL#\"}"
+            DATABASE_URL="${DATABASE_URL%\"}"
+            DATABASE_URL="${DATABASE_URL#'}"
+            DATABASE_URL="${DATABASE_URL%'}"
             if [ -z "${DATABASE_URL:-}" ]; then
               echo "❌ DATABASE_URL 未配置，无法执行 Prisma 迁移"
               exit 1
             fi
-            docker run --rm --env DATABASE_URL="$DATABASE_URL" $IMAGE pnpm prisma migrate deploy
+            if [[ "$DATABASE_URL" != mysql://* ]]; then
+              echo "❌ DATABASE_URL 必须以 mysql:// 开头，无法执行 Prisma 迁移"
+              exit 1
+            fi
+            MIGRATION_DOCKER_ARGS=(--rm --env DATABASE_URL="$DATABASE_URL")
+            PRIMARY_NETWORK="$(docker inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "$CONTAINER_NAME" 2>/dev/null | awk '$0!="bridge" && $0!="host" && $0!="none" { print; exit }' || true)"
+            if [ -n "$PRIMARY_NETWORK" ]; then
+              echo "🔌 迁移容器接入 Docker 网络: $PRIMARY_NETWORK"
+              MIGRATION_DOCKER_ARGS+=(--network "$PRIMARY_NETWORK")
+            fi
+            docker run "${MIGRATION_DOCKER_ARGS[@]}" "$IMAGE" pnpm prisma migrate deploy
 
             # 停止并删除旧容器
             echo "🛑 停止旧容器..."
