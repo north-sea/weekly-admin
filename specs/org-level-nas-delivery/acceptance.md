@@ -128,3 +128,14 @@ Weekly-admin NAS deployment directory/container:
 
 - During compose verification, `docker compose config` expanded `.env` values into command output. Do not use full `docker compose config` for future evidence collection; only grep non-secret fields such as the image line.
 - Because secret values were exposed in tool output during this session, rotate production secrets after the migration, especially API keys and shared service tokens.
+
+### Iteration Notes
+
+- First deployed image failed with `/app/docker-entrypoint.sh: not found`; fixed by changing the Dockerfile to start standalone Next.js directly with `CMD ["node", "server.js"]`.
+- Second deployed image started Next.js but failed Prisma engine resolution for Alpine; fixed by adding `linux-musl-openssl-3.0.x` to `prisma/schema.prisma` binary targets.
+- Third deployed image started Next.js and loaded Prisma correctly, but `/api/health` timed out because the container was not attached to the MySQL container network and `DATABASE_URL` pointed to an unreachable Tailscale IP.
+- NAS deploy config was updated:
+  - `.env` was backed up before edits.
+  - DB host changed from the unreachable IP to `mysql`.
+  - `docker-compose.yml` now attaches `weekly-admin` to external `1panel-network`.
+- Workflow health checks now use `curl --max-time 5` so a hung health endpoint does not occupy the single NAS runner indefinitely.

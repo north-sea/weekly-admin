@@ -139,7 +139,7 @@ jobs:
             echo "🔍 执行健康检查..."
             HEALTH_OK=false
             for i in {1..12}; do
-              if curl -sf http://localhost:3000/api/health > /dev/null; then
+              if curl -sf --max-time 5 http://localhost:3000/api/health > /dev/null; then
                 HEALTH_OK=true
                 echo "✅ 健康检查通过"
                 break
@@ -189,7 +189,7 @@ jobs:
 
                 # 验证回滚
                 sleep 10
-                if curl -sf http://localhost:3000/api/health > /dev/null; then
+                if curl -sf --max-time 5 http://localhost:3000/api/health > /dev/null; then
                   echo "✅ 回滚成功"
                   DEPLOY_STATUS="rollback"
                   DEPLOY_MESSAGE="部署失败，已回滚到上一版本"
