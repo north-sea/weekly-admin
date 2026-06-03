@@ -61,7 +61,7 @@ describe('search service', () => {
         content_type_id: 3,
         status: 'draft',
         category_id: 2,
-        category: { name: 'Tech' },
+        categories: { name: 'Tech' },
         content_tags: [{ tag_id: 5, tag: { name: 'AI' } }],
         view_count: BigInt(7),
         word_count: 120,
@@ -108,6 +108,7 @@ describe('search service', () => {
     expect(result.meta?.degraded).toBe(true);
     expect(result.limit).toBe(100);
     expect(result.hits[0].title).toBe('Fallback');
+    expect(result.hits[0].category_name).toBe('Tech');
   });
 
   it('builds conservative MySQL fallback query and reports unsupported filters', async () => {
@@ -125,6 +126,9 @@ describe('search service', () => {
     expect(prisma.contents.findMany).toHaveBeenCalledWith(expect.objectContaining({
       take: 10,
       orderBy: { updated_at: 'desc' },
+      include: expect.objectContaining({
+        categories: true,
+      }),
     }));
     expect(result.meta?.unsupportedFilters).toEqual(['tagIds', 'sort:unsupported:asc']);
   });

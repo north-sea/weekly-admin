@@ -27,10 +27,10 @@
 | Dimension | Verdict | Notes |
 |---|---|---|
 | Component capability | PASS | Search config, index naming, fallback search, route integration, health degraded behavior, and startup validation were implemented with focused tests. |
-| Workflow closure | PASS | Meili failure flows to MySQL fallback for search and degraded health for health checks; shared-index misconfiguration is blocked before writes. |
-| User-visible outcome | PASS | `/api/search` returns HTTP 200 fallback payload instead of Meili 503; `/api/health` returns degraded HTTP 200 when only search is down. |
+| Workflow closure | CONDITIONAL PASS | Meili failure flows to MySQL fallback locally; NAS old image exposed a Prisma relation-name issue that is fixed locally and requires redeploy smoke. |
+| User-visible outcome | CONDITIONAL PASS | `/api/health` runtime smoke passes; `/api/search` runtime smoke must be repeated after deploying the fallback relation-name fix. |
 
-**Overall**: PASS
+**Overall**: CONDITIONAL PASS pending redeploy smoke
 
 ## Workflow Replay
 
@@ -52,21 +52,41 @@ Results on 2026-06-03:
 - Focused tests: 3 files passed, 12 tests passed.
 - Type check: passed.
 - Lint: passed with existing warnings, 0 errors.
+- `pnpm lint --quiet`: passed.
+- `pnpm build`: passed.
+
+## Runtime Smoke
+
+NAS smoke on 2026-06-03 before redeploying the local fallback fix:
+
+- `/api/health`: PASS. HTTP 200, `overall = "degraded"`, database/startup healthy, search degraded because Meilisearch health is unavailable.
+- Unauthenticated `/api/search`: PASS for auth guard. HTTP 401 `Authentication required`.
+- Authenticated `/api/search`: FAIL on the old deployed image. Request reached fallback after Meilisearch failure, then returned HTTP 500 because fallback used `include.category` while the generated Prisma relation is `categories`.
+
+Local fix:
+
+- `src/lib/search.ts` now uses `include.categories` for MySQL fallback.
+- `mapContentToSearchDocument` accepts `categories?.name` and keeps compatibility with `category?.name`.
+- `src/lib/search.test.ts` now asserts fallback category mapping and `include.categories`.
+
+Remaining runtime gate:
+
+- Deploy the local fix and rerun authenticated `/api/search` NAS smoke. Expected result: HTTP 200 with `success = true` and `data.meta.mode = "fallback"` while Meilisearch remains unavailable.
 
 ## Closeout Checklist
 
 | Check | Status | Notes |
 |---|---|---|
 | 旧逻辑退役 | PASS | `/api/search` 不再把 Meili connection failure 映射为 503；`scripts/test-search.ts` 改为 fallback-aware；startup validation 不再要求 `MEILISEARCH_HOST` 必填。 |
-| 发布/CI 跟进 | PASS | 无数据库迁移；需要部署时补充 `MEILISEARCH_CONTENT_INDEX=weekly_admin_contents`。 |
+| 发布/CI 跟进 | CONDITIONAL PASS | 无数据库迁移；需要部署当前 fallback fix 后补 authenticated `/api/search` NAS smoke。 |
 | 文档更新 | PASS | `.env.example`、`docs/nas-deployment.md`、`scripts/README.md` 已更新 optional Meili 与共享 index 规则。 |
 | ADR 保留 | PASS | `plan.md` 保留 health degraded、fallback 查询、index 命名、NAS 复用边界、PG/pgvector 边界决策。 |
 | 架构债 / 后续演进 | PASS | FULLTEXT fallback 优化、NAS Docker network 接入、PG/pgvector semantic retrieval 均明确延后，不阻塞本 feature。 |
-| Workflow replay | PASS | 见上方 fixture replay；真实 NAS smoke 可在部署窗口执行。 |
+| Workflow replay | CONDITIONAL PASS | fixture replay 通过；真实 NAS `/api/health` 通过；真实 NAS authenticated `/api/search` 等待 redeploy 后复测。 |
 
 ## Final Completion Record
 
-**Status**: Complete.
+**Status**: Pending redeploy smoke.
 
 **Delayed by design**:
 
@@ -79,3 +99,4 @@ Results on 2026-06-03:
 
 - Existing deployments may keep `MEILISEARCH_HOST` unset or unreachable; Admin should continue with degraded/fallback search.
 - Shared Meilisearch deployments must use an Admin-specific index such as `weekly_admin_contents`.
+- Production secrets/API keys should be rotated because a container inspect during smoke investigation exposed environment values in tool output.

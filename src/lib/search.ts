@@ -460,7 +460,7 @@ const mapContentToSearchDocument = (content: any): SearchDocument => ({
   content_type_name: content.content_type_id === 3 ? 'Weekly' : 'Blog',
   status: content.status || '',
   category_id: content.category_id || undefined,
-  category_name: content.category?.name || '',
+  category_name: content.categories?.name || content.category?.name || '',
   tag_ids: content.content_tags?.map((item: any) => item.tag_id) || [],
   tag_names: content.content_tags?.map((item: any) => item.tag?.name).filter(Boolean).join(' ') || '',
   user_id: content.user_id || undefined,
@@ -542,7 +542,7 @@ export const searchContentsInMysql = async (
       take: limit,
       orderBy,
       include: {
-        category: true,
+        categories: true,
         content_tags: {
           include: {
             tag: true,
