@@ -8,14 +8,14 @@ import { errorTracker } from '@/lib/monitoring/error-tracker';
 import { logger } from '@/lib/logger';
 
 interface HealthStatus {
-  status: 'healthy' | 'unhealthy';
+  status: 'healthy' | 'degraded' | 'unhealthy';
   message: string;
   timestamp: Date;
   responseTime?: number;
 }
 
 interface HealthCheckResponse {
-  overall: 'healthy' | 'unhealthy';
+  overall: 'healthy' | 'degraded' | 'unhealthy';
   services: {
     database: HealthStatus;
     search: HealthStatus;
@@ -61,7 +61,7 @@ export async function GET() {
         timestamp,
       },
       search: {
-        status: 'unhealthy', 
+        status: 'degraded', 
         message: 'Not checked',
         timestamp,
       },
@@ -155,11 +155,13 @@ export async function GET() {
     };
   } catch (error) {
     healthCheck.services.search = {
-      status: 'unhealthy',
+      status: 'degraded',
       message: error instanceof Error ? error.message : 'Search service connection failed',
       timestamp,
     };
-    healthCheck.overall = 'unhealthy';
+    if (healthCheck.overall === 'healthy') {
+      healthCheck.overall = 'degraded';
+    }
   }
 
   // Update application response time
@@ -208,7 +210,7 @@ export async function GET() {
   });
 
   // Return appropriate status code
-  const statusCode = healthCheck.overall === 'healthy' ? 200 : 503;
+  const statusCode = healthCheck.overall === 'unhealthy' ? 503 : 200;
   
   return NextResponse.json(healthCheck, { status: statusCode });
 }

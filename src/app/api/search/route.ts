@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { searchContents, getSearchSuggestions, SearchOptions } from '@/lib/search';
+import { searchContentsWithFallback, getSearchSuggestions, SearchOptions } from '@/lib/search';
 import { z } from 'zod';
 
 // Search request validation schema
@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
     };
     
     // Perform search
-    const result = await searchContents(searchOptions);
+    const result = await searchContentsWithFallback(searchOptions);
     
     return NextResponse.json({
       success: true,
@@ -136,20 +136,13 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Search API error:', error);
     
-    // Check if it's a Meilisearch connection error
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const isMeilisearchDown = errorMessage.includes('ECONNREFUSED') || 
-                              errorMessage.includes('ENOTFOUND') || 
-                              errorMessage.includes('fetch failed');
     
     return NextResponse.json({
       success: false,
-      error: isMeilisearchDown ? 'Search service unavailable' : 'Search failed',
-      message: isMeilisearchDown 
-        ? 'Meilisearch service is not available. Please contact the administrator to enable search functionality.'
-        : errorMessage,
-      searchDisabled: isMeilisearchDown,
-    }, { status: isMeilisearchDown ? 503 : 500 });
+      error: 'Search failed',
+      message: errorMessage,
+    }, { status: 500 });
   }
 }
 
@@ -188,7 +181,7 @@ export async function POST(request: NextRequest) {
     };
     
     // Perform search
-    const result = await searchContents(searchOptions);
+    const result = await searchContentsWithFallback(searchOptions);
     
     return NextResponse.json({
       success: true,
@@ -198,19 +191,12 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Search API error:', error);
     
-    // Check if it's a Meilisearch connection error
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const isMeilisearchDown = errorMessage.includes('ECONNREFUSED') || 
-                              errorMessage.includes('ENOTFOUND') || 
-                              errorMessage.includes('fetch failed');
     
     return NextResponse.json({
       success: false,
-      error: isMeilisearchDown ? 'Search service unavailable' : 'Search failed',
-      message: isMeilisearchDown 
-        ? 'Meilisearch service is not available. Please contact the administrator to enable search functionality.'
-        : errorMessage,
-      searchDisabled: isMeilisearchDown,
-    }, { status: isMeilisearchDown ? 503 : 500 });
+      error: 'Search failed',
+      message: errorMessage,
+    }, { status: 500 });
   }
 }

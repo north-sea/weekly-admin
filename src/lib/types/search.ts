@@ -25,6 +25,12 @@ export interface SearchResult {
   limit: number;
   processingTimeMs: number;
   query: string;
+  meta?: {
+    mode: 'meilisearch' | 'fallback' | 'disabled' | 'misconfigured';
+    degraded: boolean;
+    reason?: string;
+    unsupportedFilters?: string[];
+  };
 }
 
 export interface SearchHistoryItem {

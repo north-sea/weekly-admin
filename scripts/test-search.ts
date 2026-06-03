@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import { searchContents, getSearchSuggestions, getIndexStats } from '../src/lib/search';
+import { searchContentsWithFallback, getSearchSuggestions, getIndexStats } from '../src/lib/search';
 
 async function testSearch() {
   try {
@@ -12,17 +12,22 @@ async function testSearch() {
     
     // Test 1: Get index stats
     console.log('\n📊 Getting index statistics...');
-    const stats = await getIndexStats();
-    console.log(`Index contains ${stats.numberOfDocuments} documents`);
+    try {
+      const stats = await getIndexStats();
+      console.log(`Index contains ${stats.numberOfDocuments} documents`);
+    } catch (error) {
+      console.warn('Meilisearch index stats unavailable; continuing with fallback-capable search test');
+    }
     
     // Test 2: Basic search
     console.log('\n🔎 Testing basic search...');
-    const searchResult = await searchContents({
+    const searchResult = await searchContentsWithFallback({
       query: 'React',
       limit: 5,
     });
     console.log(`Found ${searchResult.total} results for "React"`);
     console.log(`Processing time: ${searchResult.processingTimeMs}ms`);
+    console.log(`Search mode: ${searchResult.meta?.mode || 'unknown'}`);
     
     if (searchResult.hits.length > 0) {
       console.log('\nFirst result:');
@@ -34,7 +39,7 @@ async function testSearch() {
     
     // Test 3: Search with filters
     console.log('\n🎯 Testing filtered search...');
-    const filteredResult = await searchContents({
+    const filteredResult = await searchContentsWithFallback({
       query: '',
       filters: {
         contentType: 'weekly',
@@ -51,7 +56,7 @@ async function testSearch() {
     
     // Test 5: Empty search (should return all)
     console.log('\n📋 Testing empty search...');
-    const allResults = await searchContents({
+    const allResults = await searchContentsWithFallback({
       query: '',
       limit: 10,
     });

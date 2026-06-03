@@ -1,7 +1,7 @@
 // Search API Service
 // 搜索服务 - 提供搜索相关的 API 端点和类型定义
 
-import { SearchFilters, SearchOptions, SearchResult } from '@/hooks/useSearch';
+import { SearchOptions, SearchResult } from '@/hooks/useSearch';
 
 // 搜索建议响应类型
 export interface SearchSuggestionsResponse {

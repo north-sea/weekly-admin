@@ -16,8 +16,10 @@ export interface EnvironmentConfig {
   dbName?: string;
   
   // Search
-  meilisearchHost: string;
+  meilisearchHost?: string;
   meilisearchMasterKey?: string;
+  meilisearchContentIndex: string;
+  meilisearchSharedInstance: boolean;
   
   // Image Upload
   imageUploadUrl?: string;
@@ -32,7 +34,6 @@ export interface EnvironmentConfig {
 const REQUIRED_ENV_VARS = [
   'DATABASE_URL',
   'JWT_SECRET',
-  'MEILISEARCH_HOST'
 ] as const;
 
 // Optional environment variables with defaults
@@ -41,6 +42,8 @@ const OPTIONAL_ENV_VARS = {
   PORT: '3000',
   JWT_EXPIRES_IN: '8h',
   MEILISEARCH_MASTER_KEY: '',
+  MEILISEARCH_CONTENT_INDEX: 'weekly_admin_contents',
+  MEILISEARCH_SHARED_INSTANCE: 'false',
   IMAGE_UPLOAD_URL: '',
   IMAGE_UPLOAD_TOKEN: '',
   DB_HOST: '',
@@ -123,6 +126,12 @@ export function validateEnvironmentVariables(): EnvironmentConfig {
     }
   }
 
+  const meilisearchContentIndex = process.env.MEILISEARCH_CONTENT_INDEX || OPTIONAL_ENV_VARS.MEILISEARCH_CONTENT_INDEX;
+  const meilisearchSharedInstance = process.env.MEILISEARCH_SHARED_INSTANCE === 'true';
+  if (meilisearchSharedInstance && meilisearchContentIndex.trim().toLowerCase() === 'contents') {
+    errors.push('MEILISEARCH_CONTENT_INDEX cannot be "contents" when MEILISEARCH_SHARED_INSTANCE=true');
+  }
+
   // Validate IMAGE_UPLOAD_URL format if provided
   const imageUploadUrl = process.env.IMAGE_UPLOAD_URL;
   if (imageUploadUrl) {
@@ -174,8 +183,10 @@ export function validateEnvironmentVariables(): EnvironmentConfig {
     dbUser: process.env.DB_USER,
     dbPassword: process.env.DB_PASSWORD,
     dbName: process.env.DB_NAME,
-    meilisearchHost: meilisearchHost!,
+    meilisearchHost,
     meilisearchMasterKey: process.env.MEILISEARCH_MASTER_KEY,
+    meilisearchContentIndex,
+    meilisearchSharedInstance,
     imageUploadUrl: process.env.IMAGE_UPLOAD_URL,
     imageUploadToken: process.env.IMAGE_UPLOAD_TOKEN,
     jwtSecret: jwtSecret!,
@@ -248,6 +259,11 @@ export async function validateDatabaseConnection(config: EnvironmentConfig): Pro
  * Validate Meilisearch connection
  */
 export async function validateMeilisearchConnection(config: EnvironmentConfig): Promise<void> {
+  if (!config.meilisearchHost) {
+    console.log('⚠️  Meilisearch host not configured - Search functionality will use fallback mode');
+    return;
+  }
+
   try {
     console.log('🔍 Validating Meilisearch connection...');
     

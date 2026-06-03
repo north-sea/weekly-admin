@@ -58,7 +58,9 @@ DATABASE_URL=mysql://user:password@host:3306/database
 
 # Meilisearch 配置
 MEILISEARCH_HOST=http://meilisearch:7700
-MEILISEARCH_API_KEY=your-api-key
+MEILISEARCH_MASTER_KEY=your-api-key
+MEILISEARCH_CONTENT_INDEX=weekly_admin_contents
+MEILISEARCH_SHARED_INSTANCE=false
 
 # 认证配置
 JWT_SECRET=your-jwt-secret
@@ -229,7 +231,8 @@ docker exec weekly-admin curl -v http://database-host:3306
 ### 4. 健康检查失败
 
 - 检查数据库连接
-- 检查 Meilisearch 连接
+- 检查 Meilisearch 连接。Meilisearch 是 optional keyword search backend；它不可达时 `/api/health` 应显示 degraded 而不是因为 search 单项失败返回整体 503。
+- 若复用 NAS 上已有的 Karakeep Meilisearch，必须使用 Admin 独立 index（例如 `weekly_admin_contents`），不要使用通用 `contents` 或 Karakeep 已有 index。NAS Docker 网络接入方式需单独确认。
 - 查看应用日志
 
 ---

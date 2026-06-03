@@ -184,9 +184,10 @@ node scripts/validate-startup.js
 ```
 
 **验证项**：
-- 必需变量：`DATABASE_URL`、`JWT_SECRET`、`MEILISEARCH_HOST`
-- 格式验证：数据库 URL、Meilisearch URL、端口号
+- 必需变量：`DATABASE_URL`、`JWT_SECRET`
+- 格式验证：数据库 URL、可选 Meilisearch URL、端口号
 - 安全检查：JWT_SECRET 长度
+- Meilisearch 是可选关键词搜索后端；未配置或不可达时应用应进入 fallback/degraded 模式
 
 ---
 
@@ -303,5 +304,7 @@ pnpm tsx scripts/迁移/sync-weekly-from-karakeep.ts --no-archive
 | `KARAKEEP_MIGRATION_LIST_ID` | Karakeep 迁移列表 ID |
 | `IMAGE_UPLOAD_URL` | 图床上传 API 地址 |
 | `IMAGE_UPLOAD_TOKEN` | 图床 API Token |
-| `MEILISEARCH_HOST` | Meilisearch 地址 |
+| `MEILISEARCH_HOST` | 可选 Meilisearch 地址 |
+| `MEILISEARCH_CONTENT_INDEX` | Admin 专用搜索 index，默认 `weekly_admin_contents` |
+| `MEILISEARCH_SHARED_INSTANCE` | 复用共享 Meilisearch 时设为 `true`，禁止使用通用 `contents` index |
 | `JWT_SECRET` | JWT 密钥 |

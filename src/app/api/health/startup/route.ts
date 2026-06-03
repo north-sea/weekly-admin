@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         status: 'healthy',
-        message: 'Application is running and all services are connected',
+        message: 'Application is running; optional services may be degraded',
         timestamp: new Date().toISOString(),
         initialized: true
       });
@@ -24,13 +24,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       status: 'healthy',
-      message: 'Application initialized successfully and all services are connected',
+      message: 'Application initialized successfully; optional services may be degraded',
       timestamp: new Date().toISOString(),
       initialized: true,
       environment: config.nodeEnv,
       services: {
         database: 'connected',
-        meilisearch: 'connected',
+        meilisearch: config.meilisearchHost ? 'optional_configured' : 'optional_not_configured',
         imageUpload: config.imageUploadUrl ? 'configured' : 'not_configured'
       }
     });
@@ -66,12 +66,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       status: 'reinitialized',
-      message: 'Application re-initialized successfully',
+      message: 'Application re-initialized successfully; optional services may be degraded',
       timestamp: new Date().toISOString(),
       environment: config.nodeEnv,
       services: {
         database: 'connected',
-        meilisearch: 'connected',
+        meilisearch: config.meilisearchHost ? 'optional_configured' : 'optional_not_configured',
         imageUpload: config.imageUploadUrl ? 'configured' : 'not_configured'
       }
     });

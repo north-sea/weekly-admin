@@ -13,8 +13,7 @@
 // Required environment variables
 const REQUIRED_ENV_VARS = [
   'DATABASE_URL',
-  'JWT_SECRET',
-  'MEILISEARCH_HOST'
+  'JWT_SECRET'
 ];
 
 // Optional environment variables with defaults
@@ -22,6 +21,8 @@ const OPTIONAL_ENV_VARS = {
   NODE_ENV: 'development',
   PORT: '3000',
   JWT_EXPIRES_IN: '8h',
+  MEILISEARCH_CONTENT_INDEX: 'weekly_admin_contents',
+  MEILISEARCH_SHARED_INSTANCE: 'false',
   LOG_LEVEL: 'info'
 };
 
@@ -73,6 +74,12 @@ function validateEnvironmentVariables() {
     }
   }
 
+  const meilisearchContentIndex = process.env.MEILISEARCH_CONTENT_INDEX || OPTIONAL_ENV_VARS.MEILISEARCH_CONTENT_INDEX;
+  const meilisearchSharedInstance = process.env.MEILISEARCH_SHARED_INSTANCE === 'true';
+  if (meilisearchSharedInstance && meilisearchContentIndex.trim().toLowerCase() === 'contents') {
+    errors.push('MEILISEARCH_CONTENT_INDEX cannot be "contents" when MEILISEARCH_SHARED_INSTANCE=true');
+  }
+
   // Validate JWT_SECRET strength
   const jwtSecret = process.env.JWT_SECRET;
   if (jwtSecret && jwtSecret.length < 32) {
@@ -99,6 +106,8 @@ function validateEnvironmentVariables() {
     port,
     databaseUrl: databaseUrl,
     meilisearchHost: meilisearchHost,
+    meilisearchContentIndex,
+    meilisearchSharedInstance,
     jwtSecret: jwtSecret,
     logLevel: process.env.LOG_LEVEL || OPTIONAL_ENV_VARS.LOG_LEVEL
   };
@@ -117,7 +126,8 @@ async function main() {
     console.log(`   - Environment: ${config.nodeEnv}`);
     console.log(`   - Port: ${config.port}`);
     console.log(`   - Database: ${config.databaseUrl.replace(/:[^:@]*@/, ':***@')}`);
-    console.log(`   - Meilisearch: ${config.meilisearchHost}`);
+    console.log(`   - Meilisearch: ${config.meilisearchHost || 'not configured (fallback mode)'}`);
+    console.log(`   - Meilisearch Index: ${config.meilisearchContentIndex}`);
     console.log(`   - Log Level: ${config.logLevel}`);
     console.log('');
 
