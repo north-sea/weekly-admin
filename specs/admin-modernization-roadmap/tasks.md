@@ -87,15 +87,15 @@
   - maps_to: US4 / FR-006 / FR-007 / FR-010 / FR-011 / ADR-004
   - verify: spec 明确 API token、scope、OpenAPI、dry-run、idempotency、operation log
 
-- [ ] T011 [US4] 创建 `database-and-search-strategy` spec
+- [x] T011 [US4] 创建并完成 `database-and-search-strategy` 工作区
   - scope: `specs/database-and-search-strategy/spec.md`
   - maps_to: FR-003 / FR-004 / FR-005 / FR-013 / FR-014 / ADR-003 / ADR-005
-  - verify: spec 明确 MySQL 事实源、PG/pgvector 智能读模型、Redis 控制层、Meilisearch optional 和 NAS 复用评估
+  - verify: spec/plan/tasks/acceptance/assessment 已存在；Meilisearch optional、health degraded、MySQL fallback、Admin index isolation 和 NAS runtime smoke 均通过
 
-- [ ] T012 [US4] 记录 NAS Meilisearch 复用约束
+- [x] T012 [US4] 记录 NAS Meilisearch 复用约束
   - scope: `specs/database-and-search-strategy/spec.md`
   - maps_to: ADR-005
-  - verify: spec 记录 `karakeep-meilisearch` 当前只在 `karakeep-app_default` 网络内，Admin 若复用需独立 index 和网络方案
+  - verify: database/search plan 和 acceptance 已记录独立 index、optional backend、NAS 网络接入不在本 feature 内；部署后 smoke 证明未接入 Meili 时 Admin 可降级运行
 
 ---
 
@@ -124,15 +124,25 @@
 
 **目标**: 将已有 SDD 工作区纳入现代化路线，而不是重复创建。
 
+- [ ] T016A [Security] 创建 `security-and-runtime-hardening` spec
+  - scope: `specs/security-and-runtime-hardening/spec.md`
+  - maps_to: 安全 / 可用性 / Post-F6 follow-through
+  - verify: spec 覆盖 production secrets/API keys 轮换、JWT/automation token 分离前置约束、Meilisearch timeout/circuit breaker、无 secret 输出规则
+
+- [ ] T016B [Security] 执行 production secrets/API keys 轮换记录
+  - scope: `security-and-runtime-hardening` acceptance
+  - maps_to: database-and-search-strategy closeout follow-up
+  - verify: JWT_SECRET、Meili master key、Karakeep、Quail、Image upload、AI encryption、DB password 等轮换项有完成证据或明确延后责任人
+
 - [ ] T016 [F8] 复核 `inbox-ai-scoring` 当前任务状态
   - scope: `specs/inbox-ai-scoring/spec.md`, `plan.md`, `tasks.md`
   - maps_to: FR-012 / Producer: AI scoring
-  - verify: 标记哪些任务已完成，哪些需要因 Redis/Hermes/API 契约调整
+  - verify: 标记 R3 Admin UI、T105 DB 回填查询、逐条耗时/P95、NAS runtime smoke 是否补齐；明确是否需要因 Redis/Hermes/API 契约调整
 
 - [ ] T017 [F7] 复核 `migration-tooling-baseline` 当前状态
   - scope: `specs/migration-tooling-baseline/spec.md`
   - maps_to: FR-012 / 可演进性
-  - verify: 明确是否应在 Next 16 后、Agent API 前推进 Prisma migrate baseline
+  - verify: 明确应在 Agent API、image field drop、Redis job 前推进 Prisma migrate baseline；把 schema drift/Prisma relation mismatch 作为 Post-F6 新证据写入 plan
 
 ---
 
@@ -160,15 +170,22 @@
   - maps_to: 可演进性 / Recommended Execution Order
   - verify: plan 已新增 Post-F0 Reassessment，并把后续顺序调整为 F6 -> F7 -> F8 -> F2 -> F1 -> F5 -> F3 -> F4
 
+- [x] T022 完成 `database-and-search-strategy` 并回写 Post-F6 复评
+  - scope: `specs/database-and-search-strategy/*`, `specs/admin-modernization-roadmap/plan.md`, `tasks.md`
+  - maps_to: ADR-003 / ADR-005 / 可用性 / 安全
+  - verify: database/search acceptance 为 PASS；roadmap 已新增 Post-F6 Reassessment 和新推荐顺序
+
 ---
 
 ## 依赖与顺序
 
-- F0 已完成，新的关键路径：T011/T012 -> T017 -> T016 -> T010 -> T007/T008 -> T013/T014。
-- T011/T012 需要提前，因为 F0 smoke 发现 `/api/health` 会被 Meilisearch 不可用拖成 503。
-- T017 需要提前，因为后续 feature 会继续改 schema，必须先建立迁移基线。
-- T016 需要提前，因为工作树已有 `inbox-ai-scoring` 实现痕迹，UI 工作台和 Agent 契约应消费其稳定输出。
-- T007/T008 仍是产品表层重点，但应在评分/搜索/契约事实稳定后实施，避免 UI feature 夹带业务补丁。
+- F0 与 F6 已完成，新的关键路径：T016A/T016B -> T017 -> T016 -> T010 -> T008 -> T007 -> T013/T014。
+- T016A/T016B 需要最先处理，因为 Post-F6 smoke 调查中曾展开生产 env，必须轮换 secrets/API keys，并补 Meili timeout/circuit breaker。
+- T017 需要提前，因为 Post-F6 authenticated search smoke 暴露了 Prisma relation name 假设错误，后续 feature 会继续改 schema，必须先建立迁移基线和 drift 检查。
+- T016 需要提前，因为 `inbox-ai-scoring` 已基本实现，但 acceptance 仍有 UI/runtime/DB 查询证据缺口；UI 工作台和 Agent 契约应消费其稳定输出。
+- T010 应在 UI 和 Hermes 前完成，因为 n8n/Hermes/MCP 需要稳定 token scope、OpenAPI、idempotency 和 audit。
+- T008 现在早于 T007，因为周刊去图片后应先退役 legacy 图片入口和写入路径，再设计新的周刊工作台。
+- T013/T014 仍后置：Redis/Hermes 应消费稳定契约、评分输出和人工确认 UI，不抢先成为事实源。
 
 ---
 
@@ -199,8 +216,8 @@
 ## Notes
 
 - 本 tasks.md 的任务重点是“创建和治理子 feature”。不要在本 roadmap workspace 中直接进行 Next.js 升级或 UI 改造。
-- `next16-upgrade-baseline` 已完成，后续不再作为 active implementation 目标。
-- 新推荐顺序：`database-and-search-strategy` -> `migration-tooling-baseline` -> `inbox-ai-scoring-continuation` -> `agent-and-automation-contracts` -> `admin-shell-and-weekly-workbench` -> `image-feature-retirement` -> `redis-job-orchestration` -> `hermes-weekly-intelligence`。
+- `next16-upgrade-baseline` 与 `database-and-search-strategy` 已完成，后续不再作为 active implementation 目标。
+- 新推荐顺序：`security-and-runtime-hardening` -> `migration-tooling-baseline` -> `inbox-ai-scoring-continuation` -> `agent-and-automation-contracts` -> `image-feature-retirement` -> `admin-shell-and-weekly-workbench` -> `redis-job-orchestration` -> `hermes-weekly-intelligence`。
 
 ---
 
@@ -208,4 +225,4 @@
 
 - 推荐下一步：`specify`
 - 阻塞项：无
-- 执行建议：优先创建 `database-and-search-strategy` 独立 SDD 工作区，解决 Meilisearch optional health / fallback 语义。
+- 执行建议：优先创建 `security-and-runtime-hardening` 独立 SDD 工作区，处理 secrets rotation 和 Meilisearch timeout/circuit breaker；随后推进 `migration-tooling-baseline`。
