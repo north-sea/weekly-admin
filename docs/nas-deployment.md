@@ -1,52 +1,53 @@
 # NAS Docker 部署指南
 
-本文档说明如何将 Weekly Admin 部署到飞牛 OS (fnOS) NAS 上。
+本文档说明如何将 Weekly Admin 通过 GitHub Actions 和 NAS self-hosted runner 部署到飞牛 OS (fnOS) NAS 上。
 
 ## 部署架构
 
 ```
-GitHub (push) → GitHub Actions (build) → GHCR (镜像) → NAS (pull & run)
+GitHub (push) → GitHub Actions (build) → GHCR (镜像) → NAS runner (pull & run)
 ```
 
 ## 前置要求
 
-1. NAS 已安装 Docker
-2. NAS 可通过 SSH 访问
-3. GitHub 仓库已配置 Secrets
+1. NAS 已安装 Docker 和 Docker Compose
+2. NAS 已注册到本仓库作为 GitHub Actions self-hosted runner
+3. Runner labels 包含 `self-hosted`、`nas`、`weekly-admin-deploy`
+4. Runner 执行用户可以运行 `docker` 和 `docker compose`
 
 ## 配置步骤
 
-### 1. 配置 GitHub Secrets
+### 1. 注册 NAS self-hosted runner
 
-在 GitHub 仓库的 `Settings > Secrets and variables > Actions` 中添加：
+在 GitHub 仓库的 `Settings > Actions > Runners` 中新增 Linux self-hosted runner。
 
-| Secret 名称 | 说明 | 示例 |
-|------------|------|------|
-| `NAS_HOST` | NAS 的 IP 或域名 | `192.168.1.100` 或 `nas.example.com` |
-| `NAS_USERNAME` | SSH 用户名 | `admin` |
-| `NAS_SSH_KEY` | SSH 私钥 | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
-| `NAS_SSH_PORT` | SSH 端口 (可选，默认 22) | `22` |
-| `NAS_DEPLOY_DIR` | 部署目录 (可选) | `/volume1/docker/weekly-admin` |
-
-### 2. 生成 SSH 密钥
+注册时添加自定义 label：
 
 ```bash
-# 在本地生成密钥对
-ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/.ssh/nas_deploy
-
-# 将公钥添加到 NAS
-ssh-copy-id -i ~/.ssh/nas_deploy.pub admin@your-nas-ip
-
-# 将私钥内容复制到 GitHub Secrets (NAS_SSH_KEY)
-cat ~/.ssh/nas_deploy
+./config.sh --labels nas,weekly-admin-deploy
 ```
+
+启动 runner：
+
+```bash
+./run.sh
+```
+
+生产环境建议按 GitHub runner 页面指引安装为系统服务。
+
+### 2. 配置 GitHub Variables
+
+如部署目录不是默认值，在 GitHub 仓库的 `Settings > Secrets and variables > Actions > Variables` 中添加：
+
+| Variable 名称 | 说明 | 默认值 |
+|------------|------|------|
+| `NAS_DEPLOY_DIR` | NAS 上的部署目录 | `/volume1/docker/weekly-admin` |
+
+当前部署流程不需要 `NAS_HOST`、`NAS_USERNAME`、`NAS_SSH_KEY` 等 SSH secrets。
 
 ### 3. 在 NAS 上创建部署目录
 
 ```bash
-# SSH 登录到 NAS
-ssh admin@your-nas-ip
-
 # 创建部署目录
 mkdir -p /volume1/docker/weekly-admin
 cd /volume1/docker/weekly-admin

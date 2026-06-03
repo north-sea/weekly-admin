@@ -73,24 +73,24 @@ jobs:
             DATABASE_URL=mysql://temp:temp@localhost:3306/temp
 
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, nas, weekly-admin-deploy]
     needs: [build]
     if: always() && (needs.build.result == 'success' || github.event.inputs.deploy_only == 'true')
+    permissions:
+      contents: read
+      packages: read
 
     steps:
-      - name: Deploy to NAS via SSH
+      - name: Deploy on NAS runner
         id: deploy
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.NAS_HOST }}
-          username: ${{ secrets.NAS_USERNAME }}
-          key: ${{ secrets.NAS_SSH_KEY }}
-          port: ${{ secrets.NAS_SSH_PORT || 22 }}
-          script: |
+        env:
+          DEPLOY_DIR: ${{ vars.NAS_DEPLOY_DIR }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
             # 配置
             CONTAINER_NAME="weekly-admin"
-            IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-            DEPLOY_DIR="${{ secrets.NAS_DEPLOY_DIR || '/volume1/docker/weekly-admin' }}"
+            IMAGE="${REGISTRY}/${GITHUB_REPOSITORY,,}:latest"
+            DEPLOY_DIR="${DEPLOY_DIR:-/volume1/docker/weekly-admin}"
             DEPLOY_STATUS="success"
             DEPLOY_MESSAGE=""
 
@@ -98,7 +98,7 @@ jobs:
             echo "📦 镜像: $IMAGE"
 
             # 登录 GitHub Container Registry
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
             # 记录旧镜像 ID（用于回滚）
             OLD_IMAGE=$(docker inspect --format='{{.Image}}' $CONTAINER_NAME 2>/dev/null || echo "")
