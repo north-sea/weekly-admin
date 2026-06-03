@@ -140,3 +140,27 @@ Weekly-admin NAS deployment directory/container:
   - `docker-compose.yml` now attaches `weekly-admin` to external `1panel-network`.
 - Workflow health checks now use `curl --max-time 5` so a hung health endpoint does not occupy the single NAS runner indefinitely.
 - `/api/health` currently returns HTTP 200 with `overall=degraded` when Meilisearch is unreachable, but it can take close to 10 seconds because the search backend attempt waits before degrading. Workflow health check timeout was adjusted to 20 seconds to match the current endpoint behavior.
+
+### Weekly-Admin Final Evidence
+
+- Successful Actions run: `26864142208`.
+- Successful commit SHA: `df93aae1e1a7f23890e749af946be197d0fdc100`.
+- Build job: success.
+- Deploy job: success.
+- GHCR package: `ghcr.io/north-sea/weekly-admin`.
+- Latest package tags after success: `latest`, `sha-df93aae`.
+- NAS container:
+  - name: `weekly-admin`
+  - image: `ghcr.io/north-sea/weekly-admin:latest`
+  - status: `healthy`
+  - network: `1panel-network`
+- Health endpoint:
+  - URL: `http://localhost:3000/api/health` from NAS
+  - HTTP status: `200`
+  - overall: `degraded`
+  - database: `healthy`
+  - search/Meilisearch: degraded because `100.113.231.101:7700` is not reachable from the container.
+
+### Weekly-Admin Verdict
+
+`weekly-admin` migration/build/deploy is accepted for this feature. The service is running on NAS from the org GHCR namespace using the org-level NAS runner. Meilisearch remains degraded and should be treated as a follow-up configuration task, not a blocker for this feature because the spec accepts expected degraded health.

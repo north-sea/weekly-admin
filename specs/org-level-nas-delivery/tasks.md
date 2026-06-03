@@ -83,7 +83,7 @@
   - maps_to: US3-1 / FR-007
   - verify: compose/docker run 使用 `ghcr.io/north-sea/weekly-admin`；如有 compose，`docker compose config` 解析后的 image 匹配新 namespace
 
-- [ ] T011 验证 `weekly-admin` build/package/deploy/health
+- [x] T011 验证 `weekly-admin` build/package/deploy/health
   - scope: GitHub Actions run + GHCR package + NAS container
   - maps_to: US3-1 / FR-008
   - verify: build success；package push success；NAS `docker pull` success；deploy job 被 org runner 接单；`docker inspect weekly-admin` image 为 org namespace；`/api/health` 通过或预期 degraded
