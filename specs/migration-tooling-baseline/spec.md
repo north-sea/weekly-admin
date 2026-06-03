@@ -8,6 +8,22 @@
 > 本 spec 定义 F1.5 (migration-tooling-baseline),在 F1 (inbox-ai-scoring) 完成后、F2 (preference-learning) 开始前,将项目从"自定义迁移脚本 + 裸 SQL"切换到"标准 Prisma migrate 工作流 + 独立 seed"。
 > 上游文档:`docs/automation-plan-admin.md` (v2.2) 的 Feature 拆分章节。
 
+> 2026-06-03 更新:当前 roadmap 已完成 `database-and-search-strategy`,本 feature 现在排在 `inbox-ai-scoring-continuation` 之前。原 F1/F2 叙述保留为历史来源,当前执行依据以 `specs/admin-modernization-roadmap/plan.md` 的 Post-F6 Reassessment 为准。
+
+---
+
+## Feature Traits
+
+| Trait | 是否命中 | 依据 |
+|---|---|---|
+| `multi-stage-workflow` | ✅ | baseline 生成、dev resolve、prod resolve、seed 抽离、部署自动迁移、后续迁移创建构成多阶段工作流。 |
+| `external-side-effects` | ✅ | `prisma migrate resolve` 会写入迁移元数据,`prisma migrate deploy` 会在部署时修改数据库 schema。 |
+| `artifact-handoff` | ✅ | baseline migration、`_prisma_migrations`、`prisma/seed.ts`、迁移文档和 CI 日志会被后续开发、部署和验收消费。 |
+| `user-visible-output` | ✅ | 开发者/运维可见的迁移文档、命令输出和部署日志属于直接可见产物。 |
+| `prior-closure-failure` | ✅ | Post-F6 runtime smoke 暴露过 Prisma relation name 与实际 schema 假设不一致,本 feature 需要防止 DB 变更闭环再次断裂。 |
+
+**结论**: plan 阶段必须生成 Producer-Consumer Matrix；verify 阶段必须有 Evidence Gate；closeout/acceptance 阶段必须给出 Component / Workflow / User-Visible Outcome 三维结论。
+
 ---
 
 ## 现状摘要(写 spec 前的范围级只读探索结论)
@@ -28,7 +44,7 @@
 - 项目从已有数据库启动,用 `prisma db pull` 生成初始 schema
 - 后续变更用自定义脚本 + 裸 SQL,从未切换到 `prisma migrate`
 - `migrate-db.ts` 用 `SHOW COLUMNS LIKE` 实现幂等性,避免重复执行报错
-- 部署时手动跑 `pnpm migrate` 或 `./scripts/run-sql-migration.sh`,无自动化
+- 部署时手动跑 `pnpm db:migrate` 或 `./scripts/run-sql-migration.sh`,无自动化
 
 **当前数据库状态**(2026-05-23 探查):
 
@@ -36,6 +52,13 @@
 - `inbox_items`: 566 条记录
 - `contents`: 1404 条记录
 - 所有表结构与 `prisma/schema.prisma` 一致
+
+> 注意:以上数据库状态是 2026-05-23 的历史快照。进入 plan/implement 前必须重新执行 fresh drift/status 检查,不能沿用旧结论作为生产 baseline 依据。
+
+**Post-F6 新证据**(2026-06-03):
+
+- `database-and-search-strategy` 的生产 fallback smoke 暴露过 Prisma relation name 假设与实际 generated client/schema 不一致的问题。
+- 因此 F1.5 不只是工具标准化,还必须把 schema drift、generated client、生产 DB 和 baseline migration 的一致性检查纳入验收。
 
 **F1.5 要解决的问题**:
 
@@ -49,7 +72,7 @@
 
 **关键决策已确认 (clarify 阶段已收口)**:
 
-- **切换时机**: F1 完成后,F2 开始前(F1 已用 `database/inbox_scoring_baseline.sql`,F2 起用新流程)
+- **切换时机**: 历史决策是 F1 完成后、F2 开始前；当前 roadmap 更新为在 `database-and-search-strategy` 完成后、`inbox-ai-scoring-continuation` 前执行。
 - **历史迁移**: 不回溯,用 `prisma migrate diff --from-empty` 生成 baseline,`prisma migrate resolve --applied` 标记为已应用
 - **现有脚本**: `migrate-db.ts` 保留但标记为 deprecated,`database/*.sql` 工作流在 F1.5 后废弃
 - **部署策略**: 先在 dev 环境验证 baseline,再在 prod 环境 `prisma migrate resolve`,最后更新 CI/CD
@@ -181,12 +204,13 @@
 - **FR-008**: `scripts/migrate-db.ts` 必须标记为 deprecated,添加警告注释
 - **FR-009**: `database/*.sql` 工作流必须在文档中标记为废弃,F2 起不再使用
 - **FR-010**: 系统必须提供迁移工作流文档,说明如何创建/应用/回滚迁移
+- **FR-011**: 系统必须在生成/标记 baseline 前提供 fresh drift/status 检查证据,覆盖 Prisma schema、generated client、当前数据库和 migration status。
 
 ### Non-Functional Requirements
 
 - **NFR-001 (零停机)**: baseline 标记为已应用时,不修改数据库,不影响生产服务
-- **NFR-002 (向后兼容)**: F1.5 上线后,`pnpm migrate` 命令仍可用(内部调 `prisma migrate deploy`)
-- **NFR-003 (可回滚)**: 所有迁移必须可通过反向迁移回滚
+- **NFR-002 (向后兼容)**: F1.5 上线后,`pnpm db:migrate` 命令仍可用(内部调 `prisma migrate deploy`)
+- **NFR-003 (可回滚)**: 所有迁移必须提供前进式修复/反向迁移策略；不得假设所有 MySQL DDL 都能自动事务回滚
 - **NFR-004 (文档完整)**: 迁移工作流文档必须覆盖开发/部署/回滚三个场景
 
 ### Key Entities
@@ -250,7 +274,7 @@
 
 进入 plan 阶段前已确认的关键决议:
 
-- **Q1 — 何时切换**:**F1 完成后,F2 开始前**。F1 最后一次用旧流程(`database/inbox_scoring_baseline.sql`),F2 起用新流程。
+- **Q1 — 何时切换**:**当前 roadmap 中在 `database-and-search-strategy` 完成后、`inbox-ai-scoring-continuation` 前执行**。历史来源是 F1 完成后、F2 开始前,F1 最后一次用旧流程(`database/inbox_scoring_baseline.sql`)。
 - **Q2 — 历史迁移怎么办**:**不回溯**。用 `prisma migrate diff --from-empty` 生成 baseline,包含当前所有表,`prisma migrate resolve --applied` 标记为已应用。
 - **Q3 — 现有脚本怎么办**:**保留但 deprecated**。`migrate-db.ts` 加警告注释,`database/*.sql` 工作流文档标记废弃。
 - **Q4 — 部署策略**:**先 dev 验证,再 prod resolve,最后更新 CI/CD**。生产环境用 `prisma migrate resolve` 标记 baseline,不实际执行 SQL。
@@ -270,8 +294,10 @@
   5. `.github/workflows/deploy.yml` - 部署前加 `prisma migrate deploy`
   6. `docs/migration-workflow.md` - 迁移工作流文档
   7. `scripts/migrate-db.ts` - 顶部加 deprecated 注释
+  8. fresh drift/status 证据 - 覆盖 Prisma schema、generated client、当前数据库和 migration status
 - **阻塞项**: 无
 - **风险**:
-  - **R1 (低)**: baseline 与生产 DB 不一致 — 已验证无 drift,风险低
-  - **R2 (中)**: 生产环境 `prisma migrate resolve` 需停机 — 不需要,resolve 只写 `_prisma_migrations` 表,不改 schema
-  - **R3 (低)**: 现有调用方依赖 `migrate-db.ts` — 只有 `package.json` 的 `migrate` 命令,改为调 `prisma migrate deploy` 即可
+  - **R1 (中)**: baseline 与生产 DB 不一致 — 旧的无 drift 证据已过期,必须重新验证
+  - **R2 (中)**: 生产环境 `prisma migrate resolve` 需停机 — 不需要,resolve 只写 `_prisma_migrations` 表,不改 schema,但仍需备份/checkpoint
+  - **R3 (低)**: 现有调用方依赖 `migrate-db.ts` — 目前主要是 `package.json` 的 `db:migrate` 命令,改为调 `prisma migrate deploy` 即可
+  - **R4 (中)**: MySQL DDL rollback 语义不统一 — plan 中必须采用前进式修复迁移作为生产回滚主路径

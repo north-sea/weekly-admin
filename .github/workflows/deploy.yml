@@ -81,11 +81,29 @@ jobs:
       packages: read
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install deploy dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Deploy on NAS runner
         id: deploy
         env:
           DEPLOY_DIR: ${{ vars.NAS_DEPLOY_DIR }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
             # 配置
             CONTAINER_NAME="weekly-admin"
@@ -110,6 +128,18 @@ jobs:
               echo "❌ 镜像拉取失败"
               exit 1
             fi
+
+            # 在停止旧容器前应用数据库迁移，避免迁移失败造成服务中断
+            echo "🗄️ 应用数据库迁移..."
+            if [ -z "${DATABASE_URL:-}" ] && [ -f "$DEPLOY_DIR/.env" ]; then
+              DATABASE_URL="$(grep -E '^DATABASE_URL=' "$DEPLOY_DIR/.env" | tail -n 1 | cut -d= -f2-)"
+              export DATABASE_URL
+            fi
+            if [ -z "${DATABASE_URL:-}" ]; then
+              echo "❌ DATABASE_URL 未配置，无法执行 Prisma 迁移"
+              exit 1
+            fi
+            pnpm prisma migrate deploy
 
             # 停止并删除旧容器
             echo "🛑 停止旧容器..."

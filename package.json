@@ -19,11 +19,16 @@
     "test:coverage": "vitest --coverage",
     "db:generate": "pnpm prisma generate",
     "db:pull": "pnpm prisma db pull",
-    "db:migrate": "pnpm tsx scripts/migrate-db.ts",
+    "db:migrate": "pnpm prisma migrate deploy",
+    "db:seed": "pnpm prisma db seed",
+    "db:status": "pnpm prisma migrate status",
     "validate-startup": "node scripts/validate-startup.js",
     "docker:build": "docker build -t weekly-content-management .",
     "docker:run": "docker run -p 3000:3000 --env-file .env weekly-content-management",
     "health-check": "curl -f http://localhost:3000/api/health || exit 1"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

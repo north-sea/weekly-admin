@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Legacy SQL migration runner.
+# Deprecated after migration-tooling-baseline: new schema changes must use
+# Prisma Migrate under prisma/migrations/.
+#
 # 执行 SQL 迁移脚本
 # 用法: ./scripts/run-sql-migration.sh database/add_content_preview_fields.sql
 
@@ -102,5 +106,4 @@ else
   echo "❌ SQL 迁移执行失败"
   exit 1
 fi
-
 

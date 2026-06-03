@@ -19,6 +19,10 @@ node scripts/<script-name>.js
 
 ## 数据库相关
 
+> F1.5 migration-tooling-baseline 之后，新的 schema 变更必须走 Prisma Migrate：
+> `pnpm prisma migrate dev --name <change>` 创建迁移，`pnpm db:migrate` 部署迁移。
+> 本节中的 legacy 脚本只保留用于历史排障，不再作为新增 schema change 入口。
+
 ### `check-db.ts`
 检查数据库结构和连接状态。
 
@@ -33,8 +37,8 @@ pnpm tsx scripts/check-db.ts
 
 ---
 
-### `migrate-db.ts`
-执行数据库迁移，创建必要的表和字段。
+### `migrate-db.ts` (legacy)
+历史自定义数据库迁移脚本，已废弃。不要继续在这里新增 schema 变更。
 
 ```bash
 pnpm tsx scripts/migrate-db.ts
@@ -45,6 +49,11 @@ pnpm tsx scripts/migrate-db.ts
 - 为 `contents` 表添加 `user_id` 字段
 - 为 `weekly_issues` 表添加 Quail 相关字段
 - 创建默认用户（admin/editor）
+
+**替代方式**：
+- schema 变更：`pnpm prisma migrate dev --name <change>`
+- 部署迁移：`pnpm db:migrate`
+- 默认数据：`pnpm prisma db seed`
 
 ---
 
@@ -57,14 +66,16 @@ pnpm tsx scripts/apply-schema-changes.ts
 
 ---
 
-### `run-sql-migration.sh`
-执行 SQL 迁移文件。
+### `run-sql-migration.sh` (legacy)
+执行历史 SQL 文件。F1.5 后不得新增 `database/*.sql` 作为 schema 变更入口。
 
 ```bash
 ./scripts/run-sql-migration.sh database/add_content_preview_fields.sql
 ```
 
 **参数**：SQL 文件路径（默认 `database/add_content_preview_fields.sql`）
+
+**替代方式**：使用 `prisma/migrations/<timestamp>_<name>/migration.sql`。
 
 ---
 

@@ -1,5 +1,11 @@
 import 'dotenv/config';
 
+/**
+ * @deprecated This legacy schema migration script is retained for historical
+ * reference only. New schema changes must use Prisma Migrate:
+ * `pnpm prisma migrate dev` in development and `pnpm db:migrate` for deploy.
+ * Default data initialization now belongs in `pnpm prisma db seed`.
+ */
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
