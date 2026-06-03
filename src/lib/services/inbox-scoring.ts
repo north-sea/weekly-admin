@@ -46,7 +46,11 @@ export class InboxScoringService {
       UPDATE inbox_items
       SET scoring_status = 'pending'
       WHERE scoring_status = 'processing'
-        AND STR_TO_DATE(JSON_UNQUOTE(JSON_EXTRACT(ai_score_details, '$.last_scored_at')), '%Y-%m-%dT%H:%i:%s.%fZ') < DATE_SUB(UTC_TIMESTAMP(), INTERVAL ${timeoutMinutes} MINUTE)
+        AND (
+          JSON_EXTRACT(ai_score_details, '$.last_scored_at') IS NULL
+          OR STR_TO_DATE(JSON_UNQUOTE(JSON_EXTRACT(ai_score_details, '$.last_scored_at')), '%Y-%m-%dT%H:%i:%s.%fZ') IS NULL
+          OR STR_TO_DATE(JSON_UNQUOTE(JSON_EXTRACT(ai_score_details, '$.last_scored_at')), '%Y-%m-%dT%H:%i:%s.%fZ') < DATE_SUB(UTC_TIMESTAMP(), INTERVAL ${timeoutMinutes} MINUTE)
+        )
     `;
 
     if (result > 0) {

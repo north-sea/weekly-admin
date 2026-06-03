@@ -18,6 +18,10 @@ export type AiSettingRecord = {
 
 const DEFAULT_AI_SETTINGS: Record<string, AiSettingValue> = {
   [AUTO_SCORE_SETTING_KEY]: { enabled: true },
+  inbox_promotion_threshold: { value: 70 },
+  inbox_scoring_enabled: { value: true },
+  inbox_scoring_batch_size: { value: 50 },
+  inbox_scoring_processing_timeout_minutes: { value: 10 },
 };
 
 const normalizeAutoScoreSetting = (value: unknown): AutoScoreSettingValue => {

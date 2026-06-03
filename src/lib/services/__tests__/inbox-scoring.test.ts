@@ -187,6 +187,11 @@ describe('InboxScoringService.sweepStaleProcessing', () => {
 
     expect(swept).toBe(3);
     expect(executeRawMock).toHaveBeenCalledOnce();
+    const sqlParts = executeRawMock.mock.calls[0][0] as TemplateStringsArray;
+    const sql = Array.from(sqlParts).join('?');
+    expect(sql).toContain("JSON_EXTRACT(ai_score_details, '$.last_scored_at') IS NULL");
+    expect(sql).toContain('STR_TO_DATE');
+    expect(sql).toContain('DATE_SUB');
   });
 
   it('无超时项时返回 0', async () => {
