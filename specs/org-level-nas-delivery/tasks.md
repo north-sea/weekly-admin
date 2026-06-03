@@ -94,27 +94,27 @@
 
 **目标**: 在 weekly-admin 通过后迁移并验证 MCP release 流程。
 
-- [ ] T012 迁移 `mcps` 到 `north-sea`
+- [x] T012 迁移 `mcps` 到 `north-sea`
   - scope: GitHub repository transfer, local remote `/Users/yqg/personal/AI/mcps`
   - maps_to: US1 / FR-001 / FR-006
   - verify: `gh repo view north-sea/mcps` 成功；local `origin` 指向 `north-sea`
 
-- [ ] T013 授权 `mcps` 使用 org runner / org secrets
+- [x] T013 授权 `mcps` 使用 org runner / org secrets
   - scope: GitHub runner group selected repositories, org Actions secret visibility
   - maps_to: US2-2 / FR-002 / FR-003
   - verify: runner group repo list 包含 `mcps`；如配置 `GHCR_TOKEN`，visibility 包含 `mcps`
 
-- [ ] T014 更新 `mcps` release workflow 和 service manifest
+- [x] T014 更新 `mcps` release workflow 和 service manifest
   - scope: `/Users/yqg/personal/AI/mcps/.github/workflows/mcp-release.yml`, `deploy/mcp-services.json`, `deploy/services/*.yml`
   - maps_to: US3-2 / FR-004 / FR-005 / FR-007
   - verify: YAML/JSON parse；image refs 指向 `ghcr.io/north-sea/...`；runner label 为 `deploy`
 
-- [ ] T015 同步 `mcps` NAS 部署目录
+- [x] T015 同步 `mcps` NAS 部署目录
   - scope: `/vol1/1000/Docker/hermes-db-mcp`
   - maps_to: US3-2 / FR-007
   - verify: compose override 或 service compose 使用 `ghcr.io/north-sea/hermes-db-mcp`；`docker compose config` 解析后的 image 匹配新 namespace
 
-- [ ] T016 验证 `mcps` release build/package/deploy/smoke
+- [x] T016 验证 `mcps` release build/package/deploy/smoke
   - scope: release tag or workflow_dispatch equivalent
   - maps_to: US3-2 / FR-008
   - verify: build success；package push success；NAS `docker pull` success；deploy success；MCP smoke test 通过；actual image 等于 tag image ref

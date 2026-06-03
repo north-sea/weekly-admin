@@ -164,3 +164,58 @@ Weekly-admin NAS deployment directory/container:
 ### Weekly-Admin Verdict
 
 `weekly-admin` migration/build/deploy is accepted for this feature. The service is running on NAS from the org GHCR namespace using the org-level NAS runner. Meilisearch remains degraded and should be treated as a follow-up configuration task, not a blocker for this feature because the spec accepts expected degraded health.
+
+---
+
+## Phase 3 MCPS Setup
+
+### Repository Transfer
+
+- `mcps` transferred from `NorthSeacoder/mcps` to `north-sea/mcps`.
+- `gh api repos/north-sea/mcps` confirms:
+  - `id`: `975374359`
+  - `full_name`: `north-sea/mcps`
+  - `visibility`: `public`
+  - `default_branch`: `main`
+  - current token permissions include admin access.
+- Local origin updated to `git@github.com:north-sea/mcps.git`.
+
+### Runner Authorization
+
+- Added repository ID `975374359` to `nas-deploy` runner group selected repositories.
+- Runner group selected repositories now include `north-sea/weekly-admin` and `north-sea/mcps`.
+
+### Workflow / Manifest Update
+
+- `/Users/yqg/personal/AI/mcps/.github/workflows/mcp-release.yml` deploy job now uses org runner labels: `self-hosted`, `nas`, `deploy`.
+- `deploy/mcp-services.json` image changed to `ghcr.io/north-sea/hermes-db-mcp`.
+- `deploy/services/hermes-db.yml`, `deploy/nas.example.env`, and `deploy/README.md` updated from `northseacoder` / `mcps-deploy` to org namespace / org runner.
+- Workflow override generation changed to `printf` and now verifies the composed image with `docker compose ... config | grep`.
+- Validation:
+  - Workflow YAML parsed successfully.
+  - `deploy/mcp-services.json` parsed successfully.
+  - Search found no remaining `northseacoder` or `mcps-deploy` under `.github` and `deploy`.
+
+### NAS Deploy Directory
+
+- NAS deploy directory: `/vol1/1000/Docker/hermes-db-mcp`.
+- Existing `.mcps-release.override.yml` was backed up before editing.
+- Existing env files were backed up before registry edits when present.
+- Current composed image after release: `ghcr.io/north-sea/hermes-db-mcp:v0.2.8`.
+
+### Release Evidence
+
+- Release tag pushed: `hermes-db-v0.2.8`.
+- Successful Actions run: `26864724411`.
+- Build image: `ghcr.io/north-sea/hermes-db-mcp:v0.2.8`.
+- Build/test/deploy jobs: success.
+- GHCR package: `ghcr.io/north-sea/hermes-db-mcp`.
+- NAS container:
+  - name: `hermes-db-mcp`
+  - image: `ghcr.io/north-sea/hermes-db-mcp:v0.2.8`
+  - status: running
+- Workflow deploy smoke test completed successfully through the MCP health check.
+
+### MCPS Verdict
+
+`mcps` migration/build/deploy is accepted for this feature. The service is running on NAS from the org GHCR namespace using the org-level NAS runner.
