@@ -139,3 +139,4 @@ Weekly-admin NAS deployment directory/container:
   - DB host changed from the unreachable IP to `mysql`.
   - `docker-compose.yml` now attaches `weekly-admin` to external `1panel-network`.
 - Workflow health checks now use `curl --max-time 5` so a hung health endpoint does not occupy the single NAS runner indefinitely.
+- `/api/health` currently returns HTTP 200 with `overall=degraded` when Meilisearch is unreachable, but it can take close to 10 seconds because the search backend attempt waits before degrading. Workflow health check timeout was adjusted to 20 seconds to match the current endpoint behavior.
