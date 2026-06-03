@@ -50,12 +50,13 @@ RUN set -ex && \
     echo "Files in directory:" && ls -la && \
     pnpm next build
 
-# Production runner stage (no pnpm needed for standalone mode)
+# Production runner stage
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-# Install only curl for health checks and create non-root user
-RUN apk add --no-cache curl && \
+# Install runtime libraries for health checks and deploy-time Prisma migrations.
+RUN apk add --no-cache curl openssl libgcc && \
+    npm install -g pnpm@10 && \
     addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
@@ -76,6 +77,14 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+COPY --from=builder --chown=nextjs:nodejs /app/pnpm-lock.yaml ./pnpm-lock.yaml
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+
+# Install production dependencies in the runner image so deploy-time Prisma
+# migrations use binaries for the final Alpine runtime.
+RUN rm -rf node_modules && \
+    pnpm install --prod --frozen-lockfile && \
+    DATABASE_URL="mysql://user:password@localhost:3306/temp_db" pnpm prisma generate
 
 # Copy necessary scripts
 COPY --from=builder --chown=nextjs:nodejs /app/docker/healthcheck.js ./docker/healthcheck.js
