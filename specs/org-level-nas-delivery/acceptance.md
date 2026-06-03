@@ -307,13 +307,9 @@ Weekly-admin NAS deployment directory/container:
   - `/vol1/1000/Docker/github-actions-runner/mcps`
   - `/vol1/1000/Docker/github-actions-runner/agents`
   - `/vol1/1000/Docker/github-actions-runner/org-nas-deploy`
-- Follow-up: the old `mcps` repo-level runner service still restarts a local orphan `Runner.Listener` on NAS after the GitHub-side runner record is deleted. `svc.sh status/stop/uninstall` requires interactive `sudo` for user `nsea`, and no sudo password was available in this session. Stop and uninstall it manually with sudo:
-
-```bash
-ssh nas
-sudo /vol1/1000/Docker/github-actions-runner/mcps/svc.sh stop
-sudo /vol1/1000/Docker/github-actions-runner/mcps/svc.sh uninstall
-```
+- NAS process check now shows only the org runner listener:
+  - `/vol1/1000/Docker/github-actions-runner/org-nas-deploy/bin/Runner.Listener run`
+- Optional cleanup: the old `mcps` and `agents` runner directories may be deleted after a longer rollback window, but they are no longer registered as GitHub repo-level runners.
 
 ### Repo-Level Secrets Review
 
@@ -324,16 +320,10 @@ sudo /vol1/1000/Docker/github-actions-runner/mcps/svc.sh uninstall
 
 ### Knowledge / Memory
 
-- `nmem` write was not completed because the local service was unreachable:
-  - error: `Cannot reach http://127.0.0.1:14242`
-- The durable facts to save when Nowledge Mem is available:
-  - `weekly-admin`, `mcps`, and `agents` are migrated to `north-sea`.
-  - Org runner group `nas-deploy` has selected repositories for all three repos.
-  - NAS org runner `nas-org-deploy` is online with labels `self-hosted`, `Linux`, `X64`, `nas`, `deploy`.
-  - Current deployed images:
-    - `ghcr.io/north-sea/weekly-admin:latest`
-    - `ghcr.io/north-sea/hermes-db-mcp:v0.2.8`
-    - `ghcr.io/north-sea/wechat-mcp-server:v0.1.6`
+- `nmem` memory saved:
+  - id: `129999f1-3c5c-42b6-9c2c-37be55a4e8c2`
+  - title: `org-level NAS runner delivery for weekly-admin/mcps/agents`
+  - labels: `infra`, `nas`, `github-actions`, `deployment`
 
 ### Final Verdict
 

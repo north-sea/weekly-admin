@@ -156,7 +156,7 @@
 
 **目标**: 移除旧模式，留下可复用文档。
 
-- [ ] T022 停用旧 repo-level runners
+- [x] T022 停用旧 repo-level runners
   - scope: GitHub repo runners, NAS runner services
   - maps_to: NFR-003
   - verify: repo-level runner list 无旧 runner；NAS 上旧 runner service stopped/disabled
@@ -171,7 +171,7 @@
   - maps_to: FR-008
   - verify: 记录三仓 Actions run IDs、image refs、NAS health/smoke 结果、遗留风险
 
-- [ ] T025 保存知识库
+- [x] T025 保存知识库
   - scope: nmem memory
   - maps_to: NFR-004
   - verify: 保存 org runner/token 接入流程和三仓最终状态
