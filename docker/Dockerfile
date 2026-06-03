@@ -81,9 +81,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=nextjs:nodejs /app/docker/healthcheck.js ./docker/healthcheck.js
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/validate-startup.js ./scripts/validate-startup.js
 
-# Switch to non-root user
-USER nextjs
-
 # Expose port
 EXPOSE 3000
 
@@ -122,6 +119,9 @@ node server.js &\n\
 PID=$!\n\
 wait $PID\n\
 ' > /app/docker-entrypoint.sh && chmod +x /app/docker-entrypoint.sh
+
+# Switch to non-root user
+USER nextjs
 
 # Graceful shutdown signal
 STOPSIGNAL SIGTERM
