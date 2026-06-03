@@ -11,20 +11,20 @@ GitHub (push) → GitHub Actions (build) → GHCR (镜像) → NAS runner (pull 
 ## 前置要求
 
 1. NAS 已安装 Docker 和 Docker Compose
-2. NAS 已注册到本仓库作为 GitHub Actions self-hosted runner
-3. Runner labels 包含 `self-hosted`、`nas`、`weekly-admin-deploy`
+2. NAS 已注册到 `north-sea` GitHub Organization 作为 org-level self-hosted runner
+3. Runner labels 包含 `self-hosted`、`nas`、`deploy`
 4. Runner 执行用户可以运行 `docker` 和 `docker compose`
 
 ## 配置步骤
 
 ### 1. 注册 NAS self-hosted runner
 
-在 GitHub 仓库的 `Settings > Actions > Runners` 中新增 Linux self-hosted runner。
+在 GitHub Organization 的 `Settings > Actions > Runners` 中新增 Linux self-hosted runner，并把 runner 放入 `nas-deploy` runner group。
 
 注册时添加自定义 label：
 
 ```bash
-./config.sh --labels nas,weekly-admin-deploy
+./config.sh --url https://github.com/north-sea --runnergroup nas-deploy --labels nas,deploy
 ```
 
 启动 runner：
@@ -85,7 +85,7 @@ version: '3.8'
 
 services:
   weekly-admin:
-    image: ghcr.io/your-username/weekly-admin:latest
+    image: ghcr.io/north-sea/weekly-admin:latest
     container_name: weekly-admin
     restart: unless-stopped
     ports:
@@ -148,7 +148,7 @@ curl http://localhost:3000/api/health
 
 ```bash
 # 查看可用的镜像标签
-docker images ghcr.io/your-username/weekly-admin
+docker images ghcr.io/north-sea/weekly-admin
 
 # 回滚到指定版本
 docker stop weekly-admin
@@ -158,7 +158,7 @@ docker run -d \
   --restart unless-stopped \
   --env-file .env \
   -p 3000:3000 \
-  ghcr.io/your-username/weekly-admin:20260131-abc1234
+  ghcr.io/north-sea/weekly-admin:20260131-abc1234
 ```
 
 ## 使用 Watchtower 自动更新 (可选)
@@ -171,7 +171,7 @@ version: '3.8'
 
 services:
   weekly-admin:
-    image: ghcr.io/your-username/weekly-admin:latest
+    image: ghcr.io/north-sea/weekly-admin:latest
     container_name: weekly-admin
     restart: unless-stopped
     ports:
@@ -238,4 +238,4 @@ docker exec weekly-admin curl -v http://database-host:3306
 
 ---
 
-*最后更新: 2026-01-31*
+*最后更新: 2026-06-03*

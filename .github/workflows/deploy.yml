@@ -73,7 +73,7 @@ jobs:
             DATABASE_URL=mysql://temp:temp@localhost:3306/temp
 
   deploy:
-    runs-on: [self-hosted, nas, weekly-admin-deploy]
+    runs-on: [self-hosted, nas, deploy]
     needs: [build]
     if: always() && (needs.build.result == 'success' || github.event.inputs.deploy_only == 'true')
     permissions:
@@ -122,7 +122,9 @@ jobs:
 
             # 使用 docker-compose 或直接 docker run
             if [ -f "docker-compose.yml" ]; then
-              docker compose up -d --force-recreate --remove-orphans
+              printf 'services:\n  weekly-admin:\n    image: %s\n' "$IMAGE" > .weekly-admin-release.override.yml
+              docker compose -f docker-compose.yml -f .weekly-admin-release.override.yml config | grep -F "image: $IMAGE"
+              docker compose -f docker-compose.yml -f .weekly-admin-release.override.yml up -d --force-recreate --remove-orphans
             else
               docker run -d \
                 --name $CONTAINER_NAME \
