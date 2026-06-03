@@ -2,7 +2,7 @@
 
 **Workspace**: `org-level-nas-delivery`  
 **Started**: 2026-06-03  
-**Status**: In Progress
+**Status**: Accepted with Follow-ups
 
 ---
 
@@ -219,3 +219,122 @@ Weekly-admin NAS deployment directory/container:
 ### MCPS Verdict
 
 `mcps` migration/build/deploy is accepted for this feature. The service is running on NAS from the org GHCR namespace using the org-level NAS runner.
+
+---
+
+## Phase 4 Agents Setup
+
+### Repository Transfer
+
+- `agents` transferred from `NorthSeacoder/agents` to `north-sea/agents`.
+- `gh api repos/north-sea/agents` confirms:
+  - `id`: `1251305869`
+  - `full_name`: `north-sea/agents`
+  - `visibility`: `private`
+  - `default_branch`: `main`
+  - current token permissions include admin access.
+- Local origin updated to `git@github.com:north-sea/agents.git`.
+- Existing local user changes were left untouched:
+  - `README.md`
+  - `specs/.active`
+  - untracked `specs/*` retrospective/spec files.
+
+### Runner Authorization
+
+- Added repository ID `1251305869` to `nas-deploy` runner group selected repositories.
+- Runner group selected repositories now include:
+  - `north-sea/weekly-admin`
+  - `north-sea/mcps`
+  - `north-sea/agents`
+
+### Workflow / Manifest Update
+
+- `/Users/yqg/personal/AI/agents/.github/workflows/mcp-release.yml` deploy job now uses org runner labels: `self-hosted`, `nas`, `deploy`.
+- `apps/wechat-agent/docker-compose.yml` default image owner changed to `north-sea`.
+- `deploy/NAS_SETUP_GUIDE.md` documents runner group `nas-deploy`, labels `nas,deploy`, and default owner `north-sea`.
+- `deploy/README.md` documents labels `nas,deploy`.
+- Validation:
+  - Workflow YAML parsed successfully.
+  - `deploy/mcp-services.json` parsed successfully.
+  - Search found no remaining `agents-deploy`, old default owner `yqg`, `northseacoder`, `NorthSeacoder/agents`, or old local origin in `.github`, `deploy`, and `apps/wechat-agent`.
+
+### NAS Deploy Directory
+
+- NAS deploy directory: `/vol1/1000/Docker/wechat-mcp-server`.
+- Existing `docker-compose.yml` was backed up to `docker-compose.yml.bak-org-level-nas-delivery-20260603`.
+- Current compose image line:
+  - `ghcr.io/${GITHUB_REPOSITORY_OWNER:-north-sea}/wechat-mcp-server:${TAG:-latest}`
+
+### Release Evidence
+
+- Release tag pushed: `wechat-agent-v0.1.6`.
+- Successful Actions run: `26866465680`.
+- Run head: tag `wechat-agent-v0.1.6`, commit `6cb98163b39c95856779a1d66d3bd19fc52e7331`.
+- Jobs:
+  - `Resolve release target`: success.
+  - `Verify workspace`: success.
+  - `Build and publish wechat-mcp-server:v0.1.6`: success.
+  - `Deploy wechat-mcp-server to NAS`: success on runner `nas-org-deploy`.
+- GHCR package: `ghcr.io/north-sea/wechat-mcp-server`.
+- Latest package tags after success: `latest`, `v0.1.6`.
+- NAS container:
+  - name: `wechat-mcp-server`
+  - image: `ghcr.io/north-sea/wechat-mcp-server:v0.1.6`
+  - status: `healthy`
+- Health endpoint:
+  - URL: `http://127.0.0.1:3011/health` from NAS
+  - response: `OK`
+
+### Agents Verdict
+
+`agents` migration/build/deploy is accepted for this feature. The private repository can publish and deploy the private package from the org GHCR namespace using the org-level NAS runner and `GITHUB_TOKEN`.
+
+---
+
+## Phase 5 Closeout
+
+### Repo-Level Runner Retirement
+
+- GitHub repo-level runner list is now empty for:
+  - `north-sea/weekly-admin`
+  - `north-sea/mcps`
+  - `north-sea/agents`
+- Org runner remains online:
+  - name: `nas-org-deploy`
+  - labels: `self-hosted`, `Linux`, `X64`, `nas`, `deploy`
+  - status: `online`
+- NAS runner directories retained for rollback/evidence:
+  - `/vol1/1000/Docker/github-actions-runner/mcps`
+  - `/vol1/1000/Docker/github-actions-runner/agents`
+  - `/vol1/1000/Docker/github-actions-runner/org-nas-deploy`
+- Follow-up: the old `mcps` repo-level runner service still restarts a local orphan `Runner.Listener` on NAS after the GitHub-side runner record is deleted. `svc.sh status/stop/uninstall` requires interactive `sudo` for user `nsea`, and no sudo password was available in this session. Stop and uninstall it manually with sudo:
+
+```bash
+ssh nas
+sudo /vol1/1000/Docker/github-actions-runner/mcps/svc.sh stop
+sudo /vol1/1000/Docker/github-actions-runner/mcps/svc.sh uninstall
+```
+
+### Repo-Level Secrets Review
+
+- `north-sea/weekly-admin`: no repo-level Actions secrets.
+- `north-sea/mcps`: repo-level `GHCR_TOKEN` exists and is still referenced as a fallback by `.github/workflows/mcp-release.yml`; keep until the workflow is simplified.
+- `north-sea/agents`: repo-level `GHCR_TOKEN` exists but the current release workflow uses `secrets.GITHUB_TOKEN`; it is a retirement candidate after confirming no other workflows use it.
+- `north-sea` org-level Actions secrets: none.
+
+### Knowledge / Memory
+
+- `nmem` write was not completed because the local service was unreachable:
+  - error: `Cannot reach http://127.0.0.1:14242`
+- The durable facts to save when Nowledge Mem is available:
+  - `weekly-admin`, `mcps`, and `agents` are migrated to `north-sea`.
+  - Org runner group `nas-deploy` has selected repositories for all three repos.
+  - NAS org runner `nas-org-deploy` is online with labels `self-hosted`, `Linux`, `X64`, `nas`, `deploy`.
+  - Current deployed images:
+    - `ghcr.io/north-sea/weekly-admin:latest`
+    - `ghcr.io/north-sea/hermes-db-mcp:v0.2.8`
+    - `ghcr.io/north-sea/wechat-mcp-server:v0.1.6`
+
+### Final Verdict
+
+The core feature objective is complete: all three repositories are under `north-sea`, use the org-level NAS runner for deployment, publish to the org GHCR namespace, and have successful NAS deployment evidence. Remaining follow-ups are operational cleanup, not blockers for accepting `org-level-nas-delivery`.

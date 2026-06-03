@@ -125,27 +125,27 @@
 
 **目标**: 最后迁移 private repo，并重点验证 private package 权限。
 
-- [ ] T017 迁移 `agents` 到 `north-sea`
+- [x] T017 迁移 `agents` 到 `north-sea`
   - scope: GitHub repository transfer, local remote `/Users/yqg/personal/AI/agents`
   - maps_to: US1 / FR-001 / FR-006
   - verify: `gh repo view north-sea/agents` 成功；private visibility 保持；local `origin` 指向 `north-sea`
 
-- [ ] T018 授权 `agents` 使用 org runner / org secrets
+- [x] T018 授权 `agents` 使用 org runner / org secrets
   - scope: GitHub runner group selected repositories, org Actions secret visibility
   - maps_to: US2-2 / FR-002 / FR-003
   - verify: runner group repo list 包含 `agents`；如配置 `GHCR_TOKEN`，visibility 包含 `agents`
 
-- [ ] T019 更新 `agents` release workflow 和 service manifest
+- [x] T019 更新 `agents` release workflow 和 service manifest
   - scope: `/Users/yqg/personal/AI/agents/.github/workflows/mcp-release.yml`, `deploy/mcp-services.json`, compose files
   - maps_to: US3-3 / FR-004 / FR-005 / FR-007
   - verify: YAML/JSON parse；image refs 指向 `ghcr.io/north-sea/...`；runner label 为 `deploy`
 
-- [ ] T020 同步 `agents` NAS 部署目录
+- [x] T020 同步 `agents` NAS 部署目录
   - scope: `/vol1/1000/Docker/wechat-mcp-server`
   - maps_to: US3-3 / FR-007
   - verify: compose 使用 `ghcr.io/north-sea/wechat-mcp-server`；`docker compose config` 解析后的 image 匹配新 namespace
 
-- [ ] T021 验证 `agents` release build/package/deploy/health
+- [x] T021 验证 `agents` release build/package/deploy/health
   - scope: release tag or workflow_dispatch equivalent
   - maps_to: US3-3 / FR-008
   - verify: build success；private package access 正常；NAS `docker pull` success；deploy success；health check 通过；actual image 等于 tag image ref
@@ -161,12 +161,12 @@
   - maps_to: NFR-003
   - verify: repo-level runner list 无旧 runner；NAS 上旧 runner service stopped/disabled
 
-- [ ] T023 检查 repo-level secrets 是否可退役
+- [x] T023 检查 repo-level secrets 是否可退役
   - scope: three repos Actions secrets
   - maps_to: 安全
   - verify: 不再需要 `NAS_HOST`, `NAS_SSH_KEY`, repo-specific `GHCR_TOKEN`
 
-- [ ] T024 写验收记录
+- [x] T024 写验收记录
   - scope: `specs/org-level-nas-delivery/acceptance.md`
   - maps_to: FR-008
   - verify: 记录三仓 Actions run IDs、image refs、NAS health/smoke 结果、遗留风险
