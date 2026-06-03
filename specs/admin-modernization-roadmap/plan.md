@@ -7,7 +7,7 @@
 
 ## Summary
 
-本计划把 Admin 现代化改造拆成一组可独立交付的 feature，并规定推荐执行顺序、跨系统边界、依赖关系和验证路径。当前 Next.js 16 基线和 database/search 边界已经完成；后续路线应先处理生产 secrets 与迁移治理，再收口评分闭环、自动化契约和产品表层。
+本计划把 Admin 现代化改造拆成一组可独立交付的 feature，并规定推荐执行顺序、跨系统边界、依赖关系和验证路径。当前 Next.js 16 基线和 database/search 边界已经完成；后续主线从迁移治理开始，再收口评分闭环、自动化契约和产品表层。生产 secrets 相关事项作为单独 deferred follow-up，不进入本次主线排序。
 
 本 plan 是 umbrella plan，不直接替代各执行 feature 的 `plan.md`。进入开发前，每个 feature 仍需拥有自己的 `spec.md` / `plan.md` / `tasks.md`。
 
@@ -89,43 +89,39 @@ Admin UI 展示建议 -> 人确认 -> Admin API 写回 MySQL
    - 已完成。Meilisearch 已成为 optional keyword backend；NAS runtime smoke 证明 `/api/health` degraded HTTP 200、authenticated `/api/search` fallback HTTP 200。
    - 保留后续优化：Meilisearch timeout/circuit breaker、FULLTEXT fallback 优化、NAS Meili 网络复用。
 
-### Phase 1: Security And Migration Foundations
+### Phase 1: Migration And Scoring Foundations
 
-3. `security-and-runtime-hardening`
-   - 新增轻量 follow-through。先轮换生产 secrets/API keys，并把 Meilisearch health/search 超时缩短到可接受范围。
-   - 这是本次 smoke 调查暴露出的安全和运行时风险，不应等到 UI 或 Hermes 阶段。
-
-4. `migration-tooling-baseline`
+3. `migration-tooling-baseline`
    - 在继续新增或 drop 字段前，建立 Prisma migrate baseline。
    - 本次 fallback 生产失败来自 Prisma relation name 假设与实际 schema 关系不一致，说明迁移和 schema drift 检查必须前置。
 
-5. `inbox-ai-scoring-continuation`
+4. `inbox-ai-scoring-continuation`
    - 收口当前已经落地的 scoring schema/service/API/tests/acceptance。
    - 重点转为 verify/closeout：补 NAS/runtime smoke、R3 UI 验证、T105 DB 回填查询和评分耗时证据。
 
 ### Phase 2: Automation Contracts
 
-6. `agent-and-automation-contracts`
+5. `agent-and-automation-contracts`
    - 提供 token、scope、OpenAPI、agent-friendly API。
-   - 本次 secret 暴露后需要更明确地区分人类 JWT、automation token、scope、rotation 和 audit。
+   - 明确区分人类 JWT 与 automation token，固定 scope、OpenAPI、idempotency 和 audit。secret rotation 仍作为 deferred follow-up，不阻塞本 feature。
 
 ### Phase 3: Product Surface
 
-7. `image-feature-retirement`
+6. `image-feature-retirement`
    - 提前到 UI 工作台之前。周刊已去图片，先退役图片入口/上传/裁剪/AI 图片路径，避免新 workbench 继续承载 legacy image surface。
    - 字段 drop 仍必须在 migration baseline 之后执行。
 
-8. `admin-shell-and-weekly-workbench`
+7. `admin-shell-and-weekly-workbench`
    - 以 `nextjs-tpl` 为主重塑后台壳层和周刊生产驾驶舱。
    - 消费稳定的 scoring/search/contracts，且在图片入口退役后再做主 UI 设计。
 
 ### Phase 4: Execution Control and Intelligence
 
-9. `redis-job-orchestration`
+8. `redis-job-orchestration`
    - 将长任务逐步迁入 Redis job/lock/status。
    - 形成任务中心和可观测性。
 
-10. `hermes-weekly-intelligence`
+9. `hermes-weekly-intelligence`
    - 在 API 契约和读模型稳定后接入 Hermes skill。
    - 先做建议和复盘，不做自动发布。
 
@@ -137,25 +133,28 @@ Admin UI 展示建议 -> 人确认 -> Admin API 写回 MySQL
 |---------|------|----------|
 | F0 `next16-upgrade-baseline` | 已完成 | Next.js 16、proxy、lint/type-check/build/smoke 已完成。 |
 | F6 `database-and-search-strategy` | 已完成 | Meili optional、health degraded、MySQL fallback、Admin index isolation 和 NAS smoke 均通过。 |
-| New `security-and-runtime-hardening` | 新增并前置 | smoke 调查中容器 env 曾暴露；生产 secrets/API keys 必须轮换。Meili fallback 当前约 10s 才降级，也应加 timeout/circuit breaker。 |
+| Deferred `security-and-runtime-hardening` | 暂不进入主线排序 | 用户要求先不管 secret 相关 feature。保留为单独风险 follow-up；Meili timeout/circuit breaker 可在 migration 或 search follow-up 中择机处理。 |
 | F7 `migration-tooling-baseline` | 需要迭代并保持下一优先级 | fallback 生产失败证明 schema drift / Prisma relation assumptions 是现实风险；后续字段 drop、API token、Redis job 前必须先建立 migrate baseline 和 drift 检查。 |
 | F8 `inbox-ai-scoring-continuation` | 需要迭代后 closeout | 大多数任务已完成，但 acceptance 仍有 R3 UI N/A、T105 DB 回填查询、逐条耗时证据不足；应在 migration baseline 后做 runtime 验证和收尾。 |
-| F2 `agent-and-automation-contracts` | 需要迭代 | scope 应加入 token rotation、automation token 与 human JWT 分离、OpenAPI、idempotency、audit；不能复用临时 JWT smoke 思路作为正式自动化鉴权。 |
-| F5 `image-feature-retirement` | 需要提前到 UI 前 | 图片功能已是 legacy，且 image upload secret 也属于轮换范围；先退役入口和写入路径，再设计周刊工作台更干净。 |
+| F2 `agent-and-automation-contracts` | 需要迭代 | scope 应明确 automation token 与 human JWT 分离、OpenAPI、idempotency、audit；不能复用临时 JWT smoke 思路作为正式自动化鉴权。 |
+| F5 `image-feature-retirement` | 需要提前到 UI 前 | 图片功能已是 legacy；先退役入口和写入路径，再设计周刊工作台更干净。 |
 | F1 `admin-shell-and-weekly-workbench` | 需要迭代，继续后移 | UI 应消费稳定 scoring/search/contracts，并在图片入口清理后设计；避免把 backend/runtime 补丁夹带到 UI feature。 |
 | F3 `redis-job-orchestration` | 需要迭代，后移 | 现有 inbox scoring 仍是进程内 cron；Redis job 应在 API 契约稳定后接管长任务状态和任务中心。 |
 | F4 `hermes-weekly-intelligence` | 需要迭代，仍最后 | Hermes 依赖 scoring 输出、feedback digest、API contracts、PG/pgvector read-model 边界和人工确认 UI。 |
 
 新推荐顺序：
 
-1. `security-and-runtime-hardening`
-2. `migration-tooling-baseline`
-3. `inbox-ai-scoring-continuation`
-4. `agent-and-automation-contracts`
-5. `image-feature-retirement`
-6. `admin-shell-and-weekly-workbench`
-7. `redis-job-orchestration`
-8. `hermes-weekly-intelligence`
+1. `migration-tooling-baseline`
+2. `inbox-ai-scoring-continuation`
+3. `agent-and-automation-contracts`
+4. `image-feature-retirement`
+5. `admin-shell-and-weekly-workbench`
+6. `redis-job-orchestration`
+7. `hermes-weekly-intelligence`
+
+Deferred follow-up, not in the mainline order:
+
+- `security-and-runtime-hardening`
 
 ---
 

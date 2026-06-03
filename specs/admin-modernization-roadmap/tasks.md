@@ -124,15 +124,7 @@
 
 **目标**: 将已有 SDD 工作区纳入现代化路线，而不是重复创建。
 
-- [ ] T016A [Security] 创建 `security-and-runtime-hardening` spec
-  - scope: `specs/security-and-runtime-hardening/spec.md`
-  - maps_to: 安全 / 可用性 / Post-F6 follow-through
-  - verify: spec 覆盖 production secrets/API keys 轮换、JWT/automation token 分离前置约束、Meilisearch timeout/circuit breaker、无 secret 输出规则
-
-- [ ] T016B [Security] 执行 production secrets/API keys 轮换记录
-  - scope: `security-and-runtime-hardening` acceptance
-  - maps_to: database-and-search-strategy closeout follow-up
-  - verify: JWT_SECRET、Meili master key、Karakeep、Quail、Image upload、AI encryption、DB password 等轮换项有完成证据或明确延后责任人
+> Deferred follow-up: `security-and-runtime-hardening` 暂不进入主线排序。生产 secrets/API keys 轮换和 Meili timeout/circuit breaker 保留为单独风险事项，不阻塞下面的主线 feature。
 
 - [ ] T016 [F8] 复核 `inbox-ai-scoring` 当前任务状态
   - scope: `specs/inbox-ai-scoring/spec.md`, `plan.md`, `tasks.md`
@@ -179,8 +171,8 @@
 
 ## 依赖与顺序
 
-- F0 与 F6 已完成，新的关键路径：T016A/T016B -> T017 -> T016 -> T010 -> T008 -> T007 -> T013/T014。
-- T016A/T016B 需要最先处理，因为 Post-F6 smoke 调查中曾展开生产 env，必须轮换 secrets/API keys，并补 Meili timeout/circuit breaker。
+- F0 与 F6 已完成，新的关键路径：T017 -> T016 -> T010 -> T008 -> T007 -> T013/T014。
+- `security-and-runtime-hardening` 暂不进入主线排序；secret rotation 和 Meili timeout/circuit breaker 保留为 deferred follow-up。
 - T017 需要提前，因为 Post-F6 authenticated search smoke 暴露了 Prisma relation name 假设错误，后续 feature 会继续改 schema，必须先建立迁移基线和 drift 检查。
 - T016 需要提前，因为 `inbox-ai-scoring` 已基本实现，但 acceptance 仍有 UI/runtime/DB 查询证据缺口；UI 工作台和 Agent 契约应消费其稳定输出。
 - T010 应在 UI 和 Hermes 前完成，因为 n8n/Hermes/MCP 需要稳定 token scope、OpenAPI、idempotency 和 audit。
@@ -217,7 +209,8 @@
 
 - 本 tasks.md 的任务重点是“创建和治理子 feature”。不要在本 roadmap workspace 中直接进行 Next.js 升级或 UI 改造。
 - `next16-upgrade-baseline` 与 `database-and-search-strategy` 已完成，后续不再作为 active implementation 目标。
-- 新推荐顺序：`security-and-runtime-hardening` -> `migration-tooling-baseline` -> `inbox-ai-scoring-continuation` -> `agent-and-automation-contracts` -> `image-feature-retirement` -> `admin-shell-and-weekly-workbench` -> `redis-job-orchestration` -> `hermes-weekly-intelligence`。
+- 新推荐顺序：`migration-tooling-baseline` -> `inbox-ai-scoring-continuation` -> `agent-and-automation-contracts` -> `image-feature-retirement` -> `admin-shell-and-weekly-workbench` -> `redis-job-orchestration` -> `hermes-weekly-intelligence`。
+- Deferred follow-up：`security-and-runtime-hardening`。
 
 ---
 
@@ -225,4 +218,4 @@
 
 - 推荐下一步：`specify`
 - 阻塞项：无
-- 执行建议：优先创建 `security-and-runtime-hardening` 独立 SDD 工作区，处理 secrets rotation 和 Meilisearch timeout/circuit breaker；随后推进 `migration-tooling-baseline`。
+- 执行建议：优先推进 `migration-tooling-baseline`，把 Prisma migrate baseline 和 schema drift 检查落地。
