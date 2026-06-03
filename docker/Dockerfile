@@ -92,39 +92,11 @@ ENV HOSTNAME="0.0.0.0"
 HEALTHCHECK --interval=60s --timeout=15s --start-period=40s --retries=3 \
   CMD node docker/healthcheck.js
 
-# Create optimized startup script with monitoring initialization
-RUN echo '#!/bin/sh\n\
-echo "🚀 Starting Weekly Content Management System..."\n\
-echo "📋 Validating startup configuration..."\n\
-echo "🔍 Initializing monitoring systems..."\n\
-\n\
-# Set production optimizations\n\
-export NODE_OPTIONS="--max-old-space-size=1024"\n\
-\n\
-# Run startup validation\n\
-if ! node scripts/validate-startup.js; then\n\
-  echo "❌ Startup validation failed - exiting"\n\
-  exit 1\n\
-fi\n\
-\n\
-echo "✅ Startup validation passed"\n\
-echo "📊 Resource monitoring enabled"\n\
-echo "🚀 Starting application server..."\n\
-\n\
-# Graceful shutdown handler\n\
-trap '\''echo "🛑 Received shutdown signal, gracefully stopping..."; kill -TERM $PID; wait $PID'\'' TERM\n\
-\n\
-# Start the application\n\
-node server.js &\n\
-PID=$!\n\
-wait $PID\n\
-' > /app/docker-entrypoint.sh && chmod +x /app/docker-entrypoint.sh
-
 # Switch to non-root user
 USER nextjs
 
 # Graceful shutdown signal
 STOPSIGNAL SIGTERM
 
-# Start the application with enhanced monitoring
-CMD ["/app/docker-entrypoint.sh"]
+# Start the standalone Next.js server.
+CMD ["node", "server.js"]
