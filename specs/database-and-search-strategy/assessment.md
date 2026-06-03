@@ -1,19 +1,19 @@
 # Database And Search Strategy - SDD Assessment
 
 **Date**: 2026-06-03
-**Stage**: Verify / Closeout follow-through
+**Stage**: Closeout
 **Feature**: `database-and-search-strategy`
 
 ## SDD Stage Decision
 
-Current stage is **Verify with Closeout follow-through**, not Specify/Plan/Tasks.
+Current stage is **Closeout complete**, not Specify/Plan/Tasks.
 
 Reasoning:
 
 - Dedicated SDD artifacts now exist: `spec.md`, `plan.md`, `data-model.md`, `tasks.md`, and `acceptance.md`.
 - `tasks.md` marks the implementation and verification tasks complete.
 - `acceptance.md` contains an evidence table for the P0/P1 requirements.
-- Closeout runtime smoke found a production-only fallback issue, so implementation was briefly reopened and fixed locally.
+- Closeout runtime smoke found a production-only fallback issue; implementation was briefly reopened, fixed, deployed, and reverified.
 
 Workspace note:
 
@@ -60,6 +60,11 @@ Fresh verification:
 - NAS runtime smoke before redeploy:
   - `/api/health`: PASS, HTTP 200 with `overall = "degraded"`, database/startup healthy, search degraded.
   - `/api/search`: FAIL on old deployed image, authenticated request reached fallback but returned HTTP 500 because Prisma include used stale relation name `category`.
+- GitHub Actions deploy:
+  - Run `26868458179`, commit `c6b425b`, build/deploy success.
+- NAS runtime smoke after redeploy:
+  - `/api/health`: PASS, HTTP 200 with `overall = "degraded"`, database/startup healthy, search degraded.
+  - Authenticated `/api/search`: PASS, HTTP 200 with `success = true`, `meta.mode = "fallback"`, `meta.reason = "meilisearch_unavailable"`.
 
 ## Requirement Assessment
 
@@ -67,7 +72,7 @@ Fresh verification:
 |---|---|---|
 | Health degraded semantics | `/api/health` now supports `healthy`, `degraded`, and `unhealthy`; Meilisearch failure returns HTTP 200 when DB/startup are healthy. | PASS |
 | Critical dependency failure | Database failure still returns `overall = "unhealthy"` and HTTP 503. | PASS |
-| Search fallback | `/api/search` GET/POST call `searchContentsWithFallback`; service falls back to MySQL when Meilisearch search fails. Local tests pass after fixing fallback include to use Prisma relation `categories`. | PASS pending redeploy smoke |
+| Search fallback | `/api/search` GET/POST call `searchContentsWithFallback`; service falls back to MySQL when Meilisearch search fails. Local tests and deployed NAS smoke pass after fixing fallback include to use Prisma relation `categories`. | PASS |
 | Fallback metadata | Search responses expose `meta.mode`, `meta.degraded`, `meta.reason`, and unsupported filters where applicable. | PASS |
 | Conservative MySQL fallback | Fallback searches `title`, `description`, `summary`, `content`, `source`, and `source_url`, caps limit at 100, and avoids unsupported tag filtering. | PASS |
 | Admin index isolation | Default index is `weekly_admin_contents`; `MEILISEARCH_CONTENT_INDEX` is configurable; shared instance with generic `contents` is rejected for writes and routes reads to fallback. | PASS |
@@ -96,19 +101,19 @@ Minor caveat:
 
 - `pnpm lint` passes, but the repository still has many warnings. This feature did not create a clean lint baseline.
 - `assessment.md` had previously contained a stale pre-spec evaluation; this file now supersedes it.
-- The old deployed NAS image still fails authenticated `/api/search` fallback until the local fix is deployed.
+- The old deployed NAS image failed authenticated `/api/search` fallback before `c6b425b`; the current deployment passes.
 - During smoke investigation, container environment values were exposed in tool output. Production secrets/API keys should be rotated.
 
 ## Verdict
 
-**CONDITIONAL PASS pending redeploy smoke**
+**PASS**
 
-The local code and SDD evidence are sufficient for redeploy, but not yet sufficient for final Closeout.
+The feature is complete.
 
-Closeout condition:
+Closeout evidence:
 
-1. Deploy the fallback relation-name fix.
-2. Rerun NAS `/api/health` and authenticated `/api/search` smoke.
-3. Update `acceptance.md` with the final runtime result.
+1. Focused tests, type-check, lint quiet, and build passed locally.
+2. GitHub Actions run `26868458179` deployed commit `c6b425b` successfully.
+3. NAS `/api/health` and authenticated `/api/search` smoke passed after redeploy.
 
-Recommended next stage: **Deploy and verify**.
+Recommended next stage: **Close feature and continue roadmap**.
