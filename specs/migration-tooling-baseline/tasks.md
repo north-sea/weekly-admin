@@ -150,10 +150,10 @@
   - maps_to: US3-1 / FR-004 / FR-005
   - verify: `pnpm prisma db seed` 连续运行两次成功；默认数据存在且不重复
 
-- [ ] T020 [US2] 验证 deploy migration 工作流
+- [x] T020 [US2] 验证 deploy migration 工作流
   - scope: `.github/workflows/deploy.yml`, deployment logs or dry-run evidence
   - maps_to: US2-2 / US2-3 / FR-007
-  - verify: deploy 日志或 dry-run 证据显示 `prisma migrate deploy` 会在容器重启前执行；失败路径会中止部署
+  - verify: GitHub Actions run `26896308413` / deploy job `79336833413` 显示 `pnpm prisma migrate deploy` 在 `🛑 停止旧容器...` 之前执行；迁移容器接入 `1panel-network`；Prisma 输出 `No pending migrations to apply.`；随后容器重启且 `/api/health` 健康检查通过
 
 - [x] T021 [US1, US2, US3] 运行静态验证
   - scope: repository
@@ -216,12 +216,12 @@
 - 本任务清单不要求立即操作生产 DB；生产 resolve/deploy 的真实执行应在 implement/verify 阶段按用户确认和环境权限推进。
 - 如果 T001-T003 发现 schema drift 或 Prisma Client 与 schema 不一致，应回到 `plan` 或补充 clarify，不要继续 baseline。
 - `spec-assessment.md` 是辅助评估产物，不是实现必需文件。
-- 2026-06-03 执行记录：`pnpm prisma generate --no-engine`、`pnpm prisma generate`、`pnpm prisma validate`、`pnpm type-check`、`pnpm lint --quiet`、`pnpm test src/lib/services/__tests__/inbox-scoring.test.ts` 均通过。`pnpm prisma migrate resolve --applied 20260603202720_baseline` 已成功；`pnpm prisma migrate status` / `pnpm db:status` 显示 database schema is up to date；`pnpm prisma db seed` 连续运行两次成功。
+- 2026-06-03 执行记录：`pnpm prisma generate --no-engine`、`pnpm prisma generate`、`pnpm prisma validate`、`pnpm type-check`、`pnpm lint --quiet`、`pnpm test src/lib/services/__tests__/inbox-scoring.test.ts` 均通过。`pnpm prisma migrate resolve --applied 20260603202720_baseline` 已成功；`pnpm prisma migrate status` / `pnpm db:status` 显示 database schema is up to date；`pnpm prisma db seed` 连续运行两次成功。GitHub Actions run `26896308413` 完成真实 NAS deploy，build 和 deploy 均 success。
 
 ---
 
 ## Stage Readiness
 
-- 推荐下一步：`execute-plan`
-- 理由：任务数量多且含 DB metadata、deploy workflow、legacy deprecation 和 evidence gate，应该按阶段推进并逐项记录证据。
-- 阻塞项：无；但 T001-T003 可能在执行时发现需要回退 plan 的 drift。
+- 推荐下一步：`closeout`
+- 理由：T001-T022 已全部完成，真实 NAS deploy 证据已补齐。
+- 阻塞项：无。
