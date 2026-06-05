@@ -185,19 +185,74 @@ model tags {
 }
 
 model users {
-  id             Int              @id @default(autoincrement())
-  username       String           @unique(map: "username") @db.VarChar(100)
-  password_hash  String           @db.VarChar(255)
-  email          String?          @db.VarChar(255)
-  display_name   String?          @db.VarChar(100)
-  role           users_role?      @default(EDITOR)
-  status         users_status?    @default(ACTIVE)
-  last_login_at  DateTime?        @db.Timestamp(0)
-  login_attempts Int?             @default(0)
-  locked_until   DateTime?        @db.Timestamp(0)
-  created_at     DateTime?        @default(now()) @db.Timestamp(0)
-  updated_at     DateTime?        @default(now()) @db.Timestamp(0)
-  operation_logs operation_logs[]
+  id                Int                 @id @default(autoincrement())
+  username          String              @unique(map: "username") @db.VarChar(100)
+  password_hash     String              @db.VarChar(255)
+  email             String?             @db.VarChar(255)
+  display_name      String?             @db.VarChar(100)
+  role              users_role?         @default(EDITOR)
+  status            users_status?       @default(ACTIVE)
+  last_login_at     DateTime?           @db.Timestamp(0)
+  login_attempts    Int?                @default(0)
+  locked_until      DateTime?           @db.Timestamp(0)
+  created_at        DateTime?           @default(now()) @db.Timestamp(0)
+  updated_at        DateTime?           @default(now()) @db.Timestamp(0)
+  automation_tokens automation_tokens[]
+  operation_logs    operation_logs[]
+}
+
+model automation_tokens {
+  id                 Int               @id @default(autoincrement())
+  name               String            @db.VarChar(100)
+  token_hash         String            @unique(map: "token_hash") @db.VarChar(255)
+  token_prefix       String            @db.VarChar(16)
+  caller_type        String            @db.VarChar(50)
+  scopes             Json
+  status             String            @default("active") @db.VarChar(20)
+  created_by_user_id Int?
+  last_used_at       DateTime?         @db.Timestamp(0)
+  expires_at         DateTime?         @db.Timestamp(0)
+  revoked_at         DateTime?         @db.Timestamp(0)
+  created_at         DateTime?         @default(now()) @db.Timestamp(0)
+  updated_at         DateTime?         @default(now()) @db.Timestamp(0)
+  creator            users?            @relation(fields: [created_by_user_id], references: [id])
+  automation_runs    automation_runs[]
+
+  @@index([caller_type], map: "idx_automation_tokens_caller_type")
+  @@index([created_by_user_id], map: "idx_automation_tokens_created_by")
+  @@index([expires_at], map: "idx_automation_tokens_expires_at")
+  @@index([status], map: "idx_automation_tokens_status")
+  @@index([token_prefix], map: "idx_automation_tokens_token_prefix")
+}
+
+model automation_runs {
+  id                   String            @id @db.VarChar(64)
+  token_id             Int
+  caller_type          String            @db.VarChar(50)
+  workflow             String            @db.VarChar(80)
+  step                 String            @db.VarChar(80)
+  target_type          String?           @db.VarChar(80)
+  target_id            String?           @db.VarChar(80)
+  idempotency_key      String            @db.VarChar(160)
+  request_digest       String            @db.VarChar(128)
+  status               String            @default("running") @db.VarChar(30)
+  result_summary       Json?
+  error_code           String?           @db.VarChar(80)
+  error_message        String?           @db.VarChar(500)
+  external_side_effect Boolean           @default(false)
+  external_ref         String?           @db.VarChar(200)
+  started_at           DateTime?         @default(now()) @db.Timestamp(0)
+  finished_at          DateTime?         @db.Timestamp(0)
+  created_at           DateTime?         @default(now()) @db.Timestamp(0)
+  updated_at           DateTime?         @default(now()) @db.Timestamp(0)
+  automation_token     automation_tokens @relation(fields: [token_id], references: [id])
+
+  @@unique([token_id, workflow, step, idempotency_key], map: "unique_automation_run_idempotency")
+  @@index([started_at], map: "idx_automation_runs_started_at")
+  @@index([status], map: "idx_automation_runs_status")
+  @@index([target_type, target_id], map: "idx_automation_runs_target")
+  @@index([token_id], map: "idx_automation_runs_token_id")
+  @@index([workflow, step], map: "idx_automation_runs_workflow_step")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -266,50 +321,50 @@ model data_sources {
   created_at              DateTime?      @default(now()) @db.Timestamp(0)
   updated_at              DateTime?      @default(now()) @db.Timestamp(0)
 
-  default_category categories?  @relation(fields: [default_category_id], references: [id])
+  default_category categories?   @relation(fields: [default_category_id], references: [id])
   inbox_items      inbox_items[]
 }
 
 model inbox_items {
-  id                  BigInt      @id @default(autoincrement())
-  source_id           Int
-  source_item_id      String?     @db.VarChar(255)
-  title               String?     @db.Text
-  url                 String      @db.VarChar(2048)
-  description         String?     @db.Text
-  note                String?     @db.Text
-  summary             String?     @db.Text
-  content             String?     @db.LongText
-  image_url           String?     @db.VarChar(2048)
-  favicon_url         String?     @db.VarChar(500)
-  slug                String?     @db.VarChar(255)
-  source_name         String?     @db.VarChar(255)
-  ai_score            Float?
-  ai_score_details    Json?
-  scoring_status      String?     @default("pending") @db.VarChar(20)
-  category_suggestion String?     @db.VarChar(100)
-  tags_suggestion     Json?
-  summarization_status String?    @db.VarChar(20)
-  tagging_status      String?     @db.VarChar(20)
-  similar_item_id     BigInt?
-  similarity_score    Float?
-  image_status        String?     @db.VarChar(20)
-  status              InboxStatus? @default(pending)
-  priority            Int?        @default(0)
-  auto_promoted       Boolean?    @default(false)
-  content_id          BigInt?
-  duplicate_of_id     BigInt?
-  source_published_at DateTime?   @db.Timestamp(0)
-  collected_at        DateTime?   @db.Timestamp(0)
-  synced_at           DateTime?   @db.Timestamp(0)
-  created_at          DateTime?   @default(now()) @db.Timestamp(0)
-  updated_at          DateTime?   @default(now()) @db.Timestamp(0)
+  id                   BigInt       @id @default(autoincrement())
+  source_id            Int
+  source_item_id       String?      @db.VarChar(255)
+  title                String?      @db.Text
+  url                  String       @db.VarChar(2048)
+  description          String?      @db.Text
+  note                 String?      @db.Text
+  summary              String?      @db.Text
+  content              String?      @db.LongText
+  image_url            String?      @db.VarChar(2048)
+  favicon_url          String?      @db.VarChar(500)
+  slug                 String?      @db.VarChar(255)
+  source_name          String?      @db.VarChar(255)
+  ai_score             Float?
+  ai_score_details     Json?
+  scoring_status       String?      @default("pending") @db.VarChar(20)
+  category_suggestion  String?      @db.VarChar(100)
+  tags_suggestion      Json?
+  summarization_status String?      @db.VarChar(20)
+  tagging_status       String?      @db.VarChar(20)
+  similar_item_id      BigInt?
+  similarity_score     Float?
+  image_status         String?      @db.VarChar(20)
+  status               InboxStatus? @default(pending)
+  priority             Int?         @default(0)
+  auto_promoted        Boolean?     @default(false)
+  content_id           BigInt?
+  duplicate_of_id      BigInt?
+  source_published_at  DateTime?    @db.Timestamp(0)
+  collected_at         DateTime?    @db.Timestamp(0)
+  synced_at            DateTime?    @db.Timestamp(0)
+  created_at           DateTime?    @default(now()) @db.Timestamp(0)
+  updated_at           DateTime?    @default(now()) @db.Timestamp(0)
 
-  data_source    data_sources @relation(fields: [source_id], references: [id])
-  linked_content contents?    @relation(fields: [content_id], references: [id])
-  duplicate_of   inbox_items? @relation("InboxDuplicate", fields: [duplicate_of_id], references: [id])
+  data_source    data_sources  @relation(fields: [source_id], references: [id])
+  linked_content contents?     @relation(fields: [content_id], references: [id])
+  duplicate_of   inbox_items?  @relation("InboxDuplicate", fields: [duplicate_of_id], references: [id])
   duplicates     inbox_items[] @relation("InboxDuplicate")
-  similar_to     inbox_items? @relation("InboxSimilar", fields: [similar_item_id], references: [id])
+  similar_to     inbox_items?  @relation("InboxSimilar", fields: [similar_item_id], references: [id])
   similar_items  inbox_items[] @relation("InboxSimilar")
 
   @@unique([source_id, source_item_id])
@@ -426,7 +481,6 @@ enum weekly_issues_status {
   published
   archived
 }
-
 
 enum contents_screenshot_api {
   ScreenshotLayer

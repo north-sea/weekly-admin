@@ -37,6 +37,23 @@ pnpm tsx scripts/check-db.ts
 
 ---
 
+### `create-automation-token.ts`
+创建 automation/service token。脚本只把 token hash 写入数据库，明文 token 只在创建时输出一次。
+
+```bash
+pnpm tsx scripts/create-automation-token.ts \
+  --name n8n-prod \
+  --caller-type n8n \
+  --scopes sync:run,score:run,weekly:read,weekly:suggest
+```
+
+**功能**：
+- 生成 `wa_` 前缀 token
+- 写入 `automation_tokens.token_hash`
+- 输出 `token_prefix` 和一次性明文 token
+
+---
+
 ### `migrate-db.ts` (legacy)
 历史自定义数据库迁移脚本，已废弃。不要继续在这里新增 schema 变更。
 

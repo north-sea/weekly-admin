@@ -1,0 +1,424 @@
+export function getAutomationOpenApiDocument() {
+  return {
+    openapi: '3.1.0',
+    info: {
+      title: 'Weekly Admin Automation API',
+      version: '1.0.0',
+      description: 'Agent-friendly API contract for external automation and workflow replay.',
+    },
+    servers: [
+      {
+        url: '/api/v1',
+      },
+    ],
+    security: [
+      {
+        AutomationBearer: [],
+      },
+    ],
+    tags: [
+      { name: 'Jobs' },
+      { name: 'Weekly' },
+      { name: 'AI' },
+      { name: 'Contract' },
+    ],
+    paths: {
+      '/jobs/sync': {
+        post: {
+          tags: ['Jobs'],
+          summary: 'Run source sync',
+          description: 'Runs one or more data-source sync jobs. Requires an Idempotency-Key header.',
+          security: [{ AutomationBearer: ['sync:run'] }],
+          parameters: [idempotencyHeader()],
+          requestBody: jsonBody({
+            type: 'object',
+            properties: {
+              sourceId: { type: 'integer', minimum: 1 },
+              type: { type: 'string', enum: ['rss', 'karakeep', 'webhook', 'manual'] },
+              max_items: { type: 'integer', minimum: 1, maximum: 500 },
+              similarity_check: { type: 'boolean' },
+              auto_preprocess: { type: 'boolean' },
+              incremental: { type: 'boolean' },
+              only_due: { type: 'boolean' },
+            },
+            additionalProperties: false,
+          }),
+          responses: automationResponses('SyncResult'),
+        },
+      },
+      '/jobs/score': {
+        post: {
+          tags: ['Jobs'],
+          summary: 'Run inbox scoring batch',
+          description: 'Scores pending inbox items in a bounded batch. Requires an Idempotency-Key header.',
+          security: [{ AutomationBearer: ['score:run'] }],
+          parameters: [idempotencyHeader()],
+          requestBody: jsonBody({
+            type: 'object',
+            properties: {
+              limit: { type: 'integer', minimum: 1, maximum: 200, default: 50 },
+              delay: { type: 'integer', minimum: 0, maximum: 5000, default: 0 },
+            },
+            additionalProperties: false,
+          }),
+          responses: automationResponses('ScoreResult'),
+        },
+      },
+      '/weekly/candidates': {
+        get: {
+          tags: ['Weekly'],
+          summary: 'List weekly candidates',
+          description: 'Returns candidate inbox/content items for a weekly issue preview.',
+          security: [{ AutomationBearer: ['weekly:read'] }],
+          parameters: [
+            queryParam('weekOffset', { type: 'integer', default: 0 }),
+            queryParam('date', { type: 'string', format: 'date' }),
+            queryParam('limit', { type: 'integer', minimum: 1, maximum: 100 }),
+            queryParam('status', { type: 'string' }),
+          ],
+          responses: automationResponses('WeeklyCandidatesResult'),
+        },
+      },
+      '/weekly/suggestions': {
+        post: {
+          tags: ['Weekly'],
+          summary: 'Preview weekly organization suggestions',
+          description: 'Generates a preview artifact only; it does not write weekly_content_items.',
+          security: [{ AutomationBearer: ['weekly:suggest'] }],
+          parameters: [idempotencyHeader()],
+          requestBody: jsonBody({
+            type: 'object',
+            required: ['weeklyIssueId'],
+            properties: {
+              weeklyIssueId: { type: 'integer', minimum: 1 },
+              maxItems: { type: 'integer', minimum: 1, maximum: 30, default: 12 },
+            },
+            additionalProperties: false,
+          }),
+          responses: automationResponses('WeeklySuggestionResult'),
+        },
+      },
+      '/weekly/suggestions/{id}/apply': {
+        post: {
+          tags: ['Weekly'],
+          summary: 'Apply weekly organization suggestions',
+          description: 'Applies a preview suggestion payload to weekly_content_items and preserves section/featured fields.',
+          security: [{ AutomationBearer: ['weekly:suggest'] }],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'integer', minimum: 1 },
+              description: 'Weekly issue id.',
+            },
+            idempotencyHeader(),
+          ],
+          requestBody: jsonBody({
+            type: 'object',
+            required: ['items'],
+            properties: {
+              replaceExisting: { type: 'boolean', default: false },
+              items: {
+                type: 'array',
+                minItems: 1,
+                maxItems: 30,
+                items: {
+                  type: 'object',
+                  required: ['content_id', 'section'],
+                  properties: {
+                    content_id: { type: 'integer', minimum: 1 },
+                    section: { type: 'string', minLength: 1, maxLength: 100 },
+                    featured: { type: 'boolean', default: false },
+                    reason: { type: 'string', maxLength: 200 },
+                  },
+                },
+              },
+            },
+            additionalProperties: false,
+          }),
+          responses: automationResponses('WeeklySuggestionApplyResult'),
+        },
+      },
+      '/weekly/publish': {
+        post: {
+          tags: ['Weekly'],
+          summary: 'Publish weekly issue',
+          description: 'Publishes a weekly issue to Quail. Already-published issues require forceRepublish.',
+          security: [{ AutomationBearer: ['weekly:publish'] }],
+          parameters: [idempotencyHeader()],
+          requestBody: jsonBody({
+            type: 'object',
+            required: ['weeklyIssueId'],
+            properties: {
+              weeklyIssueId: { type: 'integer', minimum: 1 },
+              forceRepublish: { type: 'boolean', default: false },
+              deliver: { type: 'boolean', default: false },
+            },
+            additionalProperties: false,
+          }),
+          responses: automationResponses('WeeklyPublishResult'),
+        },
+      },
+      '/ai/feedback/digest': {
+        get: {
+          tags: ['AI'],
+          summary: 'Read AI feedback digest',
+          description: 'Aggregates inbox action feedback from operation logs for scoring review.',
+          security: [{ AutomationBearer: ['ops:read'] }],
+          parameters: [
+            queryParam('from', { type: 'string', format: 'date-time' }),
+            queryParam('to', { type: 'string', format: 'date-time' }),
+            queryParam('format', { type: 'string', enum: ['json', 'markdown'], default: 'json' }),
+          ],
+          responses: automationResponses('FeedbackDigestResult'),
+        },
+      },
+      '/ai/score': {
+        post: {
+          tags: ['AI'],
+          summary: 'Manual single-item scoring',
+          description: 'Compatibility endpoint for human-admin JWT flows. Automation callers should use /jobs/score.',
+          security: [{ HumanBearer: [] }],
+          requestBody: jsonBody({
+            type: 'object',
+            required: ['inbox_id'],
+            properties: {
+              inbox_id: { type: 'string', pattern: '^[0-9]+$' },
+              force: { type: 'boolean', default: false },
+            },
+            additionalProperties: false,
+          }),
+          responses: standardResponses('ManualScoreResult'),
+        },
+      },
+      '/openapi.json': {
+        get: {
+          tags: ['Contract'],
+          summary: 'Read OpenAPI contract',
+          security: [],
+          responses: {
+            '200': {
+              description: 'OpenAPI document',
+            },
+          },
+        },
+      },
+    },
+    components: {
+      securitySchemes: {
+        AutomationBearer: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'automation-token',
+          description: 'Use an automation token created by scripts/create-automation-token.ts.',
+        },
+        HumanBearer: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          description: 'Human admin JWT used by legacy/manual admin endpoints.',
+        },
+      },
+      schemas: {
+        AutomationEnvelope: automationEnvelopeSchema(),
+        ErrorEnvelope: errorEnvelopeSchema(),
+        SyncResult: statusObjectSchema(),
+        ScoreResult: statusObjectSchema(),
+        WeeklyCandidatesResult: statusObjectSchema(),
+        WeeklySuggestionResult: statusObjectSchema(),
+        WeeklySuggestionApplyResult: statusObjectSchema(),
+        WeeklyPublishResult: statusObjectSchema({
+          quailPostId: { type: 'string' },
+          quailPostSlug: { type: 'string' },
+        }),
+        FeedbackDigestResult: statusObjectSchema({
+          actions: { type: 'array', items: { type: 'object', additionalProperties: true } },
+          counts: { type: 'object', additionalProperties: { type: 'integer' } },
+        }),
+        ManualScoreResult: {
+          type: 'object',
+          properties: {
+            scored: { type: 'boolean' },
+            score: { type: ['number', 'null'] },
+            promoted: { type: 'boolean' },
+            content_id: { type: 'string' },
+            error: { type: 'string' },
+          },
+          additionalProperties: true,
+        },
+      },
+      headers: {
+        IdempotencyKey: {
+          description: 'Required for mutation endpoints. Reusing the same key and payload returns an idempotent replay.',
+          schema: { type: 'string', minLength: 1, maxLength: 160 },
+        },
+      },
+      responses: {
+        Unauthorized: errorResponse('Automation token is missing or invalid.'),
+        Forbidden: errorResponse('Automation token does not include the required scope.'),
+        ValidationError: errorResponse('Request validation failed.'),
+        IdempotencyConflict: errorResponse('Idempotency key is missing, already running, or reused with different payload.'),
+      },
+    },
+    'x-automation-scopes': [
+      'sync:run',
+      'score:run',
+      'weekly:read',
+      'weekly:suggest',
+      'weekly:publish',
+      'ops:read',
+    ],
+    'x-contract-notes': {
+      responseEnvelope: 'All automation endpoints return success/data/error/meta.',
+      idempotency: 'Mutation endpoints require Idempotency-Key. Read endpoints derive a read-only key from the URL.',
+      secretRedaction: 'Responses include tokenPrefix only and never return token hashes or full token values.',
+    },
+  };
+}
+
+function idempotencyHeader() {
+  return {
+    name: 'Idempotency-Key',
+    in: 'header',
+    required: true,
+    schema: { type: 'string', minLength: 1, maxLength: 160 },
+    description: 'Required for mutation endpoints.',
+  };
+}
+
+function queryParam(name: string, schema: Record<string, unknown>) {
+  return {
+    name,
+    in: 'query',
+    required: false,
+    schema,
+  };
+}
+
+function jsonBody(schema: Record<string, unknown>) {
+  return {
+    required: true,
+    content: {
+      'application/json': {
+        schema,
+      },
+    },
+  };
+}
+
+function automationResponses(schemaName: string) {
+  return standardResponses(schemaName, true);
+}
+
+function standardResponses(schemaName: string, automation = false) {
+  return {
+    '200': {
+      description: 'Successful response',
+      content: {
+        'application/json': {
+          schema: {
+            allOf: [
+              { $ref: '#/components/schemas/AutomationEnvelope' },
+              {
+                type: 'object',
+                properties: {
+                  data: { $ref: `#/components/schemas/${schemaName}` },
+                },
+              },
+            ],
+          },
+        },
+      },
+    },
+    '400': { $ref: '#/components/responses/ValidationError' },
+    ...(automation
+      ? {
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '403': { $ref: '#/components/responses/Forbidden' },
+          '409': { $ref: '#/components/responses/IdempotencyConflict' },
+        }
+      : {
+          '401': { $ref: '#/components/responses/Unauthorized' },
+        }),
+    '500': errorResponse('Internal server error.'),
+  };
+}
+
+function automationEnvelopeSchema() {
+  return {
+    type: 'object',
+    required: ['success', 'data'],
+    properties: {
+      success: { type: 'boolean', const: true },
+      data: { type: 'object' },
+      meta: {
+        type: 'object',
+        properties: {
+          timestamp: { type: 'string', format: 'date-time' },
+          runId: { type: 'string' },
+          status: { type: 'string', enum: ['succeeded', 'partial_success', 'skipped', 'empty', 'failed'] },
+          idempotentReplay: { type: 'boolean' },
+          caller: {
+            type: 'object',
+            properties: {
+              type: { type: 'string' },
+              tokenPrefix: { type: 'string' },
+            },
+          },
+        },
+        additionalProperties: true,
+      },
+    },
+    additionalProperties: false,
+  };
+}
+
+function errorEnvelopeSchema() {
+  return {
+    type: 'object',
+    required: ['success', 'error', 'meta'],
+    properties: {
+      success: { type: 'boolean', const: false },
+      error: {
+        type: 'object',
+        required: ['code', 'message'],
+        properties: {
+          code: { type: 'string' },
+          message: { type: 'string' },
+          details: {},
+        },
+      },
+      meta: {
+        type: 'object',
+        properties: {
+          timestamp: { type: 'string', format: 'date-time' },
+        },
+        additionalProperties: true,
+      },
+    },
+  };
+}
+
+function statusObjectSchema(extraProperties: Record<string, unknown> = {}) {
+  return {
+    type: 'object',
+    required: ['status'],
+    properties: {
+      status: { type: 'string' },
+      ...extraProperties,
+    },
+    additionalProperties: true,
+  };
+}
+
+function errorResponse(description: string) {
+  return {
+    description,
+    content: {
+      'application/json': {
+        schema: { $ref: '#/components/schemas/ErrorEnvelope' },
+      },
+    },
+  };
+}

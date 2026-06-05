@@ -1,385 +1,191 @@
 # Cron Job 配置指南
 
-本文档说明如何配置定时任务来自动化周刊管理流程，以及每日 Karakeep → 收件箱的增量同步。
+本文档说明如何用 automation token 调用 Admin `/api/v1` 契约，完成定时同步、评分和周刊候选预览。
 
 ## 概述
 
-周刊自动化系统提供以下 API 端点，可通过 Cron Job 定时调用：
+推荐 Cron 只调用 agent-friendly `/api/v1` endpoint。旧 `/api/sources/sync-all`、`/api/weekly/auto-create`、`/api/weekly/auto-link`、`/api/weekly/backfill` 仍作为 legacy human-admin/API 兼容路径保留，不再作为新自动化接入首选。
 
-| API | 功能 | 建议执行时间 |
-|-----|------|-------------|
-| `/api/sources/sync-all` | 同步 Karakeep 新增并自动评分 | 每天 08:00 |
-| `/api/weekly/auto-create` | 自动创建本周周刊 | 每周一 00:05 |
-| `/api/weekly/auto-link` | 自动关联本周内容 | 每周日 23:00 |
-| `/api/weekly/backfill` | 回填历史空周刊 | 一次性执行 |
+| API | Scope | 功能 | 建议执行时间 |
+|-----|-------|------|-------------|
+| `POST /api/v1/jobs/sync` | `sync:run` | 同步数据源到收件箱 | 每天 08:00 |
+| `POST /api/v1/jobs/score` | `score:run` | 批量执行 inbox AI 评分 | 每天 08:20 |
+| `GET /api/v1/weekly/candidates` | `weekly:read` | 查询本周候选内容 | 每周日 22:30 |
+| `POST /api/v1/weekly/suggestions` | `weekly:suggest` | 生成周刊组织建议预览，不直接写入周刊内容 | 每周日 22:45 或人工触发 |
+| `GET /api/v1/ai/feedback/digest` | `ops:read` | 汇总人工反馈动作 | 每周或排障时 |
+
+OpenAPI 契约可从 `GET /api/v1/openapi.json` 获取。
 
 ## API 认证
 
-所有 API 需要通过 Bearer Token 认证。在请求头中添加：
+`CRON_API_TOKEN` 必须是 automation token，不是后台用户 JWT，也不依赖浏览器 cookie。创建 token：
 
-```
-Authorization: Bearer <YOUR_API_TOKEN>
+```bash
+pnpm tsx scripts/create-automation-token.ts \
+  --name cron-prod \
+  --caller-type cron \
+  --scopes sync:run,score:run,weekly:read,weekly:suggest,ops:read
 ```
 
-API Token 可在系统设置中生成，或使用环境变量 `CRON_API_TOKEN`。
+脚本只保存 token hash，明文 token 只输出一次。将输出的 `wa_...` token 放入密钥管理或环境变量：
+
+```bash
+Authorization: Bearer ${CRON_API_TOKEN}
+```
+
+写入类 endpoint 必须提供 `Idempotency-Key` header。重复使用相同 key 和相同 payload 会返回 replay，不重复执行业务副作用；相同 key 搭配不同 payload 会返回 conflict。
 
 ## Crontab 配置
 
-### 1. 编辑 crontab
-
-```bash
-crontab -e
-```
-
-### 2. 添加定时任务
-
 ```crontab
-# 周刊自动化任务
-# 环境变量
 WEEKLY_API_URL=https://your-domain.com
-CRON_API_TOKEN=your-api-token
+CRON_API_TOKEN=wa_xxx
 
-# 每天 08:00 同步 Karakeep 新增并自动评分
-0 8 * * * curl -X POST "${WEEKLY_API_URL}/api/sources/sync-all" \
+# 每天 08:00 同步 Karakeep 新增内容
+0 8 * * * curl -sS -X POST "${WEEKLY_API_URL}/api/v1/jobs/sync" \
   -H "Authorization: Bearer ${CRON_API_TOKEN}" \
   -H "Content-Type: application/json" \
-  -d '{"type":"karakeep","incremental":true,"auto_preprocess":true,"wait":true}' \
+  -H "Idempotency-Key: sync-karakeep-$(date +\%Y-\%m-\%d)" \
+  -d '{"type":"karakeep","incremental":true,"auto_preprocess":true,"max_items":100}' \
   >> /var/log/weekly-cron.log 2>&1
 
-# 每周一 00:05 自动创建本周周刊
-5 0 * * 1 curl -X POST "${WEEKLY_API_URL}/api/weekly/auto-create" \
+# 每天 08:20 批量评分
+20 8 * * * curl -sS -X POST "${WEEKLY_API_URL}/api/v1/jobs/score" \
   -H "Authorization: Bearer ${CRON_API_TOKEN}" \
   -H "Content-Type: application/json" \
-  -d '{"forceCreate": false}' \
+  -H "Idempotency-Key: score-inbox-$(date +\%Y-\%m-\%d)" \
+  -d '{"limit":50,"delay":0}' \
   >> /var/log/weekly-cron.log 2>&1
 
-# 每周日 23:00 自动关联本周内容
-0 23 * * 0 curl -X POST "${WEEKLY_API_URL}/api/weekly/auto-link" \
+# 每周日 22:30 记录候选内容摘要
+30 22 * * 0 curl -sS "${WEEKLY_API_URL}/api/v1/weekly/candidates?weekOffset=0&limit=30" \
   -H "Authorization: Bearer ${CRON_API_TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d '{"maxItems": 15, "weekOffset": 0}' \
   >> /var/log/weekly-cron.log 2>&1
 ```
 
-### 3. 使用 Shell 脚本（推荐）
+## Shell 脚本示例
 
 创建脚本 `/usr/local/bin/weekly-cron.sh`：
 
 ```bash
 #!/bin/bash
+set -euo pipefail
 
-# 配置
 API_URL="${WEEKLY_API_URL:-https://your-domain.com}"
-API_TOKEN="${CRON_API_TOKEN}"
-LOG_FILE="/var/log/weekly-cron.log"
+API_TOKEN="${CRON_API_TOKEN:?CRON_API_TOKEN is required}"
+LOG_FILE="${WEEKLY_CRON_LOG:-/var/log/weekly-cron.log}"
 
-# 日志函数
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
 }
 
-# 调用 API
-call_api() {
-    local endpoint=$1
-    local data=$2
-    local description=$3
+call_post() {
+  local endpoint="$1"
+  local idempotency_key="$2"
+  local data="$3"
+  local description="$4"
 
-    log "开始执行: $description"
+  log "开始执行: $description"
 
-    response=$(curl -s -w "\n%{http_code}" -X POST "${API_URL}${endpoint}" \
-        -H "Authorization: Bearer ${API_TOKEN}" \
-        -H "Content-Type: application/json" \
-        -d "$data")
+  response=$(curl -sS -w "\n%{http_code}" -X POST "${API_URL}${endpoint}" \
+    -H "Authorization: Bearer ${API_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -H "Idempotency-Key: ${idempotency_key}" \
+    -d "$data")
 
-    http_code=$(echo "$response" | tail -n1)
-    body=$(echo "$response" | sed '$d')
-
-    if [ "$http_code" -eq 200 ]; then
-        log "成功: $description (HTTP $http_code)"
-        log "响应: $body"
-    else
-        log "失败: $description (HTTP $http_code)"
-        log "错误: $body"
-    fi
+  http_code=$(echo "$response" | tail -n1)
+  body=$(echo "$response" | sed '$d')
+  log "HTTP ${http_code}: ${body}"
 }
 
-# 主逻辑
-case "$1" in
-    sync-inbox)
-        call_api "/api/sources/sync-all" '{"type":"karakeep","incremental":true,"auto_preprocess":true,"wait":true}' "同步 Karakeep 新增并自动评分"
-        ;;
-    create)
-        call_api "/api/weekly/auto-create" '{"forceCreate": false}' "创建本周周刊"
-        ;;
-    link)
-        call_api "/api/weekly/auto-link" '{"maxItems": 15, "weekOffset": 0}' "关联本周内容"
-        ;;
-    backfill)
-        call_api "/api/weekly/backfill" '{"dryRun": false, "maxItemsPerIssue": 15}' "回填历史周刊"
-        ;;
-    *)
-        echo "用法: $0 {sync-inbox|create|link|backfill}"
-        exit 1
-        ;;
+case "${1:-}" in
+  sync-inbox)
+    call_post "/api/v1/jobs/sync" "sync-karakeep-$(date +%Y-%m-%d)" \
+      '{"type":"karakeep","incremental":true,"auto_preprocess":true,"max_items":100}' \
+      "同步 Karakeep"
+    ;;
+  score)
+    call_post "/api/v1/jobs/score" "score-inbox-$(date +%Y-%m-%d)" \
+      '{"limit":50,"delay":0}' \
+      "批量评分"
+    ;;
+  candidates)
+    curl -sS "${API_URL}/api/v1/weekly/candidates?weekOffset=0&limit=30" \
+      -H "Authorization: Bearer ${API_TOKEN}" >> "$LOG_FILE"
+    ;;
+  *)
+    echo "用法: $0 {sync-inbox|score|candidates}"
+    exit 1
+    ;;
 esac
 ```
 
-设置权限：
+## 响应判断
 
-```bash
-chmod +x /usr/local/bin/weekly-cron.sh
-```
-
-Crontab 配置：
-
-```crontab
-# 每天 08:00 同步 Karakeep 新增并自动评分
-0 8 * * * /usr/local/bin/weekly-cron.sh sync-inbox
-
-# 每周一 00:05 创建周刊
-5 0 * * 1 /usr/local/bin/weekly-cron.sh create
-
-# 每周日 23:00 关联内容
-0 23 * * 0 /usr/local/bin/weekly-cron.sh link
-```
-
-## API 参数说明
-
-### `/api/sources/sync-all`
-
-用于同步数据源到收件箱。针对本项目的恢复方案，推荐只同步 `karakeep` 类型，并开启增量同步与自动预处理。
-
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `type` | string | - | 数据源类型，恢复方案固定为 `karakeep` |
-| `incremental` | boolean | false | 只同步 `last_synced_at` 之后新增的书签 |
-| `auto_preprocess` | boolean | 跟随全局 | 同步后自动执行 AI 评分和相似度检测 |
-| `wait` | boolean | false | 等待同步完成再返回，便于 cron 直接记录结果 |
-| `max_items` | number | - | 可选，限制单次处理条数 |
-
-**推荐请求体：**
-
-```json
-{
-  "type": "karakeep",
-  "incremental": true,
-  "auto_preprocess": true,
-  "wait": true
-}
-```
-
-**响应示例：**
+所有 automation endpoint 使用统一 envelope：
 
 ```json
 {
   "success": true,
   "data": {
-    "started": true,
-    "started_at": "2026-03-09T00:00:00.000Z",
-    "finished_at": "2026-03-09T00:00:12.000Z",
-    "total_sources": 1,
-    "ok_count": 1,
-    "failed_count": 0,
-    "results": [
-      {
-        "source_id": 1,
-        "name": "Karakeep",
-        "ok": true,
-        "result": {
-          "total_candidates": 8,
-          "upserted": 8,
-          "skipped_duplicates": 0,
-          "preprocess_result": {
-            "scored": 8,
-            "similar_detected": 1,
-            "errors": []
-          }
-        }
-      }
-    ]
+    "status": "succeeded"
+  },
+  "meta": {
+    "timestamp": "2026-06-04T00:00:00.000Z",
+    "runId": "auto_...",
+    "status": "succeeded",
+    "idempotentReplay": false
   }
 }
 ```
 
-### `/api/weekly/auto-create`
+Cron 告警应优先判断：
 
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `forceCreate` | boolean | false | 是否强制创建（即使已存在） |
-| `weekOffset` | number | 0 | 周偏移量（0=本周，-1=上周） |
+- `success: false`：认证、参数、幂等冲突或内部错误。
+- `meta.status: partial_success`：部分条目失败，需要查看 `data.errors` 或 `data.results`。
+- `meta.status: empty`：没有可处理数据，通常不是故障。
+- `error.code: AUTOMATION_SCOPE_FORBIDDEN`：token scope 不足。
+- `error.code: IDEMPOTENCY_PAYLOAD_CONFLICT`：同一个 `Idempotency-Key` 被不同 payload 复用。
 
-**响应示例：**
+## Legacy 兼容路径
 
-```json
-{
-  "success": true,
-  "data": {
-    "action": "created",
-    "issue": {
-      "id": 78,
-      "issue_number": 78,
-      "title": "第 78 期",
-      "start_date": "2026-01-27",
-      "end_date": "2026-02-02"
-    }
-  }
-}
-```
+以下路径仍可能被旧脚本或后台页面使用，但新 cron 不应优先接入：
 
-### `/api/weekly/auto-link`
+| Legacy API | 推荐替代 |
+|------------|----------|
+| `POST /api/sources/sync-all` | `POST /api/v1/jobs/sync` |
+| `POST /api/weekly/auto-create` | 继续由后台创建，或由后续 weekly create contract 接管 |
+| `POST /api/weekly/auto-link` | `GET /api/v1/weekly/candidates` + `POST /api/v1/weekly/suggestions` + `POST /api/v1/weekly/suggestions/{id}/apply` |
+| `POST /api/weekly/backfill` | 保留人工维护用途 |
 
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `maxItems` | number | 15 | 每期最大关联数量 |
-| `weekOffset` | number | 0 | 周偏移量 |
-
-**响应示例：**
-
-```json
-{
-  "success": true,
-  "data": {
-    "issueId": 78,
-    "issueNumber": 78,
-    "linkedCount": 12,
-    "skippedCount": 3,
-    "linkedContents": [
-      {"id": 1001, "title": "文章标题1"},
-      {"id": 1002, "title": "文章标题2"}
-    ],
-    "skippedContents": [
-      {"id": 1003, "title": "文章标题3", "reason": "已关联到其他周刊"}
-    ]
-  }
-}
-```
-
-### `/api/weekly/backfill`
-
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `dryRun` | boolean | false | 是否仅预览不执行 |
-| `maxItemsPerIssue` | number | 15 | 每期最大关联数量 |
-
-**响应示例：**
-
-```json
-{
-  "success": true,
-  "data": {
-    "processedIssues": 5,
-    "linkedContents": 45,
-    "skippedContents": 10,
-    "details": [
-      {
-        "issueId": 47,
-        "issueNumber": 47,
-        "linkedCount": 8,
-        "linkedContents": [...]
-      }
-    ]
-  }
-}
-```
-
-## 日志监控
-
-### 查看日志
-
-```bash
-# 实时查看
-tail -f /var/log/weekly-cron.log
-
-# 查看最近 100 行
-tail -n 100 /var/log/weekly-cron.log
-
-# 搜索错误
-grep "失败" /var/log/weekly-cron.log
-```
-
-### 日志轮转
-
-创建 `/etc/logrotate.d/weekly-cron`：
-
-```
-/var/log/weekly-cron.log {
-    weekly
-    rotate 4
-    compress
-    delaycompress
-    missingok
-    notifempty
-    create 644 root root
-}
-```
+`POST /api/v1/ai/score` 是 human-admin JWT 手动单条重评分入口；automation 批量评分使用 `POST /api/v1/jobs/score`。
+发布到 Quail 使用 `POST /api/v1/weekly/publish`，该 endpoint 需要 `weekly:publish` scope 和 `Idempotency-Key`。
 
 ## 故障排查
 
-### 常见问题
+1. **401**
+   - 检查 `CRON_API_TOKEN` 是否为 `wa_` automation token。
+   - 确认 token 未过期、未禁用、未撤销。
 
-1. **认证失败 (401)**
-   - 检查 API Token 是否正确
-   - 确认 Token 未过期
+2. **403**
+   - 检查 token 是否包含 endpoint 所需 scope。
 
-2. **请求超时**
-   - 检查网络连接
-   - 增加 curl 超时时间：`curl --max-time 60 ...`
+3. **409**
+   - 检查 `Idempotency-Key` 是否被不同 payload 复用。
+   - 若旧 run 仍在 `running`，等待完成后再重试。
 
-3. **周刊已存在**
-   - 正常情况，API 会返回已存在的周刊信息
-   - 如需强制创建，设置 `forceCreate: true`
+4. **空结果**
+   - `empty` 是有效状态。同步、评分或候选查询没有数据时不应直接告警。
 
-4. **无内容可关联**
-   - 检查是否有 `ready` 或 `published` 状态的内容
-   - 确认内容的 `created_at` 在周刊时间范围内
-
-### 手动测试
-
-```bash
-# 测试创建周刊（dry-run 模式不可用，直接测试）
-curl -X POST "https://your-domain.com/api/weekly/auto-create" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"forceCreate": false}'
-
-# 测试回填（使用 dry-run 模式预览）
-curl -X POST "https://your-domain.com/api/weekly/backfill" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"dryRun": true, "maxItemsPerIssue": 15}'
-```
+5. **数据库迁移未应用**
+   - automation token/run 依赖 `automation_tokens` 和 `automation_runs` 表。
+   - 部署前运行 `pnpm db:migrate`。
 
 ## 安全建议
 
-1. **Token 安全**
-   - 不要在代码中硬编码 Token
-   - 使用环境变量或密钥管理服务
-   - 定期轮换 Token
+- 不要把 token 写入仓库、日志或截图。
+- 为 cron、n8n、Hermes 分配不同 token 和最小 scope。
+- 发布/投递类 scope 不要和普通同步/评分 token 混用。
+- 定期轮换 token；撤销旧 token 后确认外部任务已切换。
 
-2. **网络安全**
-   - 使用 HTTPS
-   - 考虑 IP 白名单限制
-
-3. **权限控制**
-   - Cron 脚本使用最小权限用户运行
-   - 日志文件设置适当权限
-
-## 监控告警
-
-建议配置以下监控：
-
-1. **Cron 执行状态**
-   - 监控日志中的错误关键字
-   - 设置执行失败告警
-
-2. **API 响应时间**
-   - 监控 API 响应延迟
-   - 设置超时告警
-
-3. **周刊状态**
-   - 监控空周刊数量
-   - 设置内容数量异常告警
-
----
-
-*最后更新: 2026-01-31*
+*最后更新: 2026-06-04*

@@ -11,6 +11,8 @@ const BodySchema = z.object({
   force: z.boolean().optional(),
 });
 
+// Keep this as a human-admin JWT endpoint for manual single-item rescoring.
+// Automation callers must use /api/v1/jobs/score with the score:run scope.
 export async function POST(request: NextRequest) {
   try {
     const authResult = await authenticateRequest(request);

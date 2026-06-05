@@ -18,6 +18,7 @@ const publicRoutes = [
   '/login',
   '/api/auth/login',
   '/api/health',
+  '/api/v1',
   '/api/upload/image',
 ];
 
