@@ -89,41 +89,37 @@ Admin UI 展示建议 -> 人确认 -> Admin API 写回 MySQL
    - 已完成。Meilisearch 已成为 optional keyword backend；NAS runtime smoke 证明 `/api/health` degraded HTTP 200、authenticated `/api/search` fallback HTTP 200。
    - 保留后续优化：Meilisearch timeout/circuit breaker、FULLTEXT fallback 优化、NAS Meili 网络复用。
 
-### Phase 1: Migration And Scoring Foundations
-
 3. `migration-tooling-baseline`
-   - 在继续新增或 drop 字段前，建立 Prisma migrate baseline。
-   - 本次 fallback 生产失败来自 Prisma relation name 假设与实际 schema 关系不一致，说明迁移和 schema drift 检查必须前置。
+   - 已完成。Prisma baseline migration、seed、legacy migration deprecation、deploy 前 `prisma migrate deploy` 和真实 NAS deploy 验证均已通过。
+   - 后续任何 schema change 都必须通过 `prisma/migrations/`，不得新增 `database/*.sql` 作为 schema 变更入口。
 
 4. `inbox-ai-scoring-continuation`
-   - 收口当前已经落地的 scoring schema/service/API/tests/acceptance。
-   - 重点转为 verify/closeout：补 NAS/runtime smoke、R3 UI 验证、T105 DB 回填查询和评分耗时证据。
-
-### Phase 2: Automation Contracts
+   - 已完成。settings 默认值、processing sweep、doctor/backfill、DB apply、UI evidence 和 acceptance 均已收口。
+   - 代表性 `score-batch` 样本仍有上游 `405 Not Allowed`，归为后续内容抓取质量跟进，不阻塞主线。
 
 5. `agent-and-automation-contracts`
-   - 提供 token、scope、OpenAPI、agent-friendly API。
-   - 明确区分人类 JWT 与 automation token，固定 scope、OpenAPI、idempotency 和 audit。secret rotation 仍作为 deferred follow-up，不阻塞本 feature。
+   - 已完成。automation token、scope、OpenAPI、agent-friendly API、idempotency、`automation_runs`、apply/publish contract 和 live smoke 均通过。
+   - secret rotation、token 管理 UI 和审计面板仍作为 deferred follow-up，不阻塞主线。
 
-### Phase 3: Product Surface
+### Phase 1: Product Surface
 
 6. `image-feature-retirement`
-   - 提前到 UI 工作台之前。周刊已去图片，先退役图片入口/上传/裁剪/AI 图片路径，避免新 workbench 继续承载 legacy image surface。
+   - 下一步。周刊已去图片，先退役图片入口/上传/裁剪/AI 图片路径，避免新 workbench 继续承载 legacy image surface。
    - 字段 drop 仍必须在 migration baseline 之后执行。
 
 7. `admin-shell-and-weekly-workbench`
    - 以 `nextjs-tpl` 为主重塑后台壳层和周刊生产驾驶舱。
-   - 消费稳定的 scoring/search/contracts，且在图片入口退役后再做主 UI 设计。
+   - 消费稳定的 scoring/search/contracts 和 `/api/v1` weekly suggestion/apply/publish 契约，且在图片入口退役后再做主 UI 设计。
 
-### Phase 4: Execution Control and Intelligence
+### Phase 2: Execution Control and Intelligence
 
 8. `redis-job-orchestration`
    - 将长任务逐步迁入 Redis job/lock/status。
-   - 形成任务中心和可观测性。
+   - 消费既有 `/api/v1` contract 和 `automation_runs`，形成任务中心和可观测性。
 
 9. `hermes-weekly-intelligence`
    - 在 API 契约和读模型稳定后接入 Hermes skill。
-   - 先做建议和复盘，不做自动发布。
+   - 先做建议和复盘，不直接写 MySQL，不做自动发布。
 
 ## Post-F6 Reassessment
 
@@ -155,6 +151,179 @@ Admin UI 展示建议 -> 人确认 -> Admin API 写回 MySQL
 Deferred follow-up, not in the mainline order:
 
 - `security-and-runtime-hardening`
+
+## Post-F7 Reassessment
+
+2026-06-04 复核 `migration-tooling-baseline` 完成后的剩余未开发 feature：
+
+| Feature | 是否需要迭代 | 调整结论 |
+|---------|--------------|----------|
+| `migration-tooling-baseline` | 不需要继续迭代主线 | 已 PASS。`acceptance.md` 记录 GitHub Actions run `26896308413` / deploy job `79336833413`：迁移在停止旧容器前执行，Prisma 输出 `No pending migrations to apply.`，部署后 `/api/health` 通过。 |
+| `inbox-ai-scoring-continuation` | 需要小迭代后 closeout | 迁移前置已解除。剩余工作不应再走旧 SQL；需要补 runtime/UI/DB evidence，把 `acceptance.md` 的 R3 UI N/A、T105 查询、逐条耗时/P95 残缺收掉。 |
+| `agent-and-automation-contracts` | 需要迭代 spec | 现在可把 token/API 表、operation log、idempotency 等持久化改动纳入 Prisma Migrate；spec 必须显式要求 migration + seed/fixture + deploy evidence。仍不处理 secret rotation。 |
+| `image-feature-retirement` | 需要迭代 spec | 字段 drop 已被 migration baseline 解锁，但仍必须分阶段：先清 UI/API/读取点，再用 Prisma Migrate drop legacy image fields；drop 前保留备份/checkpoint 和 Astro 展示端读取清单。 |
+| `admin-shell-and-weekly-workbench` | 需要迭代 spec | 顺序不提前。它应消费已 closeout 的 scoring 输出、search fallback、automation contracts，并在图片入口退役后设计，避免新 UI 继续承载 legacy image surface。 |
+| `redis-job-orchestration` | 需要迭代 spec | 后置不变。接管 cron/job 状态时如新增 job 表或状态表，必须用 Prisma Migrate；应消费 automation contracts，而不是绕过 Admin API。 |
+| `hermes-weekly-intelligence` | 需要迭代 spec | 仍最后。依赖 scoring 反馈、automation contracts、Redis/job 可观测性和 Admin UI 的人工确认面；PG/pgvector 仍是读模型，不替代 MySQL 事实源。 |
+
+更新后的主线开发顺序：
+
+1. `inbox-ai-scoring-continuation`
+2. `agent-and-automation-contracts`
+3. `image-feature-retirement`
+4. `admin-shell-and-weekly-workbench`
+5. `redis-job-orchestration`
+6. `hermes-weekly-intelligence`
+
+Deferred follow-up, not in the mainline order:
+
+- `security-and-runtime-hardening`
+- Meilisearch timeout/circuit breaker / FULLTEXT fallback tuning
+- Prisma 7 seed config migration (`package.json#prisma` -> `prisma.config.ts`)
+- GitHub Actions Node.js 20 action runtime upgrade before 2026-09-16
+
+## Post-F2 Reassessment
+
+2026-06-05 完成并提交 `agent-and-automation-contracts` 后，剩余未开发 feature 需要按新的 `/api/v1` 契约重新排序和收窄范围。
+
+| Feature | 是否需要迭代 | 调整结论 |
+|---------|--------------|----------|
+| `agent-and-automation-contracts` | 不需要继续迭代主线 | 已完成并提交 commit `1f38443`。已落地 automation token、scope、OpenAPI、`automation_runs`、idempotency、operation log mirror、`/api/v1/jobs/sync`、`/api/v1/jobs/score`、weekly candidates/suggestions/apply/publish、feedback digest、proxy pass-through、docs 和 live smoke。 |
+| `image-feature-retirement` | 需要迭代 spec，作为下一步 | 顺序保持最前。现在 automation contract 已稳定，图片退役应先清 Admin UI/API/上传/裁剪/AI 图片生成入口，再确认 Astro 展示端读取点，最后用 Prisma Migrate drop legacy image fields。不得再新增 `database/*.sql`。 |
+| `admin-shell-and-weekly-workbench` | 需要重写 spec 输入 | 工作台不应继续围绕 legacy `/api/weekly/auto-link` 或图片入口设计。新版 UI 应消费 `/api/v1/weekly/candidates`、`/api/v1/weekly/suggestions`、`/api/v1/weekly/suggestions/{id}/apply`、`/api/v1/weekly/publish`、`automation_runs` 状态和 OpenAPI 契约。应在图片入口退役后开发，避免新壳层继承 legacy image surface。 |
+| `redis-job-orchestration` | 需要迭代 spec | 不再负责定义外部调用契约；只接管执行控制层。应把已存在的 `/api/v1` contract 作为 caller boundary，设计 Redis job/lock/rate-limit/status 与 `automation_runs` 的关系。任何 job/status 表需走 Prisma Migrate。 |
+| `hermes-weekly-intelligence` | 需要迭代 spec，继续最后 | Hermes 不直接写 MySQL、不直接发布。它应通过 `/api/v1/ai/feedback/digest` 学习偏好，通过 candidates/suggestions contract 生成建议，经 Admin UI 人工确认后由 apply/publish 写回。PG/pgvector/hermes-db 仍是读模型。 |
+| `security-and-runtime-hardening` | 仍 deferred | 本次 token 已 hash 存储并完成 smoke，但 secret rotation、token 管理 UI、审计面板、Prisma 7 config、Meili circuit breaker 仍不是主线阻塞项。 |
+
+更新后的主线开发顺序：
+
+1. `image-feature-retirement`
+2. `admin-shell-and-weekly-workbench`
+3. `redis-job-orchestration`
+4. `hermes-weekly-intelligence`
+
+执行含义：
+
+- `image-feature-retirement` 是下一步，因为它会减少 UI 和依赖噪音，并为工作台重设计清理旧 surface。
+- `admin-shell-and-weekly-workbench` 紧随其后，承接已稳定的 scoring/search/automation contracts，形成用户可操作的人工确认面。
+- `redis-job-orchestration` 在 UI 后做更合适，因为任务中心需要真实工作台入口和用户可见状态语义。
+- `hermes-weekly-intelligence` 最后接入，避免 Hermes 在没有人工确认面和任务状态之前变成隐式事实源。
+
+Deferred follow-up, not in the mainline order:
+
+- `security-and-runtime-hardening`
+- Meilisearch timeout/circuit breaker / FULLTEXT fallback tuning
+- Prisma 7 seed config migration (`package.json#prisma` -> `prisma.config.ts`)
+- GitHub Actions Node.js 20 action runtime upgrade before 2026-09-16
+
+---
+
+## Post-F5 Reassessment
+
+2026-06-06 完成 `image-feature-retirement` 后，剩余未开发 feature 需要按“无图片 Admin surface”重新排序和收窄范围。
+
+| Feature | 是否需要迭代 | 调整结论 |
+|---------|--------------|----------|
+| `image-feature-retirement` | 不需要继续迭代主线 | 已完成。Admin 常规路径中的上传、裁剪、主图、封面、AI 图片生成、Quail 图片输出和图片专用依赖已退役；字段 drop 后置，acceptance 已记录 Astro 技术读取和 Prisma Migrate 前置条件。 |
+| `admin-shell-and-weekly-workbench` | 需要迭代 spec，作为下一步 | 必须按无图片产品模型重写 UI 输入。新工作台不再设计封面/主图/裁剪入口，应消费 `/api/v1/weekly/candidates`、`/api/v1/weekly/suggestions`、`/api/v1/weekly/suggestions/{id}/apply`、`/api/v1/weekly/publish`、`automation_runs` 状态、评分输出和 search fallback。 |
+| `redis-job-orchestration` | 需要迭代 spec，继续后置 | 不再负责补图片副作用，也不负责定义外部 API 契约。范围应收窄为执行控制层：Redis job/lock/rate-limit/status、任务中心、与 `automation_runs` 的映射，以及从现有 cron/API 到 job 的迁移。 |
+| `hermes-weekly-intelligence` | 需要迭代 spec，仍最后 | Hermes 应基于无图片周刊候选、评分反馈和人工确认工作台生成建议；不直接写 MySQL、不直接发布、不成为事实源。 |
+| `security-and-runtime-hardening` | 仍 deferred | secret rotation、token 管理 UI、审计面板、Prisma 7 config、Meili circuit breaker 仍不是主线阻塞项。 |
+
+更新后的主线开发顺序：
+
+1. `admin-shell-and-weekly-workbench`
+2. `redis-job-orchestration`
+3. `hermes-weekly-intelligence`
+
+执行含义：
+
+- `admin-shell-and-weekly-workbench` 是下一步，因为图片退役已经清掉 legacy UI surface，现在可以设计真正的生产驾驶舱和人工确认面。
+- `redis-job-orchestration` 放在 UI 之后，因为任务中心需要真实工作台入口、状态语言和用户可见操作语义。
+- `hermes-weekly-intelligence` 继续最后，因为 Hermes 建议需要稳定的候选/评分/API 契约、任务状态和人工确认 UI。
+
+Deferred follow-up, not in the mainline order:
+
+- `security-and-runtime-hardening`
+- Meilisearch timeout/circuit breaker / FULLTEXT fallback tuning
+- Prisma 7 seed config migration (`package.json#prisma` -> `prisma.config.ts`)
+- GitHub Actions Node.js 20 action runtime upgrade before 2026-09-16
+- Legacy image field drop migration after Astro technical reads and remaining historical scripts are cleared
+
+## Post-F3 Reassessment
+
+2026-06-08 完成 `redis-job-orchestration` 后，剩余主线只剩 Hermes 智能建议。Redis job 已把 `/api/v1/jobs/sync` 与 `/api/v1/jobs/score` 从 request lifecycle 长任务切到 BullMQ/Redis submit + independent worker execution。
+
+| Feature | 是否需要迭代 | 调整结论 |
+|---------|--------------|----------|
+| `redis-job-orchestration` | 不需要继续迭代主线 | 已 PASS。验收记录 `specs/redis-job-orchestration/acceptance.md` 覆盖 queue、lock、rate-limit、status、retry、worker health、legacy compatibility、docs 和 runtime replay。真实 smoke run `auto_1e130ac9-df5b-431f-9e84-39c86e1cdc56` 证明 submit -> worker -> retry -> terminal `automation_runs` -> status/health 闭环。代表性 scoring 样本最终业务失败，但该失败已作为 terminal evidence 可见，不阻塞 orchestration。 |
+| `hermes-weekly-intelligence` | 需要 specify，作为下一步 | 现在可消费稳定的 `/api/v1` 契约、评分输出、Redis job status、worker health 和工作台人工确认面。Hermes 仍不得直接写 MySQL 或直接发布；必须通过 Admin API 和人工确认闭环。 |
+| `security-and-runtime-hardening` | 仍 deferred | secret rotation、token 管理 UI、审计面板、Prisma 7 config、Meili circuit breaker 仍不是主线阻塞项。 |
+
+更新后的主线开发顺序：
+
+1. `hermes-weekly-intelligence`
+
+执行含义：
+
+- `hermes-weekly-intelligence` 是下一步，因为 Redis job 已提供长任务状态语言和 worker 健康，工作台也已有人工确认面。
+- `.active` 暂不切换到 `hermes-weekly-intelligence`，因为该 workspace 还未创建；下一轮 `specify hermes-weekly-intelligence` 时再创建目录并切换，避免 `.active` 指向空工作区。
+
+Deferred follow-up, not in the mainline order:
+
+- `security-and-runtime-hardening`
+- Meilisearch timeout/circuit breaker / FULLTEXT fallback tuning
+- Prisma 7 seed config migration (`package.json#prisma` -> `prisma.config.ts`)
+- GitHub Actions Node.js 20 action runtime upgrade before 2026-09-16
+- Legacy image field drop migration after Astro technical reads and remaining historical scripts are cleared
+- Karakeep resync 内存 `Map` 状态迁入 Redis job/status
+- Weekly suggest/apply/publish worker 化或完整任务中心页面
+
+---
+
+## Final Roadmap Closeout
+
+2026-06-08 完成 `hermes-weekly-intelligence` 后，`admin-modernization-roadmap` 主线 feature 已全部收口。Umbrella roadmap 不再推荐新的主线 implementation feature；剩余事项均为明确延后的 follow-up 或独立新需求。
+
+| Area | Final State | Evidence |
+|------|-------------|----------|
+| Next.js 16 baseline | PASS | `specs/next16-upgrade-baseline/acceptance.md` 记录 lint/type-check/test/build、proxy smoke 和 Node 版本证据。 |
+| Database/search boundary | PASS | `specs/database-and-search-strategy/acceptance.md` 记录 Meili optional、health degraded、MySQL fallback 和 NAS smoke。 |
+| Migration governance | PASS | `specs/migration-tooling-baseline/acceptance.md` 记录 Prisma baseline、seed、legacy deprecation 和 deploy migration evidence。 |
+| Inbox scoring continuation | CONDITIONAL PASS | `specs/inbox-ai-scoring-continuation/acceptance.md` 记录 DB 状态闭环、UI evidence 和 score-batch contract；代表性样本上游 405 归为内容抓取质量 follow-up。 |
+| Automation contracts | PASS | `specs/agent-and-automation-contracts/acceptance.md` 记录 token scope、OpenAPI、idempotency、automation_runs 和 live smoke。 |
+| Image retirement | PASS | `specs/image-feature-retirement/acceptance.md` 记录 UI/API/publish/dependency 图片链路退役；字段 drop 后置。 |
+| Admin shell/workbench | PASS | `specs/admin-shell-and-weekly-workbench/acceptance.md` 记录 dashboard/workbench、建议、发布检查、runs 和响应式 replay。 |
+| Redis job orchestration | PASS | `specs/redis-job-orchestration/acceptance.md` 记录 BullMQ/Redis submit、worker、retry、status、health 和 runtime smoke。 |
+| Hermes weekly intelligence | PASS | `specs/hermes-weekly-intelligence/acceptance.md` 记录 preview artifact register、workbench 展示、ops report 和人工 apply 写回。 |
+
+最终顺序状态：
+
+1. `next16-upgrade-baseline` - done
+2. `database-and-search-strategy` - done
+3. `migration-tooling-baseline` - done
+4. `inbox-ai-scoring-continuation` - done with external-content follow-up
+5. `agent-and-automation-contracts` - done
+6. `image-feature-retirement` - done
+7. `admin-shell-and-weekly-workbench` - done
+8. `redis-job-orchestration` - done
+9. `hermes-weekly-intelligence` - done
+
+No next recommended mainline feature.
+
+Deferred follow-up, not blocking roadmap closeout:
+
+- `security-and-runtime-hardening`
+- Meilisearch timeout/circuit breaker / FULLTEXT fallback tuning
+- Prisma 7 seed config migration (`package.json#prisma` -> `prisma.config.ts`)
+- GitHub Actions Node.js 20 action runtime upgrade before 2026-09-16
+- Legacy image field drop migration after Astro technical reads and remaining historical scripts are cleared
+- Karakeep resync 内存 `Map` 状态迁入 Redis job/status
+- Weekly suggest/apply/publish worker 化或完整任务中心页面
+- External Hermes skill runtime, NAS deployment and hermes-db/PG migrations in their owning runtime/repo
+- 内容抓取质量治理，覆盖 representative scoring replay 中的上游 `405 Not Allowed`
+
+`.active` 已切回 `admin-modernization-roadmap`，用于执行本次 closeout。完成后如继续新需求，应显式指定新的 feature 或从 deferred follow-up 中选择一个重新进入 `specify`。
 
 ---
 
@@ -566,9 +735,10 @@ specs/database-and-search-strategy/
 
 ## Stage Readiness
 
-- 是否需要 `data-model.md`：当前 umbrella plan 不需要；各执行 feature 按需生成。
-- 下一步建议：`tasks`
-- 阻塞项：无。建议优先为 `next16-upgrade-baseline` 创建独立 spec/plan/tasks，然后进入实现。
+- 是否需要 `data-model.md`：当前 umbrella plan 不需要；各执行 feature 已按需生成。
+- 当前阶段：`closeout`
+- 下一步建议：无新的主线 feature。若继续推进，只能从 deferred follow-up 中选择独立 feature 重新 `specify`，或由用户提出新需求。
+- 阻塞项：无。Roadmap closeout 已汇总到 `acceptance.md`；提交仍需用户显式确认 commit plan。
 
 ---
 
@@ -578,8 +748,9 @@ specs/database-and-search-strategy/
 |------|---------|------|
 | plan.md | 必须 | 当前 umbrella roadmap 的主实现计划 |
 | data-model.md | 不需要 | 本工作区不直接改实体；执行 feature 再生成 |
-| tasks.md | 后续阶段生成 | 建议生成 roadmap 级任务清单，随后切到 F0 |
-| acceptance.md | 后续阶段生成 | 用于 roadmap 收尾验收 |
+| tasks.md | 已生成 | 记录 roadmap 级任务清单和最终 T026 closeout |
+| acceptance.md | 已生成 | 用于 roadmap 收尾验收 |
+| commit-plan.md | 已生成 | 提交前确认 gate；未确认前不得 `git add` / `git commit` |
 
 ---
 

@@ -402,5 +402,6 @@
 
 ## Stage Readiness
 
-- 下一步建议：`plan`
-- 阻塞项：无。后续每个执行 feature 仍需创建自己的 spec/plan/tasks。
+- 当前阶段：`closeout complete`
+- 下一步建议：无新的主线 feature；后续只从 deferred follow-up 中选择独立 feature 重新 `specify`，或由用户提出新需求。
+- 阻塞项：无。主线执行 feature 均已有独立验收记录；最终状态见 [acceptance.md](acceptance.md)。
