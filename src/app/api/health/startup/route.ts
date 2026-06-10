@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       services: {
         database: 'connected',
         meilisearch: config.meilisearchHost ? 'optional_configured' : 'optional_not_configured',
-        imageUpload: config.imageUploadUrl ? 'configured' : 'not_configured'
+        jobQueue: config.jobQueueDisabled ? 'disabled' : config.redisUrl ? 'optional_configured' : 'optional_not_configured'
       }
     });
 
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       services: {
         database: 'connected',
         meilisearch: config.meilisearchHost ? 'optional_configured' : 'optional_not_configured',
-        imageUpload: config.imageUploadUrl ? 'configured' : 'not_configured'
+        jobQueue: config.jobQueueDisabled ? 'disabled' : config.redisUrl ? 'optional_configured' : 'optional_not_configured'
       }
     });
 

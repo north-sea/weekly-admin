@@ -20,10 +20,15 @@ export interface EnvironmentConfig {
   meilisearchMasterKey?: string;
   meilisearchContentIndex: string;
   meilisearchSharedInstance: boolean;
-  
-  // Image Upload
-  imageUploadUrl?: string;
-  imageUploadToken?: string;
+
+  // Job queue
+  redisUrl?: string;
+  jobQueuePrefix: string;
+  jobQueueDisabled: boolean;
+  jobQueueStatusTtlSeconds: number;
+  jobTargetLockTtlSeconds: number;
+  jobWorkerHeartbeatIntervalMs: number;
+  jobWorkerHeartbeatTtlSeconds: number;
   
   // JWT
   jwtSecret: string;
@@ -44,8 +49,11 @@ const OPTIONAL_ENV_VARS = {
   MEILISEARCH_MASTER_KEY: '',
   MEILISEARCH_CONTENT_INDEX: 'weekly_admin_contents',
   MEILISEARCH_SHARED_INSTANCE: 'false',
-  IMAGE_UPLOAD_URL: '',
-  IMAGE_UPLOAD_TOKEN: '',
+  JOB_QUEUE_PREFIX: 'weekly-admin',
+  JOB_QUEUE_STATUS_TTL_SECONDS: '604800',
+  JOB_TARGET_LOCK_TTL_SECONDS: '3600',
+  JOB_WORKER_HEARTBEAT_INTERVAL_MS: '30000',
+  JOB_WORKER_HEARTBEAT_TTL_SECONDS: '90',
   DB_HOST: '',
   DB_PORT: '3306',
   DB_USER: '',
@@ -132,20 +140,43 @@ export function validateEnvironmentVariables(): EnvironmentConfig {
     errors.push('MEILISEARCH_CONTENT_INDEX cannot be "contents" when MEILISEARCH_SHARED_INSTANCE=true');
   }
 
-  // Validate IMAGE_UPLOAD_URL format if provided
-  const imageUploadUrl = process.env.IMAGE_UPLOAD_URL;
-  if (imageUploadUrl) {
+  const redisUrl = process.env.REDIS_URL;
+  if (redisUrl) {
     try {
-      new URL(imageUploadUrl);
+      const url = new URL(redisUrl);
+      if (!['redis', 'rediss'].includes(url.protocol.replace(':', ''))) {
+        errors.push(`Unsupported Redis protocol in REDIS_URL: ${url.protocol}`);
+      }
     } catch (error) {
-      errors.push(`Invalid IMAGE_UPLOAD_URL format: ${imageUploadUrl}`);
-    }
-    
-    // Check if token is provided when URL is provided
-    if (!process.env.IMAGE_UPLOAD_TOKEN) {
-      warnings.push('IMAGE_UPLOAD_URL is provided but IMAGE_UPLOAD_TOKEN is missing. Image upload functionality will be disabled.');
+      errors.push(`Invalid REDIS_URL format: ${redisUrl}`);
     }
   }
+
+  const jobQueuePrefix = process.env.JOB_QUEUE_PREFIX || OPTIONAL_ENV_VARS.JOB_QUEUE_PREFIX;
+  if (!/^[a-zA-Z0-9:_-]+$/.test(jobQueuePrefix)) {
+    errors.push('JOB_QUEUE_PREFIX may only contain letters, numbers, colon, underscore, and hyphen');
+  }
+
+  const jobQueueStatusTtlSeconds = parsePositiveInteger(
+    process.env.JOB_QUEUE_STATUS_TTL_SECONDS || OPTIONAL_ENV_VARS.JOB_QUEUE_STATUS_TTL_SECONDS,
+    'JOB_QUEUE_STATUS_TTL_SECONDS',
+    errors
+  );
+  const jobTargetLockTtlSeconds = parsePositiveInteger(
+    process.env.JOB_TARGET_LOCK_TTL_SECONDS || OPTIONAL_ENV_VARS.JOB_TARGET_LOCK_TTL_SECONDS,
+    'JOB_TARGET_LOCK_TTL_SECONDS',
+    errors
+  );
+  const jobWorkerHeartbeatIntervalMs = parsePositiveInteger(
+    process.env.JOB_WORKER_HEARTBEAT_INTERVAL_MS || OPTIONAL_ENV_VARS.JOB_WORKER_HEARTBEAT_INTERVAL_MS,
+    'JOB_WORKER_HEARTBEAT_INTERVAL_MS',
+    errors
+  );
+  const jobWorkerHeartbeatTtlSeconds = parsePositiveInteger(
+    process.env.JOB_WORKER_HEARTBEAT_TTL_SECONDS || OPTIONAL_ENV_VARS.JOB_WORKER_HEARTBEAT_TTL_SECONDS,
+    'JOB_WORKER_HEARTBEAT_TTL_SECONDS',
+    errors
+  );
 
   // Validate JWT_SECRET strength
   const jwtSecret = process.env.JWT_SECRET;
@@ -187,11 +218,25 @@ export function validateEnvironmentVariables(): EnvironmentConfig {
     meilisearchMasterKey: process.env.MEILISEARCH_MASTER_KEY,
     meilisearchContentIndex,
     meilisearchSharedInstance,
-    imageUploadUrl: process.env.IMAGE_UPLOAD_URL,
-    imageUploadToken: process.env.IMAGE_UPLOAD_TOKEN,
+    redisUrl,
+    jobQueuePrefix,
+    jobQueueDisabled: process.env.JOB_QUEUE_DISABLED === 'true',
+    jobQueueStatusTtlSeconds,
+    jobTargetLockTtlSeconds,
+    jobWorkerHeartbeatIntervalMs,
+    jobWorkerHeartbeatTtlSeconds,
     jwtSecret: jwtSecret!,
     jwtExpiresIn: process.env.JWT_EXPIRES_IN || OPTIONAL_ENV_VARS.JWT_EXPIRES_IN,
   };
+}
+
+function parsePositiveInteger(value: string, name: string, errors: string[]): number {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    errors.push(`Invalid ${name}: ${value}. Must be a positive integer`);
+    return 0;
+  }
+  return parsed;
 }
 
 /**
@@ -331,38 +376,6 @@ export async function validateMeilisearchConnection(config: EnvironmentConfig): 
 }
 
 /**
- * Validate image upload service configuration
- */
-export function validateImageUploadConfiguration(config: EnvironmentConfig): void {
-  if (!config.imageUploadUrl || !config.imageUploadToken) {
-    console.log('⚠️  Image upload service not configured - image upload functionality will be disabled');
-    return;
-  }
-
-  try {
-    // Validate URL format
-    new URL(config.imageUploadUrl);
-    
-    // Check token is not empty
-    if (config.imageUploadToken.trim().length === 0) {
-      throw new Error('IMAGE_UPLOAD_TOKEN cannot be empty');
-    }
-    
-    console.log('✅ Image upload service configuration validated');
-    
-    if (config.nodeEnv === 'development') {
-      console.log(`   - Upload URL: ${config.imageUploadUrl}`);
-      console.log(`   - Token configured: Yes`);
-    }
-    
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('❌ Image upload service configuration validation failed:', errorMessage);
-    throw new ConfigValidationError(`Image upload service configuration error: ${errorMessage}`);
-  }
-}
-
-/**
  * Comprehensive startup validation
  */
 export async function validateApplicationStartup(): Promise<EnvironmentConfig> {
@@ -390,11 +403,6 @@ export async function validateApplicationStartup(): Promise<EnvironmentConfig> {
         console.log(`   Error details: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
-    console.log('');
-
-    // Step 4: Validate image upload service (optional)
-    console.log('📋 Step 4: Validating image upload service...');
-    validateImageUploadConfiguration(config);
     console.log('');
 
     console.log('🎉 All configuration validations passed successfully!\n');
