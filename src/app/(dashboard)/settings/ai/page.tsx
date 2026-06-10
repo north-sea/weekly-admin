@@ -76,6 +76,10 @@ const SCENE_LABELS: Record<AiPromptScene, string> = {
   weekly_cover: '封面',
 };
 
+const ACTIVE_PROMPT_SCENES = Object.keys(SCENE_LABELS).filter(
+  (scene): scene is AiPromptScene => scene !== 'weekly_cover'
+);
+
 export default function AiSettingsPage() {
   const { toast } = useToast();
   const aiSettingsQuery = useAiSettings();
@@ -99,7 +103,6 @@ export default function AiSettingsPage() {
     provider: 'openai' as AiConfig['provider'],
     base_url: 'https://api.openai.com',
     text_model: 'gpt-4o-mini',
-    image_model: 'gpt-image-1',
     api_key: '',
     enabled: true,
     is_default: false,
@@ -145,9 +148,10 @@ export default function AiSettingsPage() {
 
         if (canceled) return;
         setConfigs(configsJson.data ?? []);
-        setPrompts(promptsJson.data ?? []);
+        const activePrompts = (promptsJson.data ?? []).filter((prompt) => prompt.scene !== 'weekly_cover');
+        setPrompts(activePrompts);
         const nextEdits: Partial<Record<AiPromptScene, string>> = {};
-        (promptsJson.data ?? []).forEach((p) => {
+        activePrompts.forEach((p) => {
           nextEdits[p.scene] = p.prompt;
         });
         setPromptEdits(nextEdits);
@@ -196,9 +200,10 @@ export default function AiSettingsPage() {
     const res = await fetch('/api/ai/prompts', { method: 'GET' });
     const json = (await res.json().catch(() => ({}))) as ApiResponse<AiPrompt[]>;
     if (!res.ok || !json?.success) throw new Error(json?.error?.message || '刷新 Prompt 失败');
-    setPrompts(json.data ?? []);
+    const activePrompts = (json.data ?? []).filter((prompt) => prompt.scene !== 'weekly_cover');
+    setPrompts(activePrompts);
     const nextEdits: Partial<Record<AiPromptScene, string>> = {};
-    (json.data ?? []).forEach((p) => {
+    activePrompts.forEach((p) => {
       nextEdits[p.scene] = p.prompt;
     });
     setPromptEdits(nextEdits);
@@ -211,7 +216,6 @@ export default function AiSettingsPage() {
       provider: 'openai',
       base_url: 'https://api.openai.com',
       text_model: 'gpt-4o-mini',
-      image_model: 'gpt-image-1',
       api_key: '',
       enabled: true,
       is_default: configs.length === 0,
@@ -226,7 +230,6 @@ export default function AiSettingsPage() {
       provider: config.provider,
       base_url: config.base_url,
       text_model: config.text_model,
-      image_model: config.image_model ?? '',
       api_key: '',
       enabled: config.enabled,
       is_default: config.is_default,
@@ -243,7 +246,6 @@ export default function AiSettingsPage() {
         provider: configForm.provider,
         base_url: configForm.base_url,
         text_model: configForm.text_model,
-        image_model: configForm.image_model ? configForm.image_model : null,
         enabled: configForm.enabled,
       };
 
@@ -462,16 +464,12 @@ export default function AiSettingsPage() {
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                      <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="grid grid-cols-1 gap-3 text-sm">
                         <div className="space-y-1">
                           <p className="text-muted-foreground">Text Model</p>
                           <p className="font-medium break-all">{config.text_model}</p>
                         </div>
                         <div className="space-y-1">
-                          <p className="text-muted-foreground">Image Model</p>
-                          <p className="font-medium break-all">{config.image_model || '-'}</p>
-                        </div>
-                        <div className="space-y-1 col-span-2">
                           <p className="text-muted-foreground">API Key</p>
                           <p className="font-medium">{config.api_key_masked || '****'}</p>
                         </div>
@@ -529,9 +527,9 @@ export default function AiSettingsPage() {
           ) : (
             <Tabs value={activeScene} onValueChange={(v) => setActiveScene(v as AiPromptScene)}>
               <TabsList className="flex flex-wrap justify-start gap-1">
-                {Object.keys(SCENE_LABELS).map((scene) => (
+                {ACTIVE_PROMPT_SCENES.map((scene) => (
                   <TabsTrigger key={scene} value={scene} className="text-xs">
-                    {SCENE_LABELS[scene as AiPromptScene]}
+                    {SCENE_LABELS[scene]}
                   </TabsTrigger>
                 ))}
               </TabsList>
@@ -638,25 +636,14 @@ export default function AiSettingsPage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="ai-config-text-model">Text Model</Label>
-                <Input
-                  id="ai-config-text-model"
-                  value={configForm.text_model}
-                  onChange={(e) => setConfigForm((p) => ({ ...p, text_model: e.target.value }))}
-                  placeholder="gpt-4o-mini"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="ai-config-image-model">Image Model</Label>
-                <Input
-                  id="ai-config-image-model"
-                  value={configForm.image_model}
-                  onChange={(e) => setConfigForm((p) => ({ ...p, image_model: e.target.value }))}
-                  placeholder="gpt-image-1"
-                />
-              </div>
+            <div className="grid gap-2">
+              <Label htmlFor="ai-config-text-model">Text Model</Label>
+              <Input
+                id="ai-config-text-model"
+                value={configForm.text_model}
+                onChange={(e) => setConfigForm((p) => ({ ...p, text_model: e.target.value }))}
+                placeholder="gpt-4o-mini"
+              />
             </div>
 
             <div className="grid gap-2">

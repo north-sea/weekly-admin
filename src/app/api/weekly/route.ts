@@ -10,7 +10,7 @@ const CreateWeeklyIssueSchema = z.object({
   end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '结束日期格式不正确'),
   status: z.enum(['draft', 'published', 'archived']).default('draft'),
   desc: z.string().optional(),
-  cover: z.string().url().optional(),
+  cover: z.string().optional(),
 });
 
 const GetWeeklyIssuesSchema = z.object({
@@ -114,7 +114,6 @@ export async function POST(request: NextRequest) {
         end_date: new Date(data.end_date),
         status: data.status as any,
         desc: data.desc,
-        cover: data.cover,
         created_by: user.id,
       },
     });

@@ -13,7 +13,6 @@ interface Content {
   title: string;
   description?: string;
   summary?: string;
-  image_url?: string;
   content: string;
   source?: string;
   source_url?: string;
@@ -37,7 +36,6 @@ interface WeeklyIssue {
   title: string;
   description?: string;
   desc?: string;
-  cover?: string;
   start_date: string;
   end_date: string;
 }
@@ -128,20 +126,9 @@ const WeeklyPreview: React.FC<WeeklyPreviewProps> = ({ issueId, contents }) => {
     return groups;
   }, {});
 
-  const renderContentItem = (content: Content, index: number) => (
+  const renderContentItem = (content: Content) => (
     <Card key={content.id} className="p-4 hover:shadow-sm transition-all">
       <div className="flex items-start gap-3">
-        {content.image_url && (
-          <div className="w-24 h-16 rounded bg-muted/60 overflow-hidden">
-            <img
-              src={content.image_url}
-              alt=""
-              className="object-cover w-full h-full"
-              loading="lazy"
-              decoding="async"
-            />
-          </div>
-        )}
         <div className="flex-1 space-y-2 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h4 className="text-sm font-medium leading-tight line-clamp-2">{content.title}</h4>
@@ -195,18 +182,6 @@ const WeeklyPreview: React.FC<WeeklyPreviewProps> = ({ issueId, contents }) => {
   return (
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4">
-        {issue.cover && (
-          <div className="overflow-hidden rounded-lg border bg-muted/40">
-            <img
-              src={issue.cover}
-              alt={issue.title}
-              className="h-40 w-full object-cover"
-              loading="lazy"
-              decoding="async"
-            />
-          </div>
-        )}
-
         <div className="text-center space-y-2">
           <h3 className="text-xl font-bold">{issue.title}</h3>
           <p className="text-sm text-muted-foreground">
@@ -238,7 +213,7 @@ const WeeklyPreview: React.FC<WeeklyPreviewProps> = ({ issueId, contents }) => {
                 </Badge>
               </div>
               <div className="space-y-2">
-                {sectionContents.map((content, index) => renderContentItem(content, index))}
+                {sectionContents.map((content) => renderContentItem(content))}
               </div>
             </div>
           ))}

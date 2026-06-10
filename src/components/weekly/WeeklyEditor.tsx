@@ -40,6 +40,7 @@ export interface WeeklyEditorContent {
 interface WeeklyEditorProps {
   issueId: number;
   onContentsChange?: (contents: WeeklyEditorContent[]) => void;
+  refreshKey?: number;
 }
 
 interface Category {
@@ -47,7 +48,7 @@ interface Category {
   name: string;
 }
 
-const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId, onContentsChange }) => {
+const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId, onContentsChange, refreshKey = 0 }) => {
   const { toast } = useToast();
   const focusRingClass = 'focus-visible:ring-1 focus-visible:ring-offset-1 focus:ring-1 focus:ring-offset-1';
   const [loading, setLoading] = useState(false);
@@ -118,11 +119,11 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId, onContentsChange }
 
   useEffect(() => {
     void fetchSelectedContents();
-  }, [fetchSelectedContents]);
+  }, [fetchSelectedContents, refreshKey]);
 
   useEffect(() => {
     void fetchAvailableContents();
-  }, [fetchAvailableContents]);
+  }, [fetchAvailableContents, refreshKey]);
 
   useEffect(() => {
     const loadCategories = async () => {
@@ -163,13 +164,27 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId, onContentsChange }
       if (!result.success) {
         throw new Error(result.error?.message || '更新失败');
       }
+
+      return true;
     } catch (error) {
       toast({
         title: '保存失败',
         description: error instanceof Error ? error.message : '更新周刊内容失败',
         variant: 'destructive',
       });
+      return false;
     }
+  };
+
+  const commitContents = (nextContents: WeeklyEditorContent[], previousContents: WeeklyEditorContent[]) => {
+    setSelectedContents(nextContents);
+    setHasLoadedContents(true);
+    void updateWeeklyContents(nextContents).then((saved) => {
+      if (!saved) {
+        setSelectedContents(previousContents);
+        setHasLoadedContents(true);
+      }
+    });
   };
 
   const handleAddContent = (content: WeeklyEditorContent) => {
@@ -181,16 +196,12 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId, onContentsChange }
     };
 
     const nextContents = [...selectedContents, newContent];
-    setSelectedContents(nextContents);
-    setHasLoadedContents(true);
-    void updateWeeklyContents(nextContents);
+    commitContents(nextContents, selectedContents);
   };
 
   const handleRemoveContent = (contentId: number) => {
     const nextContents = selectedContents.filter((item) => item.id !== contentId);
-    setSelectedContents(nextContents);
-    setHasLoadedContents(true);
-    void updateWeeklyContents(nextContents);
+    commitContents(nextContents, selectedContents);
   };
 
   const handleReorderContents = (newContents: WeeklyEditorContent[]) => {
@@ -199,9 +210,14 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId, onContentsChange }
       sort_order: index,
     }));
 
-    setSelectedContents(reorderedContents);
-    setHasLoadedContents(true);
-    void updateWeeklyContents(reorderedContents);
+    commitContents(reorderedContents, selectedContents);
+  };
+
+  const handleUpdateContent = (content: WeeklyEditorContent) => {
+    const nextContents = selectedContents.map((item) =>
+      item.id === content.id ? content : item
+    );
+    commitContents(nextContents, selectedContents);
   };
 
   const handleSearch = () => {
@@ -253,9 +269,9 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId, onContentsChange }
         max={15}
       />
 
-      <div className="h-[70vh]">
-        <div className="grid h-full grid-cols-12 gap-6">
-          <div className="col-span-3 h-full min-h-0">
+      <div className="lg:h-[70vh]">
+        <div className="grid h-full grid-cols-1 gap-6 lg:grid-cols-12">
+          <div className="h-[28rem] min-h-0 lg:col-span-3 lg:h-full">
             <Card className="h-full flex flex-col overflow-hidden shadow-sm">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -311,7 +327,7 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId, onContentsChange }
             </Card>
           </div>
 
-          <div className="col-span-5 h-full min-h-0">
+          <div className="h-[34rem] min-h-0 lg:col-span-5 lg:h-full">
             <Card className="h-full flex flex-col overflow-hidden shadow-sm">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -324,12 +340,13 @@ const WeeklyEditor: React.FC<WeeklyEditorProps> = ({ issueId, onContentsChange }
                   contents={selectedContents}
                   onRemoveContent={handleRemoveContent}
                   onReorderContents={handleReorderContents}
+                  onUpdateContent={handleUpdateContent}
                 />
               </CardContent>
             </Card>
           </div>
 
-          <div className="col-span-4 h-full min-h-0">
+          <div className="h-[34rem] min-h-0 lg:col-span-4 lg:h-full">
             <Card className="h-full flex flex-col overflow-hidden shadow-sm">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">实时预览</CardTitle>

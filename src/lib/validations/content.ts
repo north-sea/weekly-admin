@@ -1,16 +1,10 @@
 import { z } from 'zod';
 
-const CoverImageSchema = z.preprocess(
-  (val) => (val === '' || val === null ? undefined : val),
-  z.string().url('封面图片必须是有效的URL').optional()
-);
-
 // Base content schema
 export const BaseContentSchema = z.object({
   title: z.string().min(1, '标题不能为空').max(500, '标题长度不能超过500字符'),
   content: z.string().optional(),
   summary: z.string().max(2000, '摘要长度不能超过2000字符').optional(),
-  image_url: z.string().url('主图必须是有效的URL').optional().or(z.literal('')),
   description: z.string().max(1000, '描述长度不能超过1000字符').optional(),
   category_id: z.number().int().positive().optional(),
   tag_ids: z.array(z.number().int().positive()).default([]),
@@ -23,8 +17,6 @@ export const BaseContentSchema = z.object({
 // Blog-specific schema (content_type_id: 4)
 export const BlogContentSchema = BaseContentSchema.extend({
   content_type_id: z.literal(4),
-  // Blog专用字段
-  cover_image: CoverImageSchema,
   reading_time: z.number().int().min(0).optional(),
   word_count: z.number().int().min(0).optional(),
 });
@@ -70,7 +62,6 @@ export const ContentUpdateSchema = z.object({
   title: z.string().min(1, '标题不能为空').max(500, '标题长度不能超过500字符').optional(),
   content: z.string().optional(),
   summary: z.string().max(2000, '摘要长度不能超过2000字符').optional(),
-  image_url: z.string().url('主图必须是有效的URL').optional().or(z.literal('')),
   description: z.string().max(1000, '描述长度不能超过1000字符').optional(),
   category_id: z.number().int().positive().optional(),
   tag_ids: z.array(z.number().int().positive()).optional(),
@@ -79,8 +70,6 @@ export const ContentUpdateSchema = z.object({
   meta_title: z.string().max(500, 'SEO标题长度不能超过500字符').optional(),
   meta_description: z.string().max(1000, 'SEO描述长度不能超过1000字符').optional(),
   content_type_id: z.union([z.literal(3), z.literal(4)]).optional(),
-  // Blog专用字段
-  cover_image: CoverImageSchema,
   reading_time: z.number().int().min(0).optional(),
   word_count: z.number().int().min(0).optional(),
   // Weekly专用字段

@@ -133,7 +133,6 @@ export async function buildContentDataForPromotion(
     slug,
     description,
     summary,
-    image_url: item.image_url,
     content:
       item.content ||
       [
@@ -340,7 +339,6 @@ export class InboxService {
         slug,
         description,
         summary,
-        image_url: item.image_url,
         content:
           item.content ||
           [

@@ -235,24 +235,6 @@ pnpm tsx scripts/test-content-api.ts
 
 ---
 
-### `test-image-upload-config.ts`
-测试图片上传配置。
-
-```bash
-pnpm tsx scripts/test-image-upload-config.ts
-```
-
----
-
-### `test-image-upload-integration.ts`
-测试图片上传集成。
-
-```bash
-pnpm tsx scripts/test-image-upload-integration.ts
-```
-
----
-
 ## 迁移子目录 (`迁移/`)
 
 历史数据迁移脚本，用于将已有周刊内容与 Karakeep 同步。
@@ -297,24 +279,15 @@ pnpm tsx scripts/迁移/push-weekly-to-karakeep.ts --concurrency=5 --delay=100
 ---
 
 ### `sync-weekly-from-karakeep.ts`
-从 Karakeep 回写周刊数据（summary、图片）。
+已退役。该脚本过去会从 Karakeep 下载图片、上传图床并回写 `contents.image_url`，与 `image-feature-retirement` 的退役边界冲突。
 
 ```bash
-# 预览模式
-pnpm tsx scripts/迁移/sync-weekly-from-karakeep.ts --dry-run
-
-# 执行模式
 pnpm tsx scripts/迁移/sync-weekly-from-karakeep.ts
-
-# 不归档书签
-pnpm tsx scripts/迁移/sync-weekly-from-karakeep.ts --no-archive
 ```
 
-**功能**：
-- 获取 Karakeep 的 summary
-- 下载图片并上传到图床
-- 更新 `contents` 表的 `summary`、`image_url`
-- 可选归档 Karakeep 书签
+**行为**：
+- 运行即返回退役提示并以非零状态退出
+- 如需恢复 summary-only 回写，应新建脚本，且不得写入图片字段或调用图床
 
 ---
 
@@ -330,8 +303,6 @@ pnpm tsx scripts/迁移/sync-weekly-from-karakeep.ts --no-archive
 | `KARAKEEP_DRAFT_LIST_ID` | Karakeep Draft 列表 ID |
 | `KARAKEEP_WEEKLY_LIST_ID` | Karakeep Weekly 列表 ID |
 | `KARAKEEP_MIGRATION_LIST_ID` | Karakeep 迁移列表 ID |
-| `IMAGE_UPLOAD_URL` | 图床上传 API 地址 |
-| `IMAGE_UPLOAD_TOKEN` | 图床 API Token |
 | `MEILISEARCH_HOST` | 可选 Meilisearch 地址 |
 | `MEILISEARCH_CONTENT_INDEX` | Admin 专用搜索 index，默认 `weekly_admin_contents` |
 | `MEILISEARCH_SHARED_INSTANCE` | 复用共享 Meilisearch 时设为 `true`，禁止使用通用 `contents` index |

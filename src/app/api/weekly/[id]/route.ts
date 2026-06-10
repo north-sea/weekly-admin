@@ -12,7 +12,7 @@ const UpdateWeeklyIssueSchema = z.object({
   end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '结束日期格式不正确').optional(),
   status: z.enum(['draft', 'published', 'archived']).optional(),
   desc: z.string().optional(),
-  cover: z.string().url().optional(),
+  cover: z.string().optional(),
 });
 
 const UpdateWeeklyContentsSchema = z.object({
@@ -143,7 +143,6 @@ export async function PUT(
   if (data.end_date) updateData.end_date = new Date(data.end_date);
   if (data.status) updateData.status = data.status;
   if (data.desc !== undefined) updateData.desc = data.desc;
-  if (data.cover !== undefined) updateData.cover = data.cover;
 
     // 如果发布，设置发布时间
     if (data.status === 'published') {

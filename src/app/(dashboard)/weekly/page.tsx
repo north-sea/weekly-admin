@@ -42,6 +42,7 @@ import {
   AlertCircle,
   History,
   Link2,
+  LayoutDashboard,
   Loader2,
 } from 'lucide-react';
 import {
@@ -364,59 +365,48 @@ export default function WeeklyManagePage() {
           <h2 className="text-3xl font-semibold text-slate-900">周刊管理</h2>
           <p className="text-sm text-muted-foreground">管理周刊期号和内容</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button variant="outline" size="lg" onClick={() => router.push('/dashboard')}>
+            <LayoutDashboard className="mr-2 h-4 w-4" />
+            驾驶舱
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="lg">
                 <History className="mr-2 h-4 w-4" />
-                历史回填
+                历史工具
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem onClick={() => openConfirmDialog({ type: 'fillOld' })}>
-                快速填满（推荐）
+              <DropdownMenuItem onClick={() => openConfirmDialog({ type: 'create', weekOffset: 0 })}>
+                <Plus className="mr-2 h-4 w-4" />
+                创建本周草稿
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => openConfirmDialog({ type: 'create', weekOffset: 1 })}>
+                <Plus className="mr-2 h-4 w-4" />
+                创建下周草稿
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => openConfirmDialog({ type: 'link', weekOffset: 0 })}>
+                <Link2 className="mr-2 h-4 w-4" />
+                关联本周内容
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => openConfirmDialog({ type: 'link', weekOffset: 1 })}>
+                <Link2 className="mr-2 h-4 w-4" />
+                关联下周内容
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/weekly/generate')}>
+                AI 组织旧工具
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => openConfirmDialog({ type: 'fillOld' })}>
+                历史快速填满
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => openConfirmDialog({ type: 'backfillByDate' })}>
-                按时间匹配（谨慎）
+                历史按时间匹配（谨慎）
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={() => openConfirmDialog({ type: 'create', weekOffset: 0 })}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            创建本周
-          </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={() => openConfirmDialog({ type: 'create', weekOffset: 1 })}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            创建下周
-          </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={() => openConfirmDialog({ type: 'link', weekOffset: 0 })}
-          >
-            <Link2 className="mr-2 h-4 w-4" />
-            关联本周
-          </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={() => openConfirmDialog({ type: 'link', weekOffset: 1 })}
-          >
-            <Link2 className="mr-2 h-4 w-4" />
-            关联下周
-          </Button>
-          <Button variant="outline" size="lg" onClick={() => router.push('/weekly/generate')}>
-            AI 组织
-          </Button>
           <Button size="lg" onClick={() => router.push('/weekly/editor/new')}>
             <Plus className="mr-2 h-4 w-4" />
             创建周刊

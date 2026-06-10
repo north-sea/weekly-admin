@@ -377,8 +377,6 @@ function karakeepBookmarkToInboxCreate(sourceId: number, bookmark: KarakeepBookm
   if (isTwitterUrl(url)) {
     title = deriveTwitterTitle(bookmark, title);
   }
-  const imageUrl = bookmark.content?.imageUrl || bookmark.content?.screenshotAssetId || bookmark.content?.imageAssetId || null;
-
   return {
     source_id: sourceId,
     source_item_id: bookmark.id,
@@ -388,7 +386,7 @@ function karakeepBookmarkToInboxCreate(sourceId: number, bookmark: KarakeepBookm
     note: bookmark.note ?? null,
     summary: bookmark.summary ?? null,
     content: bookmark.content?.htmlContent ?? null,
-    image_url: imageUrl,
+    image_url: null,
     favicon_url: bookmark.content?.favicon ?? null,
     slug: null,
     source_name: normalizeSourceName(bookmark.content?.publisher ?? hostnameFromUrl(url)),
@@ -446,7 +444,6 @@ async function syncKarakeepToInbox(sourceId: number, options?: SyncOptions): Pro
           note: create.note,
           summary: create.summary,
           content: create.content,
-          image_url: create.image_url,
           favicon_url: create.favicon_url,
           source_name: create.source_name,
           tags_suggestion: create.tags_suggestion as any,

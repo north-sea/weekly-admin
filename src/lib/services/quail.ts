@@ -369,11 +369,6 @@ export class QuailService {
         const content = item.content;
         contentParts.push(`### [${content.title}](${content.source_url || '#'})\n\n`);
 
-        // 添加图片
-        if (content.image_url) {
-          contentParts.push(`![${content.title}](${content.image_url})\n\n`);
-        }
-
         // 添加描述（简短介绍）
         if (content.description) {
           contentParts.push(`${content.description}\n\n`);
@@ -414,7 +409,6 @@ export class QuailService {
       slug: quailSlug,
       content: contentParts.join(''),
       summary: issue.desc || undefined,
-      cover_image: issue.cover || undefined,
       tags: tagsString || undefined,
     };
   }

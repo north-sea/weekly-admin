@@ -51,7 +51,6 @@ import {
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import dayjs from 'dayjs';
-import HoverImagePreview from '@/components/weekly/HoverImagePreview';
 import type { ContentWithRelations } from '@/types/content';
 
 const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
@@ -360,8 +359,6 @@ export default function ContentListPage() {
                     {contents.map((content) => {
                       const status = statusMap[content.status] || statusMap.draft;
                       const contentType = contentTypeMap[content.content_type?.slug] || contentTypeMap.blog;
-                      const previewImage =
-                        content.image_url ?? content.cover_image ?? content.screenshot_api ?? undefined;
                       const contentId = Number(content.id);
                       const selected = selectedIds.includes(contentId);
 
@@ -388,11 +385,9 @@ export default function ContentListPage() {
                           </TableCell>
                           <TableCell className="font-medium">
                             <div className="flex items-center gap-2">
-                              <HoverImagePreview imageUrl={previewImage} title={content.title ?? '未命名'}>
-                                <span className="block max-w-[260px] truncate">
-                                  {content.title ?? '未命名'}
-                                </span>
-                              </HoverImagePreview>
+                              <span className="block max-w-[260px] truncate">
+                                {content.title ?? '未命名'}
+                              </span>
                               {content.featured && (
                                 <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
                               )}

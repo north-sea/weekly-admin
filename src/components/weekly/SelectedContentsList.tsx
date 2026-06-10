@@ -3,11 +3,11 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Trash2, GripVertical, Link2, Star, MoveUp, MoveDown } from 'lucide-react';
-import HoverImagePreview from './HoverImagePreview';
 import {
   DndContext,
   closestCenter,
@@ -33,7 +33,6 @@ interface Content {
   title: string;
   description?: string;
   summary?: string;
-  image_url?: string;
   content: string;
   source?: string;
   source_url?: string;
@@ -55,6 +54,7 @@ interface SelectedContentsListProps {
   contents: Content[];
   onRemoveContent: (contentId: number) => void;
   onReorderContents: (contents: Content[]) => void;
+  onUpdateContent?: (content: Content) => void;
 }
 
 interface SortableItemProps {
@@ -63,9 +63,10 @@ interface SortableItemProps {
   totalCount: number;
   onRemove: (id: number) => void;
   onMove: (index: number, direction: 'up' | 'down') => void;
+  onUpdate?: (content: Content) => void;
 }
 
-function SortableItem({ content, index, totalCount, onRemove, onMove }: SortableItemProps) {
+function SortableItem({ content, index, totalCount, onRemove, onMove, onUpdate }: SortableItemProps) {
   const {
     attributes,
     listeners,
@@ -133,9 +134,7 @@ function SortableItem({ content, index, totalCount, onRemove, onMove }: Sortable
         </div>
         <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-center gap-2">
-            <HoverImagePreview imageUrl={content.image_url} title={content.title}>
-              <h4 className="text-sm font-medium truncate">{content.title}</h4>
-            </HoverImagePreview>
+            <h4 className="text-sm font-medium truncate">{content.title}</h4>
             {content.source && (
               <Badge variant="outline" className="flex items-center gap-1 text-xs">
                 <Link2 className="h-3 w-3" />
@@ -152,11 +151,24 @@ function SortableItem({ content, index, totalCount, onRemove, onMove }: Sortable
             {content.summary || content.description || '/'}
           </p>
           <div className="flex items-center flex-wrap gap-1">
-            {content.section && (
-              <Badge variant="secondary" className="text-xs">
-                {content.section}
-              </Badge>
-            )}
+            <div className="flex min-w-[9rem] items-center gap-1">
+              <label htmlFor={`section-${content.id}`} className="sr-only">
+                栏目
+              </label>
+              <Input
+                id={`section-${content.id}`}
+                defaultValue={content.section || ''}
+                className="h-8 text-xs"
+                placeholder="栏目"
+                aria-label={`${content.title} 栏目`}
+                onBlur={(event) => {
+                  const section = event.currentTarget.value.trim() || '未分类';
+                  if (section !== (content.section || '未分类')) {
+                    onUpdate?.({ ...content, section });
+                  }
+                }}
+              />
+            </div>
             {content.category && (
               <Badge variant="outline" className="text-xs">
                 {content.category.name}
@@ -172,6 +184,17 @@ function SortableItem({ content, index, totalCount, onRemove, onMove }: Sortable
                 +{content.tags.length - 2}
               </Badge>
             )}
+            <Button
+              type="button"
+              size="sm"
+              variant={content.featured ? 'default' : 'outline'}
+              className="h-8"
+              onClick={() => onUpdate?.({ ...content, featured: !content.featured })}
+              aria-label={`${content.featured ? '取消精选' : '设为精选'} ${content.title}`}
+            >
+              <Star className="mr-1 h-3 w-3" />
+              {content.featured ? '精选' : '设为精选'}
+            </Button>
           </div>
         </div>
         <Button
@@ -226,6 +249,7 @@ const SelectedContentsList: React.FC<SelectedContentsListProps> = ({
   contents,
   onRemoveContent,
   onReorderContents,
+  onUpdateContent,
 }) => {
   const [activeId, setActiveId] = useState<number | null>(null);
 
@@ -294,6 +318,7 @@ const SelectedContentsList: React.FC<SelectedContentsListProps> = ({
                 totalCount={contents.length}
                 onRemove={onRemoveContent}
                 onMove={moveItem}
+                onUpdate={onUpdateContent}
               />
             ))}
           </div>

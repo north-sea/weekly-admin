@@ -1,6 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
 import {
-  AppWindow,
   BarChart3,
   CalendarClock,
   ClipboardList,
@@ -24,51 +23,80 @@ export type NavItem = {
 export const menuConfig: NavItem[] = [
   {
     path: '/dashboard',
-    name: '仪表板',
+    name: '驾驶舱',
     icon: LayoutDashboard,
   },
   {
-    path: '/inbox',
-    name: '收件箱',
-    icon: FileText,
-  },
-  {
-    path: '/content/list',
-    name: '内容库',
-    icon: AppWindow,
-  },
-  {
-    path: '/weekly',
-    name: '周刊管理',
-    icon: CalendarClock,
-  },
-  {
-    path: '/sources',
-    name: '数据源',
+    name: '采集',
     icon: Rss,
+    children: [
+      {
+        path: '/sources',
+        name: '数据源',
+        icon: Rss,
+      },
+      {
+        path: '/rss',
+        name: 'RSS',
+        icon: Rss,
+      },
+    ],
+  },
+  {
+    name: '筛选',
+    icon: FileText,
+    children: [
+      {
+        path: '/inbox',
+        name: '收件箱',
+        icon: FileText,
+      },
+      {
+        path: '/content/list',
+        name: '内容库',
+        icon: FileText,
+      },
+      {
+        path: '/search',
+        name: '搜索',
+        icon: Search,
+      },
+    ],
+  },
+  {
+    name: '组刊',
+    icon: CalendarClock,
+    children: [
+      {
+        path: '/weekly',
+        name: '周刊工作台',
+        icon: CalendarClock,
+      },
+    ],
   },
   {
     path: '/publish',
-    name: 'Newsletter',
+    name: '发布',
     icon: Send,
   },
   {
-    path: '/search',
-    name: '搜索',
-    icon: Search,
-  },
-  {
-    path: '/analytics',
-    name: '内容洞察',
+    name: '复盘',
     icon: BarChart3,
+    children: [
+      {
+        path: '/analytics',
+        name: '内容洞察',
+        icon: BarChart3,
+      },
+      {
+        path: '/operation-logs',
+        name: '操作日志',
+        icon: ClipboardList,
+      },
+    ],
   },
   {
-    path: '/operation-logs',
-    name: '操作日志',
-    icon: ClipboardList,
-  },
-  {
-    name: '系统设置',
+    name: '设置',
     icon: Settings,
     children: [
       {

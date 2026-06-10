@@ -27,7 +27,6 @@ import {
 import { ContentWithRelations } from '@/types/content';
 import StructuredPreview from './StructuredPreview';
 import { debounce } from 'lodash-es';
-import ScreenshotPasteUploader from '@/components/content/ScreenshotPasteUploader';
 import { apiClient } from '@/lib/api-client';
 import { AIScoreDisplay } from '@/components/content/AIScoreDisplay';
 import { AIScoreButton } from '@/components/content/AIScoreButton';
@@ -38,7 +37,6 @@ const contentSchema = z.object({
   title: z.string().min(1, '标题不能为空').max(500, '标题长度不能超过500字符'),
   content: z.string().optional(),
   summary: z.string().max(2000, '摘要长度不能超过2000字符').optional(),
-  image_url: z.string().url('主图必须是有效的URL').optional().or(z.literal('')),
   content_type_id: z.number(),
   category_id: z.number().optional().nullable(),
   tag_ids: z.array(z.number()).optional(),
@@ -46,7 +44,6 @@ const contentSchema = z.object({
   featured: z.boolean().optional(),
   // Blog专用字段
   description: z.string().max(1000, '描述长度不能超过1000字符').optional(),
-  cover_image: z.string().url('请输入有效的URL').optional().or(z.literal('')),
   meta_title: z.string().max(500, 'SEO标题长度不能超过500字符').optional(),
   meta_description: z.string().max(1000, 'SEO描述长度不能超过1000字符').optional(),
   // Weekly专用字段
@@ -118,14 +115,12 @@ export default function SimplifiedEditor({
       title: initialValues?.title || '',
       content: initialValues?.content || '',
       summary: initialValues?.summary || '',
-      image_url: initialValues?.image_url || '',
       content_type_id: initialValues?.content_type?.id || 4,
       category_id: initialValues?.category?.id || null,
       tag_ids: initialValues?.tags?.map(tag => tag.id) || [],
       status: (initialValues?.status as any) || 'draft',
       featured: initialValues?.featured || false,
       description: initialValues?.description || '',
-      cover_image: initialValues?.cover_image || '',
       meta_title: initialValues?.meta_title || '',
       meta_description: initialValues?.meta_description || '',
       source: initialValues?.source || '',
@@ -139,7 +134,6 @@ export default function SimplifiedEditor({
   const currentContent = watch('content') ?? initialValues?.content ?? '';
   const currentTitle = watch('title');
   const currentSummary = watch('summary');
-  const currentImage = watch('image_url');
   const currentSource = watch('source');
   const currentSourceUrl = watch('source_url');
   const currentRecommendation = watch('recommendation_reason');
@@ -246,9 +240,6 @@ export default function SimplifiedEditor({
   const applyResyncResultToForm = useCallback((job: ResyncJobState) => {
     if (job.appliedSummary !== undefined) {
       setValue('summary', job.appliedSummary || '');
-    }
-    if (job.appliedImage !== undefined && job.appliedImage !== null) {
-      setValue('image_url', job.appliedImage);
     }
   }, [setValue]);
 
@@ -847,32 +838,6 @@ export default function SimplifiedEditor({
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="image_url">主图</Label>
-                    <Controller
-                      name="image_url"
-                      control={control}
-                      render={({ field }) => (
-                        <div className="space-y-3">
-                          <Input
-                            {...field}
-                            id="image_url"
-                            placeholder="https://example.com/cover.jpg"
-                          />
-                          <ScreenshotPasteUploader
-                            value={field.value}
-                            onChange={(url) => field.onChange(url)}
-                            label="主图上传"
-                            helperText="粘贴截图或上传图片，裁剪/旋转后自动回填链接"
-                          />
-                        </div>
-                      )}
-                    />
-                    {errors.image_url && (
-                      <p className="text-sm text-destructive">{errors.image_url.message}</p>
-                    )}
-                  </div>
-
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="source">来源名称 *</Label>
@@ -918,7 +883,7 @@ export default function SimplifiedEditor({
               <Card className="shadow-sm">
                 <CardHeader>
                   <CardTitle>Blog 专用设置</CardTitle>
-                  <CardDescription>SEO 和封面图设置</CardDescription>
+                  <CardDescription>SEO 设置</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
@@ -939,26 +904,6 @@ export default function SimplifiedEditor({
                       <p className="text-sm text-destructive">{errors.description.message}</p>
                     )}
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="cover_image">封面图片</Label>
-                    <Controller
-                      name="cover_image"
-                      control={control}
-                      render={({ field }) => (
-                        <Input
-                          {...field}
-                          id="cover_image"
-                          placeholder="https://example.com/image.jpg"
-                        />
-                      )}
-                    />
-                    {errors.cover_image && (
-                      <p className="text-sm text-destructive">{errors.cover_image.message}</p>
-                    )}
-                  </div>
-
-                  <Separator />
 
                   <div className="space-y-2">
                     <Label htmlFor="meta_title">SEO 标题</Label>
@@ -1154,7 +1099,6 @@ export default function SimplifiedEditor({
                     data={{
                       title: currentTitle || '未命名',
                       url: currentSourceUrl || undefined,
-                      image_url: currentImage || undefined,
                       summary: currentSummary || currentContent,
                       description: currentRecommendation,
                       source: currentSource || '未知来源',

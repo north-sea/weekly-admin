@@ -11,11 +11,14 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { useRouter, useParams } from 'next/navigation';
-import { Save, Eye, Send, Loader2, ArrowLeft, Sparkles, Wand2, Check, X, Copy, Upload } from 'lucide-react';
+import { Save, Eye, Send, Loader2, ArrowLeft, Sparkles } from 'lucide-react';
 import dayjs from 'dayjs';
+import { AutomationRunTimeline } from '@/components/weekly/AutomationRunTimeline';
+import { PublishChecklist } from '@/components/weekly/PublishChecklist';
+import { SuggestionPanel } from '@/components/weekly/SuggestionPanel';
 import WeeklyEditor, { WeeklyEditorContent } from '@/components/weekly/WeeklyEditor';
-import { callImageModel, callTextModel } from '@/lib/ai/client';
-import { ImageUploadService } from '@/lib/services/image-upload';
+import { WeeklyWorkbench } from '@/components/weekly/WeeklyWorkbench';
+import { callTextModel } from '@/lib/ai/client';
 import isoWeek from 'dayjs/plugin/isoWeek';
 dayjs.extend(isoWeek);
 
@@ -32,6 +35,10 @@ interface WeeklyIssue {
   contents?: unknown[];
   created_at: string;
   updated_at: string;
+  quail_post_slug?: string | null;
+  quail_published_at?: string | null;
+  quail_delivered_at?: string | null;
+  quail_publish_error?: string | null;
 }
 
 const WeeklyEditorPage: React.FC = () => {
@@ -44,17 +51,12 @@ const WeeklyEditorPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [generatingDesc, setGeneratingDesc] = useState(false);
-  const [generatingCover, setGeneratingCover] = useState(false);
-  // 封面预览状态
-  const [previewCover, setPreviewCover] = useState<{ url: string; file: File } | null>(null);
-  const [uploadingCover, setUploadingCover] = useState(false);
   const [issue, setIssue] = useState<WeeklyIssue | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // 表单字段
   const [title, setTitle] = useState('');
   const [desc, setDesc] = useState('');
-  const [cover, setCover] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [weekYear, setWeekYear] = useState(dayjs().isoWeekYear());
@@ -64,6 +66,8 @@ const WeeklyEditorPage: React.FC = () => {
   const [status, setStatus] = useState<'draft' | 'published' | 'archived'>('draft');
   const [selectedContents, setSelectedContents] = useState<WeeklyEditorContent[]>([]);
   const [contentsLoaded, setContentsLoaded] = useState(false);
+  const [workbenchRefreshKey, setWorkbenchRefreshKey] = useState(0);
+  const [editorRefreshKey, setEditorRefreshKey] = useState(0);
   const focusRingClass = 'focus-visible:ring-1 focus-visible:ring-offset-1 focus:ring-1 focus:ring-offset-1';
 
   const normalizeDateInput = (dateString: string) => {
@@ -163,7 +167,6 @@ const WeeklyEditorPage: React.FC = () => {
       setTitle(result.data.title);
       setTitleTouched(true);
       setDesc(result.data.desc || '');
-      setCover(result.data.cover || '');
       setWeekYear(year);
       setWeekNumber(week);
       setStartDate(range.start);
@@ -221,7 +224,6 @@ const WeeklyEditorPage: React.FC = () => {
             issue_number: nextNumber,
             title: '',
             desc: '',
-            cover: '',
             status: 'draft',
             start_date: start,
             end_date: end,
@@ -246,7 +248,6 @@ const WeeklyEditorPage: React.FC = () => {
             issue_number: fallbackNumber,
             title: '',
             desc: '',
-            cover: '',
             status: 'draft',
             start_date: start,
             end_date: end,
@@ -309,11 +310,9 @@ const WeeklyEditorPage: React.FC = () => {
     try {
       const inferredIssueNumber = nextIssueNumber || issue?.issue_number || 0;
       const descValue = desc.trim();
-      const coverValue = cover.trim();
       const data = {
         title: title.trim() || `我不知道的周刊第 ${inferredIssueNumber} 期`,
         desc: descValue || undefined,
-        cover: coverValue || undefined,
         start_date: startDate,
         end_date: endDate,
         status,
@@ -406,6 +405,17 @@ const WeeklyEditorPage: React.FC = () => {
     }
   };
 
+  const handleSuggestionApplied = useCallback(() => {
+    setWorkbenchRefreshKey((key) => key + 1);
+    setEditorRefreshKey((key) => key + 1);
+    if (!isNew) void fetchIssue();
+  }, [fetchIssue, isNew]);
+
+  const handlePublished = useCallback(() => {
+    setWorkbenchRefreshKey((key) => key + 1);
+    if (!isNew) void fetchIssue();
+  }, [fetchIssue, isNew]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -437,11 +447,18 @@ const WeeklyEditorPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <WeeklyWorkbench
+      issueId={isNew ? null : issue.id}
+      refreshKey={workbenchRefreshKey}
+      onRefreshIssue={() => {
+        if (!isNew) void fetchIssue();
+      }}
+    >
+      <div className="space-y-6">
       <Card className="shadow-sm">
         <CardHeader>
-            <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
               <Button
                 type="button"
                 variant="ghost"
@@ -452,8 +469,8 @@ const WeeklyEditorPage: React.FC = () => {
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              <div>
-                <CardTitle className="text-2xl">
+              <div className="min-w-0">
+                <CardTitle className="text-xl sm:text-2xl">
                   {isNew ? '创建周刊' : `编辑第 ${issue.issue_number} 期周刊`}
                 </CardTitle>
                 {!isNew && (
@@ -463,7 +480,7 @@ const WeeklyEditorPage: React.FC = () => {
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {!isNew && (
                 <Badge variant={status === 'published' ? 'default' : 'secondary'}>
                   {status === 'published' ? '已发布' : status === 'draft' ? '草稿' : '已归档'}
@@ -576,7 +593,7 @@ const WeeklyEditorPage: React.FC = () => {
           {(!isNew && selectedContents.length > 0) && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="description">周刊描述（desc，用于封面）</Label>
+                <Label htmlFor="description">周刊描述</Label>
                 <Button
                   type="button"
                   variant="ghost"
@@ -653,176 +670,6 @@ const WeeklyEditorPage: React.FC = () => {
             </div>
           )}
 
-          {(!isNew && selectedContents.length > 0) && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="cover">封面图</Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8"
-                    disabled={!title.trim() || selectedContents.length === 0}
-                    onClick={() => {
-                      const topics = buildContentsSummary();
-                      const prompt = `Generate a cover image for a tech weekly newsletter.\n\nTitle: "${title.trim()}"\nTopics: ${topics}\n\nRequirements:\n- Size: 1200x400 pixels (3:1 ratio, wide banner style)\n- Style: modern, clean, dark gradient background\n- Include subtle tech elements and professional typography\n- The title should be prominently displayed`;
-                      navigator.clipboard.writeText(prompt);
-                      toast({ title: '已复制 Prompt', description: '可粘贴到 AI 绘图工具中生成封面' });
-                    }}
-                  >
-                    <Copy className="h-4 w-4 mr-1" /> 复制 Prompt
-                  </Button>
-                </div>
-                {/* 预览区域 */}
-                {previewCover && (
-                  <div className="space-y-2">
-                    <div className="overflow-hidden rounded border">
-                      <img
-                        src={previewCover.url}
-                        alt="封面预览"
-                        className="w-full object-contain"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        disabled={uploadingCover}
-                        onClick={async () => {
-                          setUploadingCover(true);
-                          try {
-                            const uploaded = await ImageUploadService.uploadImage({ file: previewCover.file });
-                            if (!uploaded?.success || !uploaded.data?.url) {
-                              throw new Error(uploaded?.message || '上传失败');
-                            }
-                            setCover(uploaded.data.url);
-                            if (previewCover.url.startsWith('blob:')) {
-                              URL.revokeObjectURL(previewCover.url);
-                            }
-                            setPreviewCover(null);
-                            toast({ title: '封面已上传', description: '已设置为周刊封面' });
-                          } catch (err: any) {
-                            toast({
-                              title: '上传失败',
-                              description: err?.message || '请稍后重试',
-                              variant: 'destructive',
-                            });
-                          } finally {
-                            setUploadingCover(false);
-                          }
-                        }}
-                      >
-                        {uploadingCover ? (
-                          <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> 上传中</>
-                        ) : (
-                          <><Check className="h-4 w-4 mr-1" /> 上传并使用</>
-                        )}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          if (previewCover.url.startsWith('blob:')) {
-                            URL.revokeObjectURL(previewCover.url);
-                          }
-                          setPreviewCover(null);
-                        }}
-                      >
-                        <X className="h-4 w-4 mr-1" /> 取消
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                {/* 上传/粘贴区域 */}
-                {!previewCover && (
-                  <button
-                    type="button"
-                    className="ui-focus-ring w-full border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                    onPaste={async (e) => {
-                      const items = e.clipboardData?.items;
-                      if (!items) return;
-                      for (const item of items) {
-                        if (item.type.startsWith('image/')) {
-                          const file = item.getAsFile();
-                          if (file) {
-                            const previewUrl = URL.createObjectURL(file);
-                            setPreviewCover({ url: previewUrl, file });
-                            toast({ title: '图片已粘贴', description: '确认后点击"上传并使用"' });
-                          }
-                          break;
-                        }
-                      }
-                    }}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={async (e) => {
-                      e.preventDefault();
-                      const file = e.dataTransfer?.files?.[0];
-                      if (file && file.type.startsWith('image/')) {
-                        const previewUrl = URL.createObjectURL(file);
-                        setPreviewCover({ url: previewUrl, file });
-                        toast({ title: '图片已添加', description: '确认后点击"上传并使用"' });
-                      }
-                    }}
-                    onClick={() => {
-                      const input = document.createElement('input');
-                      input.type = 'file';
-                      input.accept = 'image/*';
-                      input.onchange = (e) => {
-                        const file = (e.target as HTMLInputElement).files?.[0];
-                        if (file) {
-                          const previewUrl = URL.createObjectURL(file);
-                          setPreviewCover({ url: previewUrl, file });
-                        }
-                      };
-                      input.click();
-                    }}
-                    aria-label="上传封面图片"
-                    title="上传封面图片"
-                  >
-                    <Upload className="h-8 w-8 mx-auto text-slate-400 mb-2" />
-                    <p className="text-sm text-slate-600">点击上传、拖拽或粘贴图片</p>
-                    <p className="text-xs text-muted-foreground mt-1">支持 PNG、JPG、WebP 格式</p>
-                  </button>
-                )}
-                {/* 已上传的封面 */}
-                {cover && !previewCover && (
-                  <div className="relative group">
-                    <img
-                      src={cover}
-                      alt="当前封面"
-                      className="w-full object-contain rounded border"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => setCover('')}
-                      aria-label="删除封面"
-                      title="删除封面"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-                {/* URL 输入（备用） */}
-                <Input
-                  id="cover"
-                  placeholder="或直接输入图片 URL"
-                  value={cover}
-                  className={focusRingClass}
-                  onChange={(e) => setCover(e.target.value)}
-                />
-              </div>
-            </div>
-          )}
-
           <div className="space-y-2">
             <Label htmlFor="status">状态</Label>
             <Select value={status} onValueChange={(value: 'draft' | 'published' | 'archived') => setStatus(value)}>
@@ -840,6 +687,13 @@ const WeeklyEditorPage: React.FC = () => {
           {!isNew && (
             <>
               <Separator className="my-6" />
+              <SuggestionPanel issueId={issue.id} onApplied={handleSuggestionApplied} />
+              <PublishChecklist
+                issue={issue}
+                selectedCount={selectedContents.length}
+                onPublished={handlePublished}
+              />
+              <AutomationRunTimeline issueId={issue.id} refreshKey={workbenchRefreshKey} />
               <div className="space-y-2">
                 <h3 className="text-lg font-semibold">内容管理</h3>
                 <p className="text-sm text-muted-foreground">
@@ -848,6 +702,7 @@ const WeeklyEditorPage: React.FC = () => {
               </div>
               <WeeklyEditor
                 issueId={issue.id}
+                refreshKey={editorRefreshKey}
                 onContentsChange={(contents) => {
                   setSelectedContents(contents);
                   setContentsLoaded(true);
@@ -872,7 +727,8 @@ const WeeklyEditorPage: React.FC = () => {
           )}
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </WeeklyWorkbench>
   );
 };
 

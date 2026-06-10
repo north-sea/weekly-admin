@@ -32,33 +32,19 @@ export async function GET(request: NextRequest) {
       process.env.OPENAI_MODEL ??
       (provider === 'anthropic' ? process.env.ANTHROPIC_MODEL ?? 'claude-3-5-sonnet-latest' : 'gpt-4o-mini');
 
-    const imageModel =
-      (dbConfig?.enabled ? dbConfig.imageModel : null) ??
-      process.env.AI_IMAGE_MODEL ??
-      process.env.AI_TEXT_MODEL ??
-      'gpt-image-1';
-
     const weeklyDescPromptRecord = await AiPromptService.getByScene('weekly_desc');
-    const weeklyCoverPromptRecord = await AiPromptService.getByScene('weekly_cover');
 
     const weeklyDescPrompt =
       weeklyDescPromptRecord.is_default && process.env.AI_WEEKLY_DESC_PROMPT
         ? process.env.AI_WEEKLY_DESC_PROMPT
         : weeklyDescPromptRecord.prompt;
 
-    const weeklyCoverPrompt =
-      weeklyCoverPromptRecord.is_default && process.env.AI_WEEKLY_COVER_PROMPT
-        ? process.env.AI_WEEKLY_COVER_PROMPT
-        : weeklyCoverPromptRecord.prompt;
-
     return createNextSuccessResponse({
       provider,
       baseUrl,
       textModel,
-      imageModel,
       hasKey: Boolean(dbConfig?.enabled ? dbConfig.apiKey : process.env.AI_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY),
       weeklyDescPrompt,
-      weeklyCoverPrompt,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '获取 AI 配置失败';

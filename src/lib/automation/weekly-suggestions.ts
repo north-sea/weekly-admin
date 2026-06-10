@@ -13,13 +13,20 @@ export const SuggestionApplyItemSchema = z.object({
 export const SuggestionApplySchema = z.object({
   weeklyIssueId: z.number().int().positive(),
   replaceExisting: z.boolean().optional().default(false),
+  sourceRunId: z.string().min(1).max(160).optional(),
+  agentRunId: z.string().min(1).max(160).optional(),
   items: z.array(SuggestionApplyItemSchema).min(1).max(30),
 });
 
 export type SuggestionApplyInput = z.infer<typeof SuggestionApplySchema>;
 
-export async function applyWeeklySuggestion(input: SuggestionApplyInput) {
-  const parsed = SuggestionApplySchema.parse(input);
+type SuggestionValidationInput = Pick<SuggestionApplyInput, 'weeklyIssueId' | 'items'>;
+
+export async function validateWeeklySuggestionItems(input: SuggestionValidationInput) {
+  const parsed = z.object({
+    weeklyIssueId: z.number().int().positive(),
+    items: z.array(SuggestionApplyItemSchema).min(1).max(30),
+  }).parse(input);
   const contentIds = parsed.items.map((item) => BigInt(item.content_id));
   const uniqueContentIds = new Set(parsed.items.map((item) => item.content_id));
 
@@ -69,6 +76,18 @@ export async function applyWeeklySuggestion(input: SuggestionApplyInput) {
     });
   }
 
+  return {
+    issue,
+    contents,
+  };
+}
+
+export async function applyWeeklySuggestion(input: SuggestionApplyInput) {
+  const parsed = SuggestionApplySchema.parse(input);
+  const { issue, contents } = await validateWeeklySuggestionItems({
+    weeklyIssueId: parsed.weeklyIssueId,
+    items: parsed.items,
+  });
   const existingInIssue = contents.filter((content) =>
     content.weekly_content_items.some((item) => item.weekly_issue_id === parsed.weeklyIssueId)
   );
@@ -76,9 +95,12 @@ export async function applyWeeklySuggestion(input: SuggestionApplyInput) {
     return {
       status: 'skipped' as const,
       weeklyIssueId: parsed.weeklyIssueId,
+      sourceRunId: parsed.sourceRunId ?? null,
+      agentRunId: parsed.agentRunId ?? null,
       issue,
       linkedCount: 0,
       skippedCount: existingInIssue.length,
+      replacedCount: 0,
       linkedContents: [],
       skippedContents: existingInIssue.map((content) => ({
         id: Number(content.id),
@@ -137,9 +159,12 @@ export async function applyWeeklySuggestion(input: SuggestionApplyInput) {
   return {
     status: 'applied' as const,
     weeklyIssueId: parsed.weeklyIssueId,
+    sourceRunId: parsed.sourceRunId ?? null,
+    agentRunId: parsed.agentRunId ?? null,
     issue,
     linkedCount: parsed.items.length,
     skippedCount: 0,
+    replacedCount: parsed.replaceExisting ? existingInIssue.length : 0,
     linkedContents: parsed.items.map((item) => ({
       id: item.content_id,
       title: byId.get(item.content_id)?.title ?? `内容 #${item.content_id}`,

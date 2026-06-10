@@ -12,7 +12,6 @@ export interface WeeklyContentItem {
   title: string;
   description?: string;
   summary?: string;
-  image_url?: string;
   content: string;
   source?: string;
   source_url?: string;
@@ -38,7 +37,6 @@ export interface WeeklyIssueDetail {
   title: string;
   description?: string;
   desc?: string;
-  cover?: string;
   status: 'draft' | 'published' | 'archived';
   start_date: string;
   end_date: string;
@@ -89,15 +87,6 @@ const getStructuredText = (structured?: StructuredContent | null) => {
   return parts.join(' ').replace(/\s+/g, ' ').trim();
 };
 
-const findCoverImage = (content: WeeklyContentItem, structured?: StructuredContent | null) => {
-  if (content.image_url) return content.image_url;
-  if (!structured) return null;
-  const imageSection = structured.sections.find(
-    (section) => section.type === 'image' && section.imageUrl
-  );
-  return imageSection?.imageUrl || null;
-};
-
 const buildSummary = (content: WeeklyContentItem, structured?: StructuredContent | null) => {
   if (content.summary) return content.summary;
   if (content.description) return content.description;
@@ -131,24 +120,10 @@ const WeeklyContentCard: React.FC<{
   content: WeeklyContentWithStructured;
   index: number;
 }> = ({ content, index }) => {
-  const cover = findCoverImage(content, content.structured);
   const summary = buildSummary(content, content.structured);
 
   return (
     <article className="group mb-6 break-inside-avoid overflow-hidden rounded-xl border bg-card shadow-sm ring-1 ring-border/50 transition hover:-translate-y-0.5 hover:shadow-md">
-      {cover && (
-        <div className="overflow-hidden bg-muted px-4 pt-4">
-          <img
-            src={cover}
-            alt={content.title}
-            className="w-full rounded-lg object-contain transition duration-300 group-hover:scale-[1.01]"
-            style={{ maxHeight: 320 }}
-            loading="lazy"
-            decoding="async"
-          />
-        </div>
-      )}
-
       <div className="space-y-3 px-4 pb-4">
         <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
           <div className="flex flex-wrap items-center gap-2">
@@ -282,13 +257,6 @@ export const WeeklyIssueLayout: React.FC<WeeklyIssueLayoutProps> = ({ issue, foo
     <div className="space-y-8">
       <section className="space-y-4">
         <article className="overflow-hidden rounded-2xl border bg-card shadow-sm ring-1 ring-border/50">
-          {issue.cover && (
-            <img
-              src={issue.cover}
-              alt={issue.title}
-              className="h-48 w-full object-cover md:h-56"
-            />
-          )}
           <div className="space-y-4 px-6 py-6 md:px-8">
             <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
               <span className="h-2 w-2 rounded-full bg-amber-500" />

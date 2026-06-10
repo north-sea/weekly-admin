@@ -417,8 +417,7 @@ export class ContentService {
   
   // 创建内容
   static async createContent(data: ContentInput, userId: number, request?: NextRequest): Promise<ContentWithRelations> {
-    const { tag_ids, cover_image, recommendation_reason, content_type_id, content: rawContent, ...contentData } = data as ContentInput & {
-      cover_image?: string;
+    const { tag_ids, recommendation_reason, content_type_id, content: rawContent, ...contentData } = data as ContentInput & {
       recommendation_reason?: string;
     };
     const source = 'source' in data ? data.source : undefined;
@@ -453,7 +452,6 @@ export class ContentService {
     // 处理特殊属性（Blog和Weekly的专用字段）
     await this.handleContentAttributes(content.id, {
       content_type_id,
-      cover_image: cover_image ?? undefined,
       recommendation_reason: recommendation_reason ?? undefined
     });
     
@@ -509,8 +507,7 @@ export class ContentService {
   
   // 更新内容
   static async updateContent(data: ContentUpdate, userId: number, request?: NextRequest): Promise<ContentWithRelations> {
-    const { id, tag_ids, cover_image, recommendation_reason, content_type_id, content: rawContent, ...updateData } = data as ContentUpdate & {
-      cover_image?: string;
+    const { id, tag_ids, recommendation_reason, content_type_id, content: rawContent, ...updateData } = data as ContentUpdate & {
       recommendation_reason?: string;
     };
     const contentId = BigInt(id);
@@ -555,11 +552,10 @@ export class ContentService {
     }
     
     // 更新特殊属性
-    const shouldUpdateAttributes = content_type_id !== undefined || cover_image !== undefined || recommendation_reason !== undefined;
+    const shouldUpdateAttributes = content_type_id !== undefined || recommendation_reason !== undefined;
     if (shouldUpdateAttributes) {
       await this.handleContentAttributes(contentId, {
         content_type_id: content_type_id ?? oldContent.content_type_id,
-        cover_image: cover_image ?? undefined,
         recommendation_reason: recommendation_reason ?? undefined
       });
     }
@@ -743,17 +739,12 @@ export class ContentService {
   // 处理内容属性（Blog和Weekly的专用字段）
   private static async handleContentAttributes(contentId: bigint, data: {
     content_type_id?: number;
-    cover_image?: string;
     recommendation_reason?: string;
     [key: string]: unknown;
   }): Promise<void> {
     const attributes: Array<{ name: string; value: string; type: string }> = [];
     
-    if (data.content_type_id === 4) { // Blog
-      if (data.cover_image) {
-        attributes.push({ name: 'cover_image', value: data.cover_image, type: 'string' });
-      }
-    } else if (data.content_type_id === 3) { // Weekly
+    if (data.content_type_id === 3) { // Weekly
       if (data.recommendation_reason) {
         attributes.push({ name: 'recommendation_reason', value: data.recommendation_reason, type: 'string' });
       }

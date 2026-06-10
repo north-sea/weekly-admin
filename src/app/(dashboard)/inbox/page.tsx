@@ -11,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/components/ui/use-toast';
-import { Camera, CheckCircle, ChevronDown, ChevronRight, Crop, ExternalLink, ImageOff, Loader2, RefreshCw, Sparkles, ThumbsUp, Wand2, XCircle } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink, Loader2, RefreshCw, Sparkles, ThumbsUp, Wand2, XCircle } from 'lucide-react';
 import {
   useInboxBatch,
   useInboxBatchPromote,
@@ -23,7 +23,6 @@ import {
   type InboxListParams,
   type InboxStatus,
 } from '@/hooks/queries/useInboxQueries';
-import { ImageCropper, type CropResult } from '@/components/inbox/image-cropper';
 
 function hostnameFromUrl(url: string) {
   try {
@@ -49,15 +48,6 @@ function getAiSuggestion(score: number | null | undefined): { text: string; colo
   return { text: '低质量', color: 'text-red-500' };
 }
 
-// 图片状态图标
-type ImageStatus = 'ok' | 'needs_crop' | 'missing' | null | undefined;
-function getImageStatusIcon(status: ImageStatus) {
-  if (status === 'ok') return { icon: CheckCircle, color: 'text-green-500', title: '图片OK' };
-  if (status === 'needs_crop') return { icon: Crop, color: 'text-yellow-500', title: '待裁剪' };
-  if (status === 'missing') return { icon: ImageOff, color: 'text-red-500', title: '无图片' };
-  return { icon: Camera, color: 'text-muted-foreground', title: '未检测' };
-}
-
 // 默认智能选中阈值
 const SMART_SELECT_THRESHOLD = 70;
 
@@ -77,9 +67,6 @@ export default function InboxPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [hasAutoSelected, setHasAutoSelected] = useState(false);
-  const [cropDialogOpen, setCropDialogOpen] = useState(false);
-  const [cropItem, setCropItem] = useState<InboxItem | null>(null);
-  const [isCropping, setIsCropping] = useState(false);
 
   const { data: stats } = useInboxStats();
   const { data: list, isLoading, isFetched } = useInboxList({ ...filters, keyword: filters.keyword, ai_score_min: minScore });
@@ -198,38 +185,6 @@ export default function InboxPage() {
       });
     } catch (error) {
       toast({ title: 'AI 评分失败', description: error instanceof Error ? error.message : String(error), variant: 'destructive' });
-    }
-  }
-
-  function openCropDialog(item: InboxItem) {
-    if (!item.image_url) {
-      toast({ title: '该条目没有图片', variant: 'destructive' });
-      return;
-    }
-    setCropItem(item);
-    setCropDialogOpen(true);
-  }
-
-  async function handleCropComplete(result: CropResult) {
-    if (!cropItem) return;
-    setIsCropping(true);
-    try {
-      const response = await fetch(`/api/inbox/${cropItem.id}/crop-image`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(result),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || '裁剪失败');
-      }
-      toast({ title: '图片裁剪成功', variant: 'success' });
-      setCropDialogOpen(false);
-      setCropItem(null);
-    } catch (error) {
-      toast({ title: '裁剪失败', description: error instanceof Error ? error.message : String(error), variant: 'destructive' });
-    } finally {
-      setIsCropping(false);
     }
   }
 
@@ -445,21 +400,20 @@ export default function InboxPage() {
                   <TableHead>来源</TableHead>
                   <TableHead>时间</TableHead>
                   <TableHead>评分</TableHead>
-                  <TableHead className="w-[60px]">图片</TableHead>
-                  <TableHead>状态</TableHead>
+                    <TableHead>状态</TableHead>
                   <TableHead className="text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="py-12 text-center text-muted-foreground">
+                    <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
                       <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                     </TableCell>
                   </TableRow>
                 ) : rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="py-12 text-center text-muted-foreground">
+                    <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
                       暂无数据
                     </TableCell>
                   </TableRow>
@@ -470,8 +424,6 @@ export default function InboxPage() {
                     const isExpanded = expandedRows.has(item.id);
                     const aiSuggestion = getAiSuggestion(item.ai_score);
                     const tagsSuggestion = Array.isArray(item.tags_suggestion) ? item.tags_suggestion : [];
-                    const imageStatusInfo = getImageStatusIcon(item.image_status as ImageStatus);
-                    const ImageStatusIcon = imageStatusInfo.icon;
                     const detailsId = `inbox-details-${item.id}`;
 
                     return (
@@ -525,22 +477,6 @@ export default function InboxPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-1" title={imageStatusInfo.title}>
-                              <ImageStatusIcon className={`h-4 w-4 ${imageStatusInfo.color}`} />
-                              {item.image_status === 'needs_crop' && item.image_url && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6"
-                                  onClick={() => openCropDialog(item)}
-                                  title="裁剪图片"
-                                >
-                                  <Crop className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
                             <Badge variant={label.variant}>{label.label}</Badge>
                           </TableCell>
                           <TableCell className="text-right">
@@ -555,21 +491,8 @@ export default function InboxPage() {
                         </TableRow>
                         {isExpanded ? (
                           <TableRow id={detailsId} className="bg-muted/30 hover:bg-muted/30">
-                            <TableCell colSpan={9} className="p-4">
+                            <TableCell colSpan={8} className="p-4">
                               <div className="space-y-3">
-                                {item.image_url ? (
-                                  <div className="flex items-center gap-3">
-                                    <a href={item.image_url} target="_blank" rel="noreferrer">
-                                      <img
-                                        src={item.image_url}
-                                        alt={item.title ?? '收件箱图片'}
-                                        className="h-20 w-28 rounded border object-cover"
-                                        loading="lazy"
-                                      />
-                                    </a>
-                                    <span className="text-xs text-muted-foreground">点击查看原图</span>
-                                  </div>
-                                ) : null}
                                 {/* AI 建议 */}
                                 {aiSuggestion && (
                                   <div className="flex items-center gap-2">
@@ -660,19 +583,6 @@ export default function InboxPage() {
         </CardContent>
       </Card>
 
-      {/* 图片裁剪对话框 */}
-      {cropItem && cropItem.image_url && (
-        <ImageCropper
-          imageUrl={cropItem.image_url}
-          open={cropDialogOpen}
-          onOpenChange={(open) => {
-            setCropDialogOpen(open);
-            if (!open) setCropItem(null);
-          }}
-          onCropComplete={handleCropComplete}
-          isLoading={isCropping}
-        />
-      )}
     </div>
   );
 }

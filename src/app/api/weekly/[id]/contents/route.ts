@@ -63,7 +63,7 @@ export async function PUT(
         id: { in: contentIds },
         content_type_id: 3, // Weekly 类型
         status: {
-          in: ['draft', 'published'],
+          in: ['draft', 'ready', 'published'],
         },
       },
     });
