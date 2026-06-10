@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { authenticateRequest } from '@/lib/auth';
 import { createNextErrorResponse, createNextSuccessResponse } from '@/lib/utils/serialization';
 import { InboxScoringService } from '@/lib/services/inbox-scoring';
+import { markLegacyAutomationResponse } from '@/lib/automation/legacy-routes';
 import { z } from 'zod';
 
 const BatchScoreSchema = z.object({
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
     const { limit = 50, delay = 500 } = BatchScoreSchema.parse(body);
 
     const result = await InboxScoringService.runBatch({ limit, delayMs: delay, source: 'api' });
-    return createNextSuccessResponse(result);
+    return markLegacyAutomationResponse(createNextSuccessResponse(result));
   } catch (error) {
     console.error('批量评分失败:', error);
     if (error instanceof Error && error.name === 'ZodError') {

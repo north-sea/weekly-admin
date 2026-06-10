@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { prisma } from '@/lib/db';
 import client from '@/lib/search';
+import { getJobWorkerHealth } from '@/lib/jobs/health';
 import { GET } from './route';
 
 vi.mock('@/lib/db', () => ({
@@ -44,11 +45,34 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
+vi.mock('@/lib/jobs/health', () => ({
+  getJobWorkerHealth: vi.fn(),
+}));
+
 describe('/api/health route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(prisma.$queryRaw).mockResolvedValue([{ test: 1 }]);
     vi.mocked(client.health).mockResolvedValue({ status: 'available' } as any);
+    vi.mocked(getJobWorkerHealth).mockResolvedValue({
+      status: 'healthy',
+      reason: null,
+      queue: {
+        waiting: 0,
+        delayed: 0,
+        active: 0,
+        failed: 0,
+        oldestQueuedAgeMs: null,
+      },
+      workers: {
+        count: 1,
+        stale: 0,
+        heartbeats: [],
+      },
+      redis: {
+        available: true,
+      },
+    });
   });
 
   it('returns degraded HTTP 200 when only Meilisearch is down', async () => {
@@ -80,6 +104,39 @@ describe('/api/health route', () => {
     expect(response.status).toBe(200);
     expect(body.overall).toBe('healthy');
     expect(body.services.search.status).toBe('healthy');
+    expect(body.services.jobQueue.status).toBe('healthy');
+  });
+
+  it('returns degraded HTTP 200 when job queue worker health is degraded', async () => {
+    vi.mocked(getJobWorkerHealth).mockResolvedValue({
+      status: 'degraded',
+      reason: 'No worker heartbeat found',
+      queue: {
+        waiting: 1,
+        delayed: 0,
+        active: 0,
+        failed: 0,
+        oldestQueuedAgeMs: 30_000,
+      },
+      workers: {
+        count: 0,
+        stale: 0,
+        heartbeats: [],
+      },
+      redis: {
+        available: true,
+      },
+    });
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.overall).toBe('degraded');
+    expect(body.services.jobQueue).toMatchObject({
+      status: 'degraded',
+      message: 'No worker heartbeat found',
+    });
+    expect(body.jobQueue.queue.waiting).toBe(1);
   });
 });
-

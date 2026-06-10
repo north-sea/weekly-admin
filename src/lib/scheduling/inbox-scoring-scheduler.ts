@@ -1,5 +1,7 @@
 import { Cron } from 'croner';
-import { InboxScoringService } from '@/lib/services/inbox-scoring';
+
+import { authenticateAutomationTokenValue, type AutomationCaller } from '@/lib/automation/auth';
+import { submitAutomationJob, type QueuedAutomationJob } from '@/lib/jobs/submit';
 import { AiSettingsService } from '@/lib/services/ai-settings';
 
 const SCHEDULER_KEY = '__inboxScoringSchedulerStarted';
@@ -9,11 +11,65 @@ declare global {
   var __inboxScoringSchedulerStarted: boolean | undefined;
 }
 
+type SchedulerLogger = Pick<typeof console, 'error' | 'info' | 'log' | 'warn'>;
+
+export type InboxScoringSchedulerResult =
+  | { queued: true; job: QueuedAutomationJob }
+  | { queued: false; reason: 'disabled' | 'token_missing' };
+
+type SchedulerDeps = {
+  isEnabled?: () => Promise<boolean>;
+  getToken?: () => string | null;
+  authenticateToken?: typeof authenticateAutomationTokenValue;
+  submitJob?: typeof submitAutomationJob;
+  now?: () => Date;
+  logger?: SchedulerLogger;
+};
+
 async function isEnabled(): Promise<boolean> {
   const record = await AiSettingsService.get('inbox_scoring_enabled');
   if (!record) return true;
   const val = record.value as { value?: boolean };
   return val?.value ?? true;
+}
+
+function getCronAutomationToken(): string | null {
+  const token = process.env.CRON_API_TOKEN?.trim();
+  return token || null;
+}
+
+function buildSchedulerIdempotencyKey(now: Date): string {
+  return `cron:inbox-scoring:${now.toISOString().slice(0, 13)}`;
+}
+
+export async function runInboxScoringSchedulerOnce(deps: SchedulerDeps = {}): Promise<InboxScoringSchedulerResult> {
+  const logger = deps.logger ?? console;
+  const enabled = await (deps.isEnabled ?? isEnabled)();
+  if (!enabled) {
+    logger.log('[inbox-scoring-scheduler] scoring disabled, skipping');
+    return { queued: false, reason: 'disabled' };
+  }
+
+  const token = (deps.getToken ?? getCronAutomationToken)();
+  if (!token) {
+    logger.warn('[inbox-scoring-scheduler] CRON_API_TOKEN missing, skipping queue submission');
+    return { queued: false, reason: 'token_missing' };
+  }
+
+  const caller = await (deps.authenticateToken ?? authenticateAutomationTokenValue)(token, 'score:run') as AutomationCaller;
+  const job = await (deps.submitJob ?? submitAutomationJob)({
+    caller,
+    jobName: 'score.run',
+    idempotencyKey: buildSchedulerIdempotencyKey((deps.now ?? (() => new Date()))()),
+    payload: { source: 'cron' },
+  });
+
+  logger.log('[inbox-scoring-scheduler] queued scoring job', {
+    runId: job.runId,
+    status: job.status,
+    idempotentReplay: job.idempotentReplay,
+  });
+  return { queued: true, job };
 }
 
 export function startInboxScoringScheduler(): void {
@@ -25,14 +81,7 @@ export function startInboxScoringScheduler(): void {
 
   globalThis.__inboxScoringCronJob = new Cron('0 * * * *', { name: 'inbox-scoring', protect: true }, async () => {
     try {
-      const enabled = await isEnabled();
-      if (!enabled) {
-        console.log('[inbox-scoring-scheduler] scoring disabled, skipping');
-        return;
-      }
-      console.log('[inbox-scoring-scheduler] starting batch...');
-      const result = await InboxScoringService.runBatch({ source: 'cron' });
-      console.log(`[inbox-scoring-scheduler] done: ${result.scored} scored, ${result.failed} failed, ${result.skipped} skipped`);
+      await runInboxScoringSchedulerOnce();
     } catch (error) {
       console.error('[inbox-scoring-scheduler] unhandled error:', error);
     }

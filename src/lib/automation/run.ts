@@ -4,12 +4,25 @@ import { prisma } from '@/lib/db';
 import type { AutomationCaller } from './auth';
 
 export type AutomationRunStatus =
+  | 'queued'
   | 'running'
   | 'succeeded'
   | 'partial_success'
   | 'skipped'
   | 'empty'
-  | 'failed';
+  | 'failed'
+  | 'cancelled';
+
+export const AUTOMATION_RUN_STATUSES: AutomationRunStatus[] = [
+  'queued',
+  'running',
+  'succeeded',
+  'partial_success',
+  'skipped',
+  'empty',
+  'failed',
+  'cancelled',
+];
 
 export type AutomationRunTarget = {
   targetType?: string;
@@ -30,7 +43,7 @@ export type AutomationRunInput = AutomationRunTarget & {
 };
 
 export type AutomationRunSuccess<T> = {
-  status: Exclude<AutomationRunStatus, 'running' | 'failed'>;
+  status: Exclude<AutomationRunStatus, 'queued' | 'running' | 'failed' | 'cancelled'>;
   result: T;
   externalSideEffect?: boolean;
   externalRef?: string;
@@ -77,7 +90,7 @@ function safeJson(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value ?? null)) as Prisma.InputJsonValue;
 }
 
-async function findExistingRun(input: AutomationRunInput, requestDigest: string) {
+async function findExistingRun(input: AutomationRunInput, requestDigest: string, options: { allowActiveReplay?: boolean } = {}) {
   const existing = await prisma.automation_runs.findUnique({
     where: {
       token_id_workflow_step_idempotency_key: {
@@ -98,11 +111,98 @@ async function findExistingRun(input: AutomationRunInput, requestDigest: string)
     );
   }
 
-  if (existing.status === 'running') {
+  if (!options.allowActiveReplay && (existing.status === 'queued' || existing.status === 'running')) {
     throw new AutomationRunConflictError('IDEMPOTENCY_RUN_IN_PROGRESS', 'Idempotent run is still in progress');
   }
 
   return existing;
+}
+
+export async function createOrReplayQueuedAutomationRun<T = unknown>(
+  input: AutomationRunInput
+): Promise<AutomationRunResult<T>> {
+  const requestDigest = createRequestDigest(input.requestPayload);
+  const existing = await findExistingRun(input, requestDigest, { allowActiveReplay: true });
+
+  if (existing) {
+    return {
+      runId: existing.id,
+      status: existing.status as AutomationRunStatus,
+      result: existing.result_summary as T,
+      idempotentReplay: true,
+    };
+  }
+
+  const runId = createRunId();
+  await prisma.automation_runs.create({
+    data: {
+      id: runId,
+      token_id: input.caller.tokenId,
+      caller_type: input.caller.callerType,
+      workflow: input.workflow,
+      step: input.step,
+      target_type: input.targetType,
+      target_id: input.targetId === undefined ? undefined : String(input.targetId),
+      idempotency_key: input.idempotencyKey,
+      request_digest: requestDigest,
+      status: 'queued',
+    },
+  });
+
+  return {
+    runId,
+    status: 'queued',
+    idempotentReplay: false,
+  };
+}
+
+export async function markAutomationRunRunning(runId: string): Promise<void> {
+  await prisma.automation_runs.update({
+    where: { id: runId },
+    data: {
+      status: 'running',
+    },
+  });
+}
+
+export async function completeAutomationRun<T>(
+  runId: string,
+  outcome: AutomationRunSuccess<T>,
+  input?: AutomationRunInput
+): Promise<AutomationRunResult<T>> {
+  await prisma.automation_runs.update({
+    where: { id: runId },
+    data: {
+      status: outcome.status,
+      result_summary: safeJson(outcome.result),
+      external_side_effect: outcome.externalSideEffect ?? false,
+      external_ref: outcome.externalRef,
+      finished_at: new Date(),
+    },
+  });
+
+  if (input) {
+    await mirrorOperationLog(input, runId, outcome.status, outcome.result);
+  }
+
+  return {
+    runId,
+    status: outcome.status,
+    result: outcome.result,
+    idempotentReplay: false,
+  };
+}
+
+export async function failAutomationRun(runId: string, error: unknown): Promise<void> {
+  await prisma.automation_runs.update({
+    where: { id: runId },
+    data: {
+      status: 'failed',
+      error_code: error instanceof Error ? error.name : 'UNKNOWN_ERROR',
+      error_message: error instanceof Error ? error.message : String(error),
+      finished_at: new Date(),
+    },
+  });
 }
 
 export async function withAutomationRun<T>(
@@ -139,34 +239,9 @@ export async function withAutomationRun<T>(
 
   try {
     const outcome = await handler();
-    await prisma.automation_runs.update({
-      where: { id: runId },
-      data: {
-        status: outcome.status,
-        result_summary: safeJson(outcome.result),
-        external_side_effect: outcome.externalSideEffect ?? false,
-        external_ref: outcome.externalRef,
-        finished_at: new Date(),
-      },
-    });
-    await mirrorOperationLog(input, runId, outcome.status, outcome.result);
-
-    return {
-      runId,
-      status: outcome.status,
-      result: outcome.result,
-      idempotentReplay: false,
-    };
+    return completeAutomationRun(runId, outcome, input);
   } catch (error) {
-    await prisma.automation_runs.update({
-      where: { id: runId },
-      data: {
-        status: 'failed',
-        error_code: error instanceof Error ? error.name : 'UNKNOWN_ERROR',
-        error_message: error instanceof Error ? error.message : String(error),
-        finished_at: new Date(),
-      },
-    });
+    await failAutomationRun(runId, error);
     throw error;
   }
 }

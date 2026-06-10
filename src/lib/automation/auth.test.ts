@@ -17,6 +17,7 @@ vi.mock('@/lib/db', () => ({
 import {
   AutomationAuthError,
   authenticateAutomationRequest,
+  authenticateAutomationTokenValue,
   generateAutomationToken,
   hashAutomationToken,
 } from './auth';
@@ -115,6 +116,31 @@ describe('automation auth', () => {
     });
     expect(updateMock).toHaveBeenCalledWith({
       where: { id: 7 },
+      data: { last_used_at: expect.any(Date) },
+    });
+  });
+
+  it('authenticates a raw automation token for service callers', async () => {
+    findUniqueMock.mockResolvedValueOnce({
+      id: 8,
+      name: 'cron',
+      token_prefix: 'wa_cron',
+      caller_type: 'cron',
+      scopes: ['score:run'],
+      status: 'active',
+      revoked_at: null,
+      expires_at: null,
+    });
+
+    await expect(authenticateAutomationTokenValue('wa_cron_token', 'score:run')).resolves.toEqual({
+      tokenId: 8,
+      name: 'cron',
+      callerType: 'cron',
+      tokenPrefix: 'wa_cron',
+      scopes: ['score:run'],
+    });
+    expect(updateMock).toHaveBeenCalledWith({
+      where: { id: 8 },
       data: { last_used_at: expect.any(Date) },
     });
   });

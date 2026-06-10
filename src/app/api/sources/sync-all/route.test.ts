@@ -61,6 +61,8 @@ describe('/api/sources/sync-all legacy compatibility', () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('X-Automation-Execution')).toBe('legacy-sync');
+    expect(response.headers.get('X-Automation-Run-Recorded')).toBe('false');
     expect(body.data.started).toBe(true);
     expect(body.data.ok_count).toBe(1);
     expect(syncDataSourceMock).toHaveBeenCalledWith(1, expect.objectContaining({

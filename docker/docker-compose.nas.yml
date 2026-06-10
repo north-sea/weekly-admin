@@ -30,6 +30,26 @@ services:
         reservations:
           memory: 512M
 
+  weekly-admin-worker:
+    image: ghcr.io/${GITHUB_USERNAME}/weekly-admin:latest
+    container_name: weekly-admin-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    command: ["pnpm", "worker:automation"]
+    networks:
+      - weekly-network
+    depends_on:
+      - weekly-admin
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
   # 可选: Watchtower 自动更新
   watchtower:
     image: containrrr/watchtower

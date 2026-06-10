@@ -19,7 +19,15 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-import { AutomationRunConflictError, createRequestDigest, withAutomationRun } from './run';
+import {
+  AutomationRunConflictError,
+  completeAutomationRun,
+  createOrReplayQueuedAutomationRun,
+  createRequestDigest,
+  failAutomationRun,
+  markAutomationRunRunning,
+  withAutomationRun,
+} from './run';
 import type { AutomationCaller } from './auth';
 
 const caller: AutomationCaller = {
@@ -110,6 +118,99 @@ describe('automation run', () => {
       idempotentReplay: true,
     });
     expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('creates a queued automation run for worker execution', async () => {
+    findUniqueMock.mockResolvedValueOnce(null);
+
+    const result = await createOrReplayQueuedAutomationRun({
+      caller,
+      workflow: 'score',
+      step: 'run',
+      idempotencyKey: 'score-1',
+      requestPayload: { limit: 50 },
+    });
+
+    expect(result).toMatchObject({
+      status: 'queued',
+      idempotentReplay: false,
+    });
+    expect(createMock).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        workflow: 'score',
+        step: 'run',
+        idempotency_key: 'score-1',
+        request_digest: createRequestDigest({ limit: 50 }),
+        status: 'queued',
+      }),
+    });
+  });
+
+  it('replays queued or running idempotent runs without re-enqueue evidence changes', async () => {
+    findUniqueMock.mockResolvedValueOnce({
+      id: 'auto_existing',
+      status: 'queued',
+      request_digest: createRequestDigest({ limit: 50 }),
+      result_summary: null,
+    });
+
+    await expect(
+      createOrReplayQueuedAutomationRun({
+        caller,
+        workflow: 'score',
+        step: 'run',
+        idempotencyKey: 'score-1',
+        requestPayload: { limit: 50 },
+      })
+    ).resolves.toEqual({
+      runId: 'auto_existing',
+      status: 'queued',
+      result: null,
+      idempotentReplay: true,
+    });
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
+  it('updates queued runs to running and terminal states', async () => {
+    await markAutomationRunRunning('auto_1');
+    expect(updateMock).toHaveBeenCalledWith({
+      where: { id: 'auto_1' },
+      data: { status: 'running' },
+    });
+
+    await expect(
+      completeAutomationRun('auto_1', {
+        status: 'partial_success',
+        result: { failed: 1, ok: 2 },
+      })
+    ).resolves.toMatchObject({
+      runId: 'auto_1',
+      status: 'partial_success',
+      result: { failed: 1, ok: 2 },
+    });
+
+    expect(updateMock).toHaveBeenLastCalledWith({
+      where: { id: 'auto_1' },
+      data: expect.objectContaining({
+        status: 'partial_success',
+        result_summary: { failed: 1, ok: 2 },
+        finished_at: expect.any(Date),
+      }),
+    });
+  });
+
+  it('marks queued worker runs failed', async () => {
+    await failAutomationRun('auto_1', new TypeError('worker boom'));
+
+    expect(updateMock).toHaveBeenCalledWith({
+      where: { id: 'auto_1' },
+      data: expect.objectContaining({
+        status: 'failed',
+        error_code: 'TypeError',
+        error_message: 'worker boom',
+        finished_at: expect.any(Date),
+      }),
+    });
   });
 
   it('rejects idempotency key reuse with a different payload', async () => {

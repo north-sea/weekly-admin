@@ -142,6 +142,30 @@ docker logs -f weekly-admin
 curl http://localhost:3000/api/health
 ```
 
+### Redis Job Worker
+
+`docker/docker-compose.nas.yml` 包含 `weekly-admin-worker` 服务，使用同一镜像执行 `pnpm worker:automation`。
+
+NAS `.env` 需要配置：
+
+```bash
+REDIS_URL=redis://<host>:6379
+JOB_QUEUE_PREFIX=weekly-admin
+JOB_QUEUE_STATUS_TTL_SECONDS=604800
+JOB_TARGET_LOCK_TTL_SECONDS=3600
+JOB_WORKER_HEARTBEAT_INTERVAL_MS=30000
+JOB_WORKER_HEARTBEAT_TTL_SECONDS=90
+```
+
+部署后检查：
+
+```bash
+docker logs weekly-admin-worker
+curl http://localhost:3000/api/health
+```
+
+`/api/health` 应包含 `services.jobQueue` 和 `jobQueue.workers`。Redis 未配置或不可达时，jobQueue 应为 degraded，但核心 app 不应因此直接 503。
+
 ## 回滚
 
 如果新版本有问题，可以回滚到之前的版本：

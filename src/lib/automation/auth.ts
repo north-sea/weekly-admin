@@ -84,6 +84,17 @@ export async function authenticateAutomationRequest(
     throw new AutomationAuthError('AUTOMATION_TOKEN_MISSING', 'Automation token is required', 401);
   }
 
+  return authenticateAutomationTokenValue(token, requiredScope);
+}
+
+export async function authenticateAutomationTokenValue(
+  token: string,
+  requiredScope?: AutomationScope
+): Promise<AutomationCaller> {
+  if (!token.trim()) {
+    throw new AutomationAuthError('AUTOMATION_TOKEN_MISSING', 'Automation token is required', 401);
+  }
+
   const tokenHash = hashAutomationToken(token);
   const record = await prisma.automation_tokens.findUnique({
     where: { token_hash: tokenHash },

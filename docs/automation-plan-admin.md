@@ -23,7 +23,7 @@ Admin 项目负责:
 **n8n 做简单的事,Hermes 做复杂的事**
 
 - **n8n**: 数据搬运、定时触发、API 调用(可视化、易调试)
-- **Hermes**: AI 评分、学习偏好、智能决策(自主学习、持续优化)
+- **Hermes**: 学习偏好、生成建议、复盘解释(自主学习、持续优化);不直接写 MySQL 或发布
 
 ## 方案架构
 
@@ -45,25 +45,21 @@ Admin 项目负责:
 └─────────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────────┐
-│         Hermes: AI 评分与学习层 (定时技能)                     │
+│         Admin API + Hermes 学习/建议层                         │
 ├─────────────────────────────────────────────────────────────┤
-│  技能 1: 内容评分 (每小时触发)                                 │
-│    • 扫描 inbox_items 中未评分的内容                          │
-│    • 六维评分 (参考 BestBlogs)                                │
-│    • 参考 Karakeep 的分类/标签建议                            │
-│    • 参考记忆中的用户偏好                                      │
-│    • 自动晋升高分内容到 contents 表                            │
+│  Admin 契约: /api/v1/jobs/sync, /api/v1/jobs/score             │
+│    • 同步/评分由 Admin 服务层执行                              │
+│    • automation token + scope + idempotency                    │
+│    • automation_runs 记录 run 状态                             │
 │                                                               │
-│  技能 2: 学习用户偏好 (每周日触发)                             │
+│  Hermes 技能: 学习用户偏好 (每周日触发)                        │
 │    • 分析本周你的手动调整                                      │
 │    • 提取偏好规律存入记忆                                      │
-│    • 更新评分权重                                             │
+│    • 生成建议,经 Admin UI 人工确认后写回                       │
 │                                                               │
-│  技能 3: 周刊生成 (每周五 18:00)                              │
-│    • 筛选本周 ready 状态的内容                                │
-│    • 按评分和分类排序                                         │
-│    • 生成周刊草稿                                             │
-│    • 通过微信通知你审核                                        │
+│  Admin 契约: candidates -> suggestions -> apply -> publish      │
+│    • AI 建议先 preview,再由 apply 写入 weekly_content_items     │
+│    • publish 单独显式触发                                      │
 └─────────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────────┐
@@ -119,7 +115,7 @@ Admin 项目负责:
 
 **技能 1: 内容评分**
 
-> 实施约定 (K1)：评分由 **Admin 内部 cron / queue** 跑，Hermes 不直接评分。Admin 暴露 `POST /api/v1/ai/score` 用于手动重评和外部触发。Hermes 后续接管的是「偏好学习」(技能 2)。
+> 2026-06-05 Post-F2 override: 评分由 **Admin 服务层 / automation contract** 跑，Hermes 不直接评分。automation 批量评分入口是 `POST /api/v1/jobs/score`；`POST /api/v1/ai/score` 只保留为 human-admin JWT 手动单条重评入口。Hermes 后续接管的是「偏好学习」和「周刊建议」，并通过 Admin `/api/v1` 契约消费/写回。
 
 ```yaml
 名称: weekly_content_scoring
@@ -319,7 +315,7 @@ ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP;
 
 | # | 议题 | 结论 |
 |---|---|---|
-| K1 | 评分由谁执行 | **Admin 内部 cron/queue** 跑;Hermes 仅承担技能 2(偏好学习)。Admin 暴露 `POST /api/v1/ai/score` 用于手动触发。**调度形态:Node 进程内 cron,不依赖外部触发** |
+| K1 | 评分由谁执行 | **Admin 服务层 / automation contract** 跑;Hermes 仅承担偏好学习和建议。automation 批量评分入口是 `POST /api/v1/jobs/score`; human 手动单条重评入口是 `POST /api/v1/ai/score`。 |
 | K2 | `ai_dimensions` vs `ai_score_details` | 复用 `ai_score_details`(JSON 内含 `dimensions / key_points / model / version / raw`),保留 6 维原始打分 |
 | K3 | `ai_summary` vs `summary` | 复用 `summary` 字段;视为 AI 产物 |
 | K4 | `ai_key_points` 是否单独建字段 | 否,合入 `ai_score_details.key_points` |
@@ -417,25 +413,22 @@ exec "$@"
 
 ## API 路由设计
 
-参考 StrideOS 的 API 结构:
+> 2026-06-05 Post-F2 override: 下方是已落地的 agent-friendly 契约。完整机器可读契约见 `GET /api/v1/openapi.json`,调用说明见 `docs/automation-contracts.md`。
 
 ```
 src/app/api/v1/
-├── inbox/
-│   ├── route.ts              # GET /api/v1/inbox (列表)
-│   ├── [id]/route.ts         # GET/PATCH/DELETE /api/v1/inbox/:id
-│   └── [id]/promote/route.ts # POST /api/v1/inbox/:id/promote
-├── contents/
-│   ├── route.ts              # GET/POST /api/v1/contents
-│   └── [id]/route.ts         # GET/PATCH/DELETE /api/v1/contents/:id
+├── jobs/
+│   ├── sync/route.ts         # POST /api/v1/jobs/sync
+│   └── score/route.ts        # POST /api/v1/jobs/score
 ├── weekly/
-│   ├── route.ts              # GET/POST /api/v1/weekly
-│   ├── [id]/route.ts         # GET/PATCH /api/v1/weekly/:id
-│   ├── [id]/publish/route.ts # POST /api/v1/weekly/:id/publish
-│   └── [id]/items/route.ts   # GET/POST /api/v1/weekly/:id/items
+│   ├── candidates/route.ts   # GET /api/v1/weekly/candidates
+│   ├── suggestions/route.ts  # POST /api/v1/weekly/suggestions (preview)
+│   ├── suggestions/[id]/apply/route.ts # POST /api/v1/weekly/suggestions/:id/apply
+│   └── publish/route.ts      # POST /api/v1/weekly/publish
+├── openapi.json/route.ts     # GET /api/v1/openapi.json
 └── ai/
-    ├── score/route.ts        # POST /api/v1/ai/score (手动触发评分)
-    └── feedback/route.ts     # POST /api/v1/ai/feedback (记录用户反馈)
+    ├── score/route.ts        # POST /api/v1/ai/score (human JWT 手动单条重评)
+    └── feedback/digest/route.ts # GET /api/v1/ai/feedback/digest
 ```
 
 **API 示例** (参考 StrideOS):
@@ -638,8 +631,11 @@ UPDATE weekly_issues SET status = 'published' WHERE id = ?
   - 状态机(`scoring_status` 独立字段)+ 行级 CAS + 失败重试上限 3 次
   - 自动晋升原子事务(`inbox_items.auto_promoted=true` ↔ `contents.auto_promoted=true`)
   - 配置化阈值与开关(`ai_settings`)
-  - `POST /api/v1/ai/score` 手动重评接口
-  - `GET /api/v1/ai/feedback/digest` 接口骨架(F2 完善字段契约)
+  - `POST /api/v1/ai/score` human JWT 手动单条重评接口
+  - automation 批量评分通过 `POST /api/v1/jobs/score`
+  - 2026-06-08 Redis job orchestration 更新：`POST /api/v1/jobs/sync` 和 `POST /api/v1/jobs/score` 返回 queued job envelope（HTTP 202，含 `jobId`、`runId`、`statusUrl`），实际长任务由 automation worker 执行；`automation_runs` 继续作为长期运行证据。
+  - 2026-06-08 Redis job orchestration 兼容策略：进程内 hourly scoring scheduler 使用 `CRON_API_TOKEN` enqueue `score.run`；旧 `/api/inbox/score-batch` 和 `/api/sources/sync-all` 保持 human legacy 同步路径，成功响应标注 `X-Automation-Execution: legacy-sync` / `X-Automation-Run-Recorded: false`，不写 `automation_runs`。
+  - `GET /api/v1/ai/feedback/digest` 已在 F2 中扩展为真实 digest
 - **Out of scope**:偏好学习(F2)、周刊生成(F3)、UI 评分展示美化、Karakeep 摘要质量优化(F7)
 - **验收候选**:
   - 100 条样本评分通过率 ≥ 95%
@@ -647,6 +643,47 @@ UPDATE weekly_issues SET status = 'published' WHERE id = ?
   - 重启进程不丢任务(`processing` 状态机 10 分钟超时回收)
   - 阈值改 80 后,新晋升数据正确切换
   - `ai_score_details.dimensions` 6 维原始打分可查
+
+### Redis Job Worker 启动说明
+
+2026-06-08 `redis-job-orchestration` 之后，`POST /api/v1/jobs/sync` 与 `POST /api/v1/jobs/score` 只提交队列，实际执行依赖独立 worker。
+
+必需环境变量：
+
+```bash
+REDIS_URL=redis://<host>:6379
+JOB_QUEUE_PREFIX=weekly-admin
+JOB_QUEUE_STATUS_TTL_SECONDS=604800
+JOB_TARGET_LOCK_TTL_SECONDS=3600
+JOB_WORKER_HEARTBEAT_INTERVAL_MS=30000
+JOB_WORKER_HEARTBEAT_TTL_SECONDS=90
+CRON_API_TOKEN=wa_xxx
+```
+
+本地启动：
+
+```bash
+pnpm dev
+pnpm worker:automation
+```
+
+本地 smoke：
+
+```bash
+curl -sS http://127.0.0.1:3000/api/health
+curl -sS -X POST http://127.0.0.1:3000/api/v1/jobs/score \
+  -H "Authorization: Bearer ${CRON_API_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: score-smoke-$(date +%Y%m%d%H%M)" \
+  -d '{"limit":1,"delay":0}'
+```
+
+NAS / Docker：
+
+- `docker/Dockerfile` runner 会复制 `src` 与 `tsconfig.json`，同一镜像可用 `pnpm worker:automation` 启动 worker。
+- `docker/docker-compose.nas.yml` 包含 `weekly-admin-worker` 服务，与 `weekly-admin` 共用 `.env`。
+- NAS `.env` 必须配置 `REDIS_URL`；若 Redis 未配置或不可达，`/api/health` 的 `jobQueue` 会显示 degraded，但不应让核心 app health 直接 503。
+- Worker smoke：`docker logs weekly-admin-worker` 应出现 `[automation-worker] Worker started`；`curl http://localhost:3000/api/health` 应包含 `services.jobQueue` 与 `jobQueue.queue/workers`。
 
 #### F1.5. migration-tooling-baseline
 - **目标**:在 F1 完成后、F2 开始前,将项目从"自定义迁移脚本 + 裸 SQL"切换到"标准 Prisma migrate 工作流 + 独立 seed",为 F2+ 解锁标准化数据库变更管理
@@ -668,27 +705,27 @@ UPDATE weekly_issues SET status = 'published' WHERE id = ?
   - `scripts/migrate-db.ts` 顶部含 `@deprecated` JSDoc 注释
   - 详细 PRD 见 `specs/migration-tooling-baseline/spec.md`
 
-#### F2. preference-learning (Hermes 侧)
+#### F2. agent-and-automation-contracts / preference-learning contract
 - **目标**:基于 operation_logs 提取用户偏好,反哺评分权重
 - **In scope**:
+  - automation token、scope、OpenAPI、idempotency、`automation_runs`
   - `GET /api/v1/ai/feedback/digest` 聚合接口
-  - Hermes 技能 `weekly_preference_learning`(每周日 22:00)
-  - Hermes 记忆写入约定
-  - 可选:`ai_settings.inbox_promotion_threshold_override` 按分类偏置
+  - sync/score/candidates/suggestions/apply/publish contract
+  - Hermes 技能 `weekly_preference_learning` 后续通过 digest 消费反馈
 - **Out of scope**:权重直接改 prompt(交给 F1 下一迭代)
-- **依赖**:F1 已运行 ≥ 2 周,operation_logs 中有真实反馈记录
-- **验收候选**:digest 接口返回结构稳定,Hermes 记忆条目可查
+- **状态**:Admin contract 已完成并提交 commit `1f38443`; Hermes 记忆写入属于后续 `hermes-weekly-intelligence`
+- **验收候选**:已由 `specs/agent-and-automation-contracts/acceptance.md` 覆盖
 
 #### F3. weekly-auto-generation
 - **目标**:每周五 18:00 自动生成周刊草稿
 - **In scope**:
-  - Cron 技能(Admin 内部或 Hermes 调度,与 F1 一致选 Admin 内部)
-  - 筛选逻辑:status='ready' + 本周时间范围 + 按 original_score 排序
-  - 写入 weekly_issues + weekly_content_items
-  - `auto_generated=true` 标记 + `generation_metadata` 追溯
+  - 使用 `GET /api/v1/weekly/candidates` 查询候选
+  - 使用 `POST /api/v1/weekly/suggestions` 生成 preview artifact
+  - 使用 `POST /api/v1/weekly/suggestions/{id}/apply` 在人工或明确确认后写入 `weekly_content_items`
+  - 通过 `automation_runs` 追溯 run/status/result
   - **期数编号策略放宽**:历史周刊期数严格按自然时间(每周一期)递增,该约束在 F3 内**显式放宽**——允许跳号、合并、补发等场景。期数生成器接受外部传入的"目标期号 / 自动续号"两种模式,默认续号但不强制按自然周匹配。详见 F3 spec 阶段定稿。
   - 通知通道(待澄清:企微/飞书 webhook,本期暂用 admin 后台站内通知)
-- **Out of scope**:封面图自动生成(沿用现有"第一条截图"逻辑,后续 feature 再优化)、发布(F6)
+- **Out of scope**:封面图自动生成、直接自动发布
 - **验收候选**:草稿生成后人工可在 `/weekly` 看到、可编辑、可手动发布;支持手动指定期号覆盖默认续号
 
 #### F4. n8n-karakeep-sync (NAS 侧)
@@ -712,12 +749,13 @@ UPDATE weekly_issues SET status = 'published' WHERE id = ?
 #### F6. publish-pipeline
 - **目标**:周刊草稿一键发布到 Quail + 邮件触达
 - **In scope**:
-  - `POST /api/v1/weekly/:id/publish`(或复用现有)
+  - `POST /api/v1/weekly/publish`
   - Quail API 调用封装
-  - 发布后 `weekly_issues.status='published'`
+  - 已发布无 `forceRepublish` 返回 conflict
+  - Quail 失败不标记本地成功
 - **Out of scope**:订阅者管理(已在 Quail 侧)
-- **依赖**:F3(草稿存在);现有 `docs/quail-api.md` 提供 API 细节
-- **验收候选**:点击发布 → Quail 收到 → 订阅邮件成功送达样例邮箱
+- **状态**:Admin automation publish contract 已完成;UI 工作台和最终发布体验仍在后续 `admin-shell-and-weekly-workbench`
+- **验收候选**:点击发布 → Admin 调 `/api/v1/weekly/publish` → Quail 收到 → 订阅邮件成功送达样例邮箱
 
 #### F7. karakeep-summary-quality (后置优化)
 - **目标**:在去掉截图后,Karakeep 抓取的纯文字摘要也能保持高可读性
@@ -740,18 +778,18 @@ UPDATE weekly_issues SET status = 'published' WHERE id = ?
 
 ## 下一步行动
 
-1. ✅ 方案对齐:本文档已与 `prisma/schema.prisma` 现状对齐,关键决议 K1–K8 已敲定
-2. ✅ F1 spec 已收口:`specs/inbox-ai-scoring/spec.md` Q1–Q5 全部确认,可直接进入 plan
-3. ⏭️  下一步 SDD `plan`:
-   - **F1 plan**:把 6+3 评分映射、`scoring_status` 状态机迁移、Node 内 cron 形态写到 `specs/inbox-ai-scoring/plan.md`
-   - F0 schema-baseline 合并到 F1 plan 的"前置基线"章节,无需独立 feature
-4. ⏭️  F1 实现完成后,按推荐顺序逐个 feature 进入 `specify`:F4 → F5 → (积累 2 周反馈) → F2 → F3 → F6 → F7
-5. ⏭️  待澄清四项(通知通道 / n8n 现状 / 部署目标 / Twitter 抓取策略)在进入相关 feature spec 前补齐
+> 2026-06-05 更新：本节原顺序已被 `specs/admin-modernization-roadmap/plan.md` 的 Post-F2 Reassessment 覆盖。`next16-upgrade-baseline`、`database-and-search-strategy`、`migration-tooling-baseline`、`inbox-ai-scoring-continuation`、`agent-and-automation-contracts` 均已完成；后续主线顺序为 `image-feature-retirement` → `admin-shell-and-weekly-workbench` → `redis-job-orchestration` → `hermes-weekly-intelligence`。后续任何 schema 变更必须使用 Prisma Migrate，不再新增 `database/*.sql` 作为 schema 变更入口。
+
+1. ✅ 已完成基础链路:`next16-upgrade-baseline`、`database-and-search-strategy`、`migration-tooling-baseline`、`inbox-ai-scoring-continuation`、`agent-and-automation-contracts`
+2. ⏭️  下一步进入 `image-feature-retirement` specify:先清理 Admin UI/API/上传/裁剪/AI 图片生成入口,再确认 Astro 展示端读取点,最后用 Prisma Migrate drop legacy image fields。
+3. ⏭️  随后进入 `admin-shell-and-weekly-workbench` specify:工作台消费 `/api/v1/weekly/candidates`、`/api/v1/weekly/suggestions`、`/api/v1/weekly/suggestions/{id}/apply`、`/api/v1/weekly/publish` 和 `automation_runs`,不再围绕 legacy auto-link/图片入口设计。
+4. ⏭️  再进入 `redis-job-orchestration` specify:只接管执行控制层,定义 Redis job/lock/status/rate-limit 与 `automation_runs` 的关系,不重新定义外部调用契约。
+5. ⏭️  最后进入 `hermes-weekly-intelligence` specify:Hermes 只做偏好学习、建议和复盘解释,经 Admin UI 人工确认后由 apply/publish 写回;不直接写 MySQL 或发布。
 
 ---
 
-**文档版本**: v2.2 (Admin 拆分版 + 6+3 评分定稿 + F7 + scoring_status/auto_promoted 落地)
+**文档版本**: v2.4 (Post-F2 automation contract landed)
 **创建日期**: 2026-05-22
-**更新日期**: 2026-05-22
+**更新日期**: 2026-06-05
 **作者**: Claude + 用户
-**状态**: 已对齐现状,F1 spec 收口完毕,等待进入 SDD plan
+**状态**: 历史总纲，当前执行顺序以 `specs/admin-modernization-roadmap/plan.md` 的 Post-F2 Reassessment 为准

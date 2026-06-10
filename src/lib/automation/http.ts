@@ -13,6 +13,13 @@ import {
   type AutomationRunSuccess,
   type AutomationRunTarget,
 } from './run';
+import {
+  JobSubmissionError,
+  submitAutomationJob,
+  type QueuedAutomationJob,
+} from '@/lib/jobs/submit';
+import { JobRetryError } from '@/lib/jobs/retry';
+import type { AutomationJobName } from '@/lib/jobs/definitions';
 
 export function getRequiredIdempotencyKey(request: NextRequest): string {
   const value = request.headers.get('idempotency-key')?.trim();
@@ -75,6 +82,35 @@ export async function runAutomationRoute<T>(
   }
 }
 
+export async function runQueuedAutomationRoute(
+  request: NextRequest,
+  options: {
+    scope: AutomationScope;
+    jobName: AutomationJobName;
+    idempotencyKey: string;
+    requestPayload?: Record<string, unknown>;
+  }
+): Promise<NextResponse> {
+  try {
+    const caller = await authenticateAutomationRequest(request, options.scope);
+    const job = await submitAutomationJob({
+      caller,
+      jobName: options.jobName,
+      idempotencyKey: options.idempotencyKey,
+      payload: options.requestPayload ?? {},
+    });
+
+    return createAutomationSuccessResponse<QueuedAutomationJob>(job, {
+      runId: job.runId,
+      status: job.status,
+      idempotentReplay: job.idempotentReplay,
+      caller: job.caller,
+    }, job.idempotentReplay ? 200 : 202);
+  } catch (error) {
+    return automationErrorToResponse(error);
+  }
+}
+
 export function automationErrorToResponse(error: unknown): NextResponse {
   if (error instanceof AutomationAuthError) {
     return createAutomationErrorResponse(error.code, error.message, error.status);
@@ -85,6 +121,14 @@ export function automationErrorToResponse(error: unknown): NextResponse {
   }
 
   if (error instanceof AutomationRouteError) {
+    return createAutomationErrorResponse(error.code, error.message, error.status, error.details);
+  }
+
+  if (error instanceof JobSubmissionError) {
+    return createAutomationErrorResponse(error.code, error.message, error.status, error.details);
+  }
+
+  if (error instanceof JobRetryError) {
     return createAutomationErrorResponse(error.code, error.message, error.status, error.details);
   }
 

@@ -3,31 +3,27 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const runAutomationRouteMock = vi.fn();
-const runBatchMock = vi.fn();
+const runQueuedAutomationRouteMock = vi.fn();
 
 vi.mock('@/lib/automation/http', async () => {
   const actual = await vi.importActual<typeof import('@/lib/automation/http')>('@/lib/automation/http');
   return {
     ...actual,
     runAutomationRoute: (...args: unknown[]) => runAutomationRouteMock(...args),
+    runQueuedAutomationRoute: (...args: unknown[]) => runQueuedAutomationRouteMock(...args),
   };
 });
-
-vi.mock('@/lib/services/inbox-scoring', () => ({
-  InboxScoringService: {
-    runBatch: (...args: unknown[]) => runBatchMock(...args),
-  },
-}));
 
 import { POST } from './route';
 
 describe('/api/v1/jobs/score', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    runAutomationRouteMock.mockImplementation(async (_request, options) => {
-      const outcome = await options.handler();
-      return Response.json({ success: true, data: outcome.result, meta: { status: outcome.status } });
-    });
+    runQueuedAutomationRouteMock.mockResolvedValue(Response.json({
+      success: true,
+      data: { status: 'queued', runId: 'auto_1', jobId: 'auto_1' },
+      meta: { status: 'queued', runId: 'auto_1' },
+    }, { status: 202 }));
   });
 
   it('validates request body', async () => {
@@ -42,9 +38,7 @@ describe('/api/v1/jobs/score', () => {
     expect(body.error.code).toBe('VALIDATION_ERROR');
   });
 
-  it('runs scoring batch through the automation wrapper', async () => {
-    runBatchMock.mockResolvedValueOnce({ scored: 2, failed: 0, skipped: 1, errors: [] });
-
+  it('queues scoring batch through the queued automation wrapper', async () => {
     const response = await POST(new NextRequest('http://localhost/api/v1/jobs/score', {
       method: 'POST',
       headers: { 'idempotency-key': 'score-1' },
@@ -52,13 +46,14 @@ describe('/api/v1/jobs/score', () => {
     }));
     const body = await response.json();
 
-    expect(runAutomationRouteMock).toHaveBeenCalledWith(expect.any(NextRequest), expect.objectContaining({
+    expect(runQueuedAutomationRouteMock).toHaveBeenCalledWith(expect.any(NextRequest), expect.objectContaining({
       scope: 'score:run',
-      workflow: 'score',
-      step: 'run',
+      jobName: 'score.run',
       idempotencyKey: 'score-1',
+      requestPayload: { limit: 2, delay: 0 },
     }));
-    expect(runBatchMock).toHaveBeenCalledWith({ limit: 2, delayMs: 0, source: 'api' });
-    expect(body.data.status).toBe('succeeded');
+    expect(runAutomationRouteMock).not.toHaveBeenCalled();
+    expect(response.status).toBe(202);
+    expect(body.data.status).toBe('queued');
   });
 });

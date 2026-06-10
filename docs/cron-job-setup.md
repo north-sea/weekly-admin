@@ -4,7 +4,7 @@
 
 ## 概述
 
-推荐 Cron 只调用 agent-friendly `/api/v1` endpoint。旧 `/api/sources/sync-all`、`/api/weekly/auto-create`、`/api/weekly/auto-link`、`/api/weekly/backfill` 仍作为 legacy human-admin/API 兼容路径保留，不再作为新自动化接入首选。
+推荐 Cron 只调用 agent-friendly `/api/v1` endpoint。旧 `/api/sources/sync-all`、`/api/inbox/score-batch`、`/api/weekly/auto-create`、`/api/weekly/auto-link`、`/api/weekly/backfill` 仍作为 legacy human-admin/API 兼容路径保留，不再作为新自动化接入首选。
 
 | API | Scope | 功能 | 建议执行时间 |
 |-----|-------|------|-------------|
@@ -154,9 +154,12 @@ Cron 告警应优先判断：
 | Legacy API | 推荐替代 |
 |------------|----------|
 | `POST /api/sources/sync-all` | `POST /api/v1/jobs/sync` |
+| `POST /api/inbox/score-batch` | `POST /api/v1/jobs/score` |
 | `POST /api/weekly/auto-create` | 继续由后台创建，或由后续 weekly create contract 接管 |
 | `POST /api/weekly/auto-link` | `GET /api/v1/weekly/candidates` + `POST /api/v1/weekly/suggestions` + `POST /api/v1/weekly/suggestions/{id}/apply` |
 | `POST /api/weekly/backfill` | 保留人工维护用途 |
+
+这些 legacy human routes 保持同步执行，不要求 automation token 或 `Idempotency-Key`，成功响应会带 `X-Automation-Execution: legacy-sync` 和 `X-Automation-Run-Recorded: false`；它们不会写入 `automation_runs`。
 
 `POST /api/v1/ai/score` 是 human-admin JWT 手动单条重评分入口；automation 批量评分使用 `POST /api/v1/jobs/score`。
 发布到 Quail 使用 `POST /api/v1/weekly/publish`，该 endpoint 需要 `weekly:publish` scope 和 `Idempotency-Key`。

@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest } from '@/lib/auth';
 import { createNextErrorResponse, createNextSuccessResponse } from '@/lib/utils/serialization';
+import { markLegacyAutomationResponse } from '@/lib/automation/legacy-routes';
 import { DataSourceService } from '@/lib/services/data-source';
 import { SyncOrchestrator } from '@/lib/services/sync-orchestrator';
 import { prisma } from '@/lib/db';
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      return createNextSuccessResponse({
+      return markLegacyAutomationResponse(createNextSuccessResponse({
         started: true,
         started_at: startedAt,
         finished_at: new Date().toISOString(),
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest) {
         ok_count: okCount,
         failed_count: failedCount,
         results,
-      });
+      }));
     }
 
     void (async () => {
@@ -108,12 +109,12 @@ export async function POST(request: NextRequest) {
       console.error('同步全部数据源异步任务失败:', error);
     });
 
-    return createNextSuccessResponse({
+    return markLegacyAutomationResponse(createNextSuccessResponse({
       started: true,
       total,
       started_at: startedAt,
       message: '已开始同步，请稍后刷新查看结果',
-    });
+    }));
   } catch (error) {
     console.error('同步全部数据源失败:', error);
     if (error instanceof Error && error.name === 'ZodError') {

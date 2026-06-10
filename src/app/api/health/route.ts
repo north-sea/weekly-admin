@@ -6,6 +6,7 @@ import { resourceMonitor } from '@/lib/monitoring/resource-monitor';
 import { performanceMonitor } from '@/lib/monitoring/performance';
 import { errorTracker } from '@/lib/monitoring/error-tracker';
 import { logger } from '@/lib/logger';
+import { getJobWorkerHealth, type JobWorkerHealthSummary } from '@/lib/jobs/health';
 
 interface HealthStatus {
   status: 'healthy' | 'degraded' | 'unhealthy';
@@ -21,7 +22,9 @@ interface HealthCheckResponse {
     search: HealthStatus;
     application: HealthStatus;
     startup: HealthStatus;
+    jobQueue: HealthStatus;
   };
+  jobQueue?: JobWorkerHealthSummary;
   resources?: {
     memory: {
       used: number; // MB
@@ -73,6 +76,11 @@ export async function GET() {
       },
       startup: {
         status: 'unhealthy',
+        message: 'Not checked',
+        timestamp,
+      },
+      jobQueue: {
+        status: 'degraded',
         message: 'Not checked',
         timestamp,
       },
@@ -157,6 +165,29 @@ export async function GET() {
     healthCheck.services.search = {
       status: 'degraded',
       message: error instanceof Error ? error.message : 'Search service connection failed',
+      timestamp,
+    };
+    if (healthCheck.overall === 'healthy') {
+      healthCheck.overall = 'degraded';
+    }
+  }
+
+  // Check job queue / worker health. This is optional infrastructure: degrade, do not mark app down.
+  try {
+    const jobQueue = await getJobWorkerHealth();
+    healthCheck.jobQueue = jobQueue;
+    healthCheck.services.jobQueue = {
+      status: jobQueue.status,
+      message: jobQueue.reason ?? 'Job queue worker health is normal',
+      timestamp,
+    };
+    if (jobQueue.status === 'degraded' && healthCheck.overall === 'healthy') {
+      healthCheck.overall = 'degraded';
+    }
+  } catch (error) {
+    healthCheck.services.jobQueue = {
+      status: 'degraded',
+      message: error instanceof Error ? error.message : 'Job queue health check failed',
       timestamp,
     };
     if (healthCheck.overall === 'healthy') {
