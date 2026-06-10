@@ -35,8 +35,77 @@ describe('/api/v1/openapi.json', () => {
         required: true,
       }),
     ]));
+    expect(body.paths['/jobs/sync'].post.responses['202'].content['application/json'].schema.allOf[1].properties.data.$ref)
+      .toBe('#/components/schemas/QueuedJobResult');
+    expect(body.paths['/jobs/score'].post.description).toContain('Queues pending inbox scoring');
+    expect(body.components.schemas.QueuedJobResult.properties).toHaveProperty('statusUrl');
     expect(body.components.schemas.AutomationEnvelope.properties.meta.properties).toHaveProperty('runId');
+    expect(body.components.schemas.AutomationEnvelope.properties.meta.properties.status.enum).toEqual(expect.arrayContaining([
+      'queued',
+      'running',
+      'cancelled',
+    ]));
     expect(body.components.responses.IdempotencyConflict.description).toContain('Idempotency');
+  });
+
+  it('documents job status lookup with Redis history fallback', async () => {
+    const body = await (await GET()).json();
+
+    expect(body.paths['/jobs/{id}'].get.security).toEqual([
+      { AutomationBearer: ['ops:read'] },
+      { AutomationBearer: ['sync:run'] },
+      { AutomationBearer: ['score:run'] },
+    ]);
+    expect(body.paths['/jobs/{id}'].get.responses['200'].content['application/json'].schema.allOf[1].properties.data.$ref)
+      .toBe('#/components/schemas/JobStatusResult');
+    expect(body.components.schemas.JobStatusResult.properties.status.enum).toEqual(expect.arrayContaining([
+      'queued',
+      'running',
+      'retrying',
+      'failed',
+    ]));
+    expect(body.components.schemas.JobStatusResult.properties).toHaveProperty('historyOnly');
+    expect(body.components.schemas.JobStatusResult.properties).toHaveProperty('redis');
+    expect(body.components.schemas.JobStatusResult.properties).toHaveProperty('queue');
+  });
+
+  it('documents failed job retry endpoint', async () => {
+    const body = await (await GET()).json();
+
+    expect(body.paths['/jobs/{id}/retry'].post.security).toEqual([
+      { AutomationBearer: ['sync:run'] },
+      { AutomationBearer: ['score:run'] },
+    ]);
+    expect(body.paths['/jobs/{id}/retry'].post.parameters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'Idempotency-Key', required: true }),
+    ]));
+    expect(body.paths['/jobs/{id}/retry'].post.responses['202'].content['application/json'].schema.allOf[1].properties.data.$ref)
+      .toBe('#/components/schemas/RetryJobResult');
+    expect(body.components.schemas.RetryJobResult.properties).toHaveProperty('retryOfRunId');
+  });
+
+  it('documents Hermes weekly suggestion register mode', async () => {
+    const body = await (await GET()).json();
+
+    expect(body.paths['/weekly/suggestions'].post.requestBody.content['application/json'].schema.oneOf)
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          properties: expect.objectContaining({
+            mode: expect.objectContaining({ enum: ['generate'] }),
+          }),
+        }),
+        expect.objectContaining({
+          required: ['mode', 'artifact'],
+          properties: expect.objectContaining({
+            artifact: { $ref: '#/components/schemas/WeeklySuggestionArtifact' },
+          }),
+        }),
+      ]));
+    expect(body.components.schemas.WeeklySuggestionArtifact.properties).toHaveProperty('agentRunId');
+    expect(body.components.schemas.WeeklySuggestionResult.properties.provider.enum).toEqual(['hermes', 'admin']);
+    expect(body.paths['/weekly/suggestions/{id}/apply'].post.parameters[0].description).toContain('Weekly issue id');
+    expect(body.paths['/weekly/suggestions/{id}/apply'].post.requestBody.content['application/json'].schema.properties)
+      .toHaveProperty('sourceRunId');
   });
 
   it('documents digest as ops read automation and score as human manual compatibility', async () => {

@@ -26,8 +26,8 @@ export function getAutomationOpenApiDocument() {
       '/jobs/sync': {
         post: {
           tags: ['Jobs'],
-          summary: 'Run source sync',
-          description: 'Runs one or more data-source sync jobs. Requires an Idempotency-Key header.',
+          summary: 'Queue source sync',
+          description: 'Queues one or more data-source sync jobs. Requires an Idempotency-Key header and returns queued job status quickly.',
           security: [{ AutomationBearer: ['sync:run'] }],
           parameters: [idempotencyHeader()],
           requestBody: jsonBody({
@@ -43,14 +43,14 @@ export function getAutomationOpenApiDocument() {
             },
             additionalProperties: false,
           }),
-          responses: automationResponses('SyncResult'),
+          responses: automationResponses('QueuedJobResult', 202),
         },
       },
       '/jobs/score': {
         post: {
           tags: ['Jobs'],
-          summary: 'Run inbox scoring batch',
-          description: 'Scores pending inbox items in a bounded batch. Requires an Idempotency-Key header.',
+          summary: 'Queue inbox scoring batch',
+          description: 'Queues pending inbox scoring in a bounded batch. Requires an Idempotency-Key header and returns queued job status quickly.',
           security: [{ AutomationBearer: ['score:run'] }],
           parameters: [idempotencyHeader()],
           requestBody: jsonBody({
@@ -61,7 +61,51 @@ export function getAutomationOpenApiDocument() {
             },
             additionalProperties: false,
           }),
-          responses: automationResponses('ScoreResult'),
+          responses: automationResponses('QueuedJobResult', 202),
+        },
+      },
+      '/jobs/{id}': {
+        get: {
+          tags: ['Jobs'],
+          summary: 'Read automation job status',
+          description: 'Returns durable automation run history merged with retained Redis/BullMQ runtime status. If Redis status expired, data.historyOnly is true.',
+          security: [
+            { AutomationBearer: ['ops:read'] },
+            { AutomationBearer: ['sync:run'] },
+            { AutomationBearer: ['score:run'] },
+          ],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', minLength: 1, maxLength: 64 },
+              description: 'Automation run/job id.',
+            },
+          ],
+          responses: automationResponses('JobStatusResult'),
+        },
+      },
+      '/jobs/{id}/retry': {
+        post: {
+          tags: ['Jobs'],
+          summary: 'Retry failed automation job',
+          description: 'Creates a new queued run for a failed sync/score job when the original BullMQ payload is still retained. Requires the same workflow scope and an Idempotency-Key header.',
+          security: [
+            { AutomationBearer: ['sync:run'] },
+            { AutomationBearer: ['score:run'] },
+          ],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', minLength: 1, maxLength: 64 },
+              description: 'Original failed automation run/job id.',
+            },
+            idempotencyHeader(),
+          ],
+          responses: automationResponses('RetryJobResult', 202),
         },
       },
       '/weekly/candidates': {
@@ -83,17 +127,43 @@ export function getAutomationOpenApiDocument() {
         post: {
           tags: ['Weekly'],
           summary: 'Preview weekly organization suggestions',
-          description: 'Generates a preview artifact only; it does not write weekly_content_items.',
+          description: 'Generates an Admin preview or registers a Hermes preview artifact only; it does not write weekly_content_items.',
           security: [{ AutomationBearer: ['weekly:suggest'] }],
           parameters: [idempotencyHeader()],
           requestBody: jsonBody({
-            type: 'object',
-            required: ['weeklyIssueId'],
-            properties: {
-              weeklyIssueId: { type: 'integer', minimum: 1 },
-              maxItems: { type: 'integer', minimum: 1, maximum: 30, default: 12 },
-            },
-            additionalProperties: false,
+            oneOf: [
+              {
+                type: 'object',
+                required: ['weeklyIssueId'],
+                properties: {
+                  mode: { type: 'string', enum: ['generate'], default: 'generate' },
+                  weeklyIssueId: { type: 'integer', minimum: 1 },
+                  maxItems: { type: 'integer', minimum: 1, maximum: 30, default: 12 },
+                },
+                additionalProperties: false,
+              },
+              {
+                type: 'object',
+                required: ['mode', 'artifact'],
+                properties: {
+                  mode: { type: 'string', enum: ['register'] },
+                  artifact: { $ref: '#/components/schemas/WeeklySuggestionArtifact' },
+                },
+                additionalProperties: false,
+              },
+              {
+                allOf: [
+                  { $ref: '#/components/schemas/WeeklySuggestionArtifact' },
+                  {
+                    type: 'object',
+                    required: ['mode'],
+                    properties: {
+                      mode: { type: 'string', enum: ['register'] },
+                    },
+                  },
+                ],
+              },
+            ],
           }),
           responses: automationResponses('WeeklySuggestionResult'),
         },
@@ -119,6 +189,8 @@ export function getAutomationOpenApiDocument() {
             required: ['items'],
             properties: {
               replaceExisting: { type: 'boolean', default: false },
+              sourceRunId: { type: 'string', maxLength: 160 },
+              agentRunId: { type: 'string', maxLength: 160 },
               items: {
                 type: 'array',
                 minItems: 1,
@@ -223,10 +295,101 @@ export function getAutomationOpenApiDocument() {
       schemas: {
         AutomationEnvelope: automationEnvelopeSchema(),
         ErrorEnvelope: errorEnvelopeSchema(),
+        QueuedJobResult: statusObjectSchema({
+          jobId: { type: 'string' },
+          runId: { type: 'string' },
+          workflow: { type: 'string' },
+          step: { type: 'string' },
+          target: { type: 'object', additionalProperties: true },
+          statusUrl: { type: 'string' },
+          idempotentReplay: { type: 'boolean' },
+        }),
+        RetryJobResult: statusObjectSchema({
+          jobId: { type: 'string' },
+          runId: { type: 'string' },
+          retryOfRunId: { type: 'string' },
+          workflow: { type: 'string' },
+          step: { type: 'string' },
+          target: { type: 'object', additionalProperties: true },
+          statusUrl: { type: 'string' },
+          idempotentReplay: { type: 'boolean' },
+        }),
+        JobStatusResult: {
+          type: 'object',
+          required: ['runId', 'status', 'durableStatus', 'historyOnly', 'workflow', 'step', 'redis', 'queue'],
+          properties: {
+            runId: { type: 'string' },
+            status: { type: 'string', enum: [...automationRunStatusEnum, 'retrying'] },
+            durableStatus: { type: 'string', enum: automationRunStatusEnum },
+            historyOnly: { type: 'boolean' },
+            workflow: { type: 'string' },
+            step: { type: 'string' },
+            targetType: { type: ['string', 'null'] },
+            targetId: { type: ['string', 'null'] },
+            startedAt: { type: ['string', 'null'], format: 'date-time' },
+            finishedAt: { type: ['string', 'null'], format: 'date-time' },
+            resultSummary: { type: ['object', 'array', 'string', 'number', 'boolean', 'null'] },
+            errorCode: { type: ['string', 'null'] },
+            errorMessage: { type: ['string', 'null'] },
+            redis: {
+              type: 'object',
+              properties: {
+                available: { type: 'boolean' },
+                statusExpired: { type: 'boolean' },
+                error: { type: 'string' },
+                snapshot: { type: 'object', additionalProperties: true },
+              },
+              additionalProperties: true,
+            },
+            queue: {
+              type: 'object',
+              properties: {
+                available: { type: 'boolean' },
+                state: { type: ['string', 'null'] },
+                attemptsMade: { type: ['integer', 'null'] },
+                attempts: { type: ['integer', 'null'] },
+                error: { type: 'string' },
+              },
+              additionalProperties: true,
+            },
+          },
+          additionalProperties: true,
+        },
         SyncResult: statusObjectSchema(),
         ScoreResult: statusObjectSchema(),
         WeeklyCandidatesResult: statusObjectSchema(),
-        WeeklySuggestionResult: statusObjectSchema(),
+        WeeklySuggestionArtifact: weeklySuggestionArtifactSchema(),
+        WeeklySuggestionResult: {
+          type: 'object',
+          required: ['status', 'weeklyIssueId', 'provider', 'suggestion'],
+          properties: {
+            status: { type: 'string', enum: ['preview', 'empty', 'stale', 'rejected'] },
+            weeklyIssueId: { type: 'integer', minimum: 1 },
+            provider: { type: 'string', enum: ['hermes', 'admin'] },
+            artifactVersion: { type: 'string', enum: ['weekly-suggestion.v1'] },
+            agentRunId: { type: 'string' },
+            sourceRunId: { type: 'string' },
+            confidence: { type: 'number', minimum: 0, maximum: 1 },
+            evidenceRefs: { type: 'array', items: evidenceRefSchema() },
+            preferenceRefs: { type: 'array', items: { type: 'string' } },
+            generatedAt: { type: 'string', format: 'date-time' },
+            expiresAt: { type: 'string', format: 'date-time' },
+            suggestion: {
+              type: 'object',
+              required: ['items'],
+              properties: {
+                intro: { type: 'string', maxLength: 1000 },
+                items: {
+                  type: 'array',
+                  maxItems: 30,
+                  items: weeklySuggestionItemSchema(),
+                },
+              },
+              additionalProperties: false,
+            },
+          },
+          additionalProperties: false,
+        },
         WeeklySuggestionApplyResult: statusObjectSchema(),
         WeeklyPublishResult: statusObjectSchema({
           quailPostId: { type: 'string' },
@@ -277,6 +440,17 @@ export function getAutomationOpenApiDocument() {
   };
 }
 
+const automationRunStatusEnum = [
+  'queued',
+  'running',
+  'succeeded',
+  'partial_success',
+  'skipped',
+  'empty',
+  'failed',
+  'cancelled',
+];
+
 function idempotencyHeader() {
   return {
     name: 'Idempotency-Key',
@@ -307,13 +481,13 @@ function jsonBody(schema: Record<string, unknown>) {
   };
 }
 
-function automationResponses(schemaName: string) {
-  return standardResponses(schemaName, true);
+function automationResponses(schemaName: string, successStatus: 200 | 202 = 200) {
+  return standardResponses(schemaName, true, successStatus);
 }
 
-function standardResponses(schemaName: string, automation = false) {
+function standardResponses(schemaName: string, automation = false, successStatus: 200 | 202 = 200) {
   return {
-    '200': {
+    [String(successStatus)]: {
       description: 'Successful response',
       content: {
         'application/json': {
@@ -357,7 +531,7 @@ function automationEnvelopeSchema() {
         properties: {
           timestamp: { type: 'string', format: 'date-time' },
           runId: { type: 'string' },
-          status: { type: 'string', enum: ['succeeded', 'partial_success', 'skipped', 'empty', 'failed'] },
+          status: { type: 'string', enum: automationRunStatusEnum },
           idempotentReplay: { type: 'boolean' },
           caller: {
             type: 'object',
@@ -405,10 +579,68 @@ function statusObjectSchema(extraProperties: Record<string, unknown> = {}) {
     type: 'object',
     required: ['status'],
     properties: {
-      status: { type: 'string' },
+      status: { type: 'string', enum: automationRunStatusEnum },
       ...extraProperties,
     },
     additionalProperties: true,
+  };
+}
+
+function evidenceRefSchema() {
+  return {
+    type: 'object',
+    properties: {
+      type: { type: 'string', maxLength: 80 },
+      sourceType: { type: 'string', maxLength: 80 },
+      sourceId: { oneOf: [{ type: 'string', maxLength: 160 }, { type: 'integer' }] },
+      label: { type: 'string', maxLength: 160 },
+      summary: { type: 'string', maxLength: 500 },
+      runId: { type: 'string', maxLength: 160 },
+    },
+    additionalProperties: false,
+  };
+}
+
+function weeklySuggestionItemSchema() {
+  return {
+    type: 'object',
+    required: ['content_id', 'section'],
+    properties: {
+      content_id: { type: 'integer', minimum: 1 },
+      section: { type: 'string', minLength: 1, maxLength: 100 },
+      featured: { type: 'boolean', default: false },
+      reason: { type: 'string', maxLength: 200 },
+      confidence: { type: 'number', minimum: 0, maximum: 1 },
+      evidenceRefs: { type: 'array', items: evidenceRefSchema(), maxItems: 20 },
+      title: { type: 'string', maxLength: 300 },
+      source_url: { type: ['string', 'null'], maxLength: 1000 },
+      original_score: { type: ['number', 'null'] },
+      summary_score: { type: ['number', 'null'] },
+    },
+    additionalProperties: false,
+  };
+}
+
+function weeklySuggestionArtifactSchema() {
+  return {
+    type: 'object',
+    required: ['weeklyIssueId', 'items'],
+    properties: {
+      artifactVersion: { type: 'string', enum: ['weekly-suggestion.v1'], default: 'weekly-suggestion.v1' },
+      provider: { type: 'string', enum: ['hermes', 'admin'], default: 'hermes' },
+      weeklyIssueId: { type: 'integer', minimum: 1 },
+      agentRunId: { type: 'string', maxLength: 160, description: 'Required when provider is hermes.' },
+      sourceRunId: { type: 'string', maxLength: 160 },
+      status: { type: 'string', enum: ['preview', 'empty', 'stale', 'rejected'], default: 'preview' },
+      intro: { type: 'string', maxLength: 1000 },
+      items: { type: 'array', maxItems: 30, items: weeklySuggestionItemSchema() },
+      confidence: { type: 'number', minimum: 0, maximum: 1 },
+      evidenceRefs: { type: 'array', items: evidenceRefSchema(), maxItems: 30 },
+      preferenceRefs: { type: 'array', items: { type: 'string', maxLength: 160 }, maxItems: 20 },
+      generatedAt: { type: 'string', format: 'date-time' },
+      expiresAt: { type: 'string', format: 'date-time' },
+    },
+    additionalProperties: false,
   };
 }
 

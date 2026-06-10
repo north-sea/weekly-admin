@@ -71,9 +71,42 @@ describe('/api/v1/weekly/suggestions/[id]/apply', () => {
     expect(applyWeeklySuggestionMock).toHaveBeenCalledWith({
       weeklyIssueId: 7,
       replaceExisting: false,
+      sourceRunId: undefined,
+      agentRunId: undefined,
       items: [{ content_id: 10, section: 'AI', featured: true }],
     });
     expect(body.meta.status).toBe('succeeded');
     expect(body.data.linkedCount).toBe(1);
+  });
+
+  it('keeps source run metadata on the apply request payload', async () => {
+    applyWeeklySuggestionMock.mockResolvedValueOnce({
+      status: 'applied',
+      weeklyIssueId: 7,
+      sourceRunId: 'auto_suggest',
+      agentRunId: 'hermes_1',
+      linkedCount: 1,
+      skippedCount: 0,
+      linkedContents: [{ id: 10, title: 'A', section: 'AI', featured: false }],
+      skippedContents: [],
+    });
+
+    await POST(new NextRequest('http://localhost/api/v1/weekly/suggestions/7/apply', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'apply-7-source' },
+      body: JSON.stringify({
+        sourceRunId: 'auto_suggest',
+        agentRunId: 'hermes_1',
+        items: [{ content_id: 10, section: 'AI' }],
+      }),
+    }), { params: Promise.resolve({ id: '7' }) });
+
+    expect(applyWeeklySuggestionMock).toHaveBeenCalledWith({
+      weeklyIssueId: 7,
+      replaceExisting: false,
+      sourceRunId: 'auto_suggest',
+      agentRunId: 'hermes_1',
+      items: [{ content_id: 10, section: 'AI', featured: false }],
+    });
   });
 });

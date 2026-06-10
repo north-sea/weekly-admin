@@ -19,7 +19,7 @@ pnpm tsx scripts/create-automation-token.ts \
 Authorization: Bearer wa_...
 ```
 
-响应和日志只允许展示 `tokenPrefix`，不得写入完整 token、token hash、外部 API key 或数据库密码。
+响应和日志只允许展示 `tokenPrefix`，不得写入完整 token、token hash、外部 API key、数据库 URL、Redis password 或 provider key。
 
 ## Scopes
 
@@ -32,7 +32,7 @@ Authorization: Bearer wa_...
 | `weekly:publish` | 发布或投递周刊，权限高于草稿/预览类动作 |
 | `ops:read` | 读取运维审计摘要和 feedback digest |
 
-为 cron、n8n、Hermes 分别创建 token，按最小权限分配 scope。
+为 cron、n8n、Hermes 分别创建 token，按最小权限分配 scope。Hermes planner / preference learning token 默认只需要 `weekly:read,weekly:suggest,ops:read`；不得默认授予 `weekly:publish`。
 
 ## Idempotency
 
@@ -126,17 +126,61 @@ Idempotency-Key: <caller-stable-key>
 | `POST /api/v1/jobs/sync` | automation | `sync:run` | required | 同步数据源 |
 | `POST /api/v1/jobs/score` | automation | `score:run` | required | 批量评分 |
 | `GET /api/v1/weekly/candidates` | automation | `weekly:read` | generated | 查询周刊候选 |
-| `POST /api/v1/weekly/suggestions` | automation | `weekly:suggest` | required | 生成 preview artifact，不写 `weekly_content_items` |
-| `POST /api/v1/weekly/suggestions/{id}/apply` | automation | `weekly:suggest` | required | 将 preview items 写入 `weekly_content_items`，保留 section/featured |
+| `POST /api/v1/weekly/suggestions` | automation | `weekly:suggest` | required | 生成 Admin preview 或登记 Hermes preview artifact，不写 `weekly_content_items` |
+| `POST /api/v1/weekly/suggestions/{id}/apply` | automation | `weekly:suggest` | required | `{id}` 是 weekly issue id；将 preview items 写入 `weekly_content_items`，保留 section/featured |
 | `POST /api/v1/weekly/publish` | automation | `weekly:publish` | required | 发布周刊到 Quail；已发布内容必须显式 `forceRepublish` |
 | `GET /api/v1/ai/feedback/digest` | automation | `ops:read` | generated | 从 `operation_logs` 汇总 inbox feedback |
 | `POST /api/v1/ai/score` | human JWT | - | - | 管理端手动单条重评分；automation 使用 `/api/v1/jobs/score` |
 
-Suggestion apply body 使用 `/api/v1/weekly/suggestions` 返回的 preview items：
+`POST /api/v1/weekly/suggestions` 有两种模式。
+
+Admin fallback 生成预览：
+
+```json
+{
+  "weeklyIssueId": 78,
+  "maxItems": 12
+}
+```
+
+Hermes 登记已生成的 preview artifact：
+
+```json
+{
+  "mode": "register",
+  "artifact": {
+    "artifactVersion": "weekly-suggestion.v1",
+    "provider": "hermes",
+    "weeklyIssueId": 78,
+    "agentRunId": "hermes_...",
+    "status": "preview",
+    "confidence": 0.82,
+    "evidenceRefs": [
+      { "label": "feedback digest", "runId": "auto_..." }
+    ],
+    "preferenceRefs": ["pref_..."],
+    "items": [
+      {
+        "content_id": 1001,
+        "section": "AI",
+        "featured": true,
+        "reason": "匹配近期偏好",
+        "confidence": 0.9
+      }
+    ]
+  }
+}
+```
+
+Hermes artifact 可以返回 `preview`、`empty`、`stale` 或 `rejected`。`preview` 会校验 content id 是否仍符合 Admin apply 规则；`empty` 不写业务表，只记录可复盘的空结果。Artifact 不得包含 token、token hash、DB URL、Redis password、provider key 或完整私密正文。
+
+Suggestion apply body 使用 `/api/v1/weekly/suggestions` 返回的 preview items。写回必须由 Admin UI/workbench 人工确认后触发：
 
 ```json
 {
   "replaceExisting": false,
+  "sourceRunId": "auto_...",
+  "agentRunId": "hermes_...",
   "items": [
     {
       "content_id": 1001,
