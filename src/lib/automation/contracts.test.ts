@@ -6,16 +6,16 @@ import { createAutomationErrorResponse, createAutomationSuccessResponse, getCall
 describe('automation contracts', () => {
   it('returns success envelope with automation metadata', async () => {
     const response = createAutomationSuccessResponse(
-      { status: 'created' },
-      { runId: 'auto_1', status: 'succeeded', idempotentReplay: false }
+      { status: 'queued' },
+      { runId: 'auto_1', status: 'queued', idempotentReplay: false }
     );
 
     await expect(response.json()).resolves.toMatchObject({
       success: true,
-      data: { status: 'created' },
+      data: { status: 'queued' },
       meta: {
         runId: 'auto_1',
-        status: 'succeeded',
+        status: 'queued',
         idempotentReplay: false,
       },
     });
