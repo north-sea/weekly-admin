@@ -19,7 +19,6 @@ const publicRoutes = [
   '/api/auth/login',
   '/api/health',
   '/api/v1',
-  '/api/upload/image',
 ];
 
 // Define admin-only routes
@@ -154,6 +153,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|public/|api/upload/image).*)',
+    '/((?!_next/static|_next/image|favicon.ico|public/).*)',
   ],
 };

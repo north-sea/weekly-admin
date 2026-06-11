@@ -21,7 +21,6 @@ interface ContentPreviewProps {
     source?: string | null;
     source_url?: string | null;
     recommendation_reason?: string | null;
-    cover_image?: string | null;
     content_type?: { id: number; name: string } | null;
     category?: { id: number; name: string; slug?: string } | null;
     tags?: Array<{ id: number; name: string; slug?: string }>;
@@ -243,18 +242,6 @@ export default function ContentPreview({
         <Separator />
       </header>
 
-      {/* 封面图 */}
-      {content.cover_image && (
-        <div>
-          <img
-            src={content.cover_image}
-            alt={content.title}
-            className="w-full rounded object-cover"
-            style={{ maxHeight: '400px' }}
-          />
-        </div>
-      )}
-
       {/* 内容 */}
       <div className="space-y-6">
         <ReactMarkdown
@@ -350,18 +337,10 @@ export default function ContentPreview({
                 <blockquote className="border-l-4 border-primary/50 pl-4 italic text-muted-foreground">
                   {section.content}
                 </blockquote>
-              ) : section.type === 'image' && section.imageUrl ? (
-                <div className="space-y-2">
-                  <img
-                    src={section.imageUrl}
-                    alt={section.heading || '图片'}
-                    className="rounded w-full"
-                    loading="lazy"
-                  />
-                  {section.content && (
-                    <p className="text-sm text-muted-foreground">{section.content}</p>
-                  )}
-                </div>
+              ) : section.type === 'image' ? (
+                <p className="text-foreground leading-relaxed whitespace-pre-wrap">
+                  {section.content || section.heading || ''}
+                </p>
               ) : (
                 <p className="text-foreground leading-relaxed whitespace-pre-wrap">
                   {section.content}

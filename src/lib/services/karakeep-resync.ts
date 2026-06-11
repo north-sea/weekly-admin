@@ -96,15 +96,11 @@ export async function createResyncJob(params: CreateJobParams): Promise<Karakeep
 
 async function applyBookmarkToContent(job: KarakeepResyncJob, bookmark: KarakeepBookmark): Promise<KarakeepResyncJob> {
   const summary = bookmark.summary || bookmark.content?.description || null;
-  const nextImage = job.refreshScreenshot && !job.screenshotLocked
-    ? (bookmark.content?.imageUrl || bookmark.content?.screenshotAssetId || null)
-    : undefined;
 
   await prisma.contents.update({
     where: { id: BigInt(job.contentId) },
     data: {
       summary,
-      ...(nextImage !== undefined ? { image_url: nextImage, screenshot_api: 'karakeep' } : {}),
     },
   });
 
@@ -153,7 +149,7 @@ async function applyBookmarkToContent(job: KarakeepResyncJob, bookmark: Karakeep
     ...job,
     phase: 'success',
     appliedSummary: summary ?? null,
-    appliedImage: nextImage ?? null,
+    appliedImage: null,
     updatedAt: nowIso(),
   };
   jobs.set(job.jobId, updated);

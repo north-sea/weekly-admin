@@ -11,7 +11,6 @@ import { cn } from '@/lib/utils';
 export interface StructuredPreviewData {
   title: string;
   url?: string;
-  image_url?: string;
   summary?: string;
   description?: string;
   source?: string;
@@ -29,7 +28,6 @@ export interface StructuredPreviewProps {
   data: StructuredPreviewData;
   mode?: 'desktop' | 'mobile';
   showMeta?: boolean;
-  showImage?: boolean;
 }
 
 const parseStructuredContent = (content?: string): StructuredContent | null => {
@@ -40,18 +38,6 @@ const parseStructuredContent = (content?: string): StructuredContent | null => {
   } catch {
     return null;
   }
-};
-
-const pickImageFromStructured = (
-  data: StructuredPreviewData,
-  structured?: StructuredContent | null
-) => {
-  if (data.image_url) return data.image_url;
-  if (!structured) return null;
-  const imageSection = structured.sections.find(
-    (section) => section.type === 'image' && section.imageUrl
-  );
-  return imageSection?.imageUrl || null;
 };
 
 const buildSummaryFromStructured = (
@@ -69,11 +55,9 @@ const buildSummaryFromStructured = (
 export default function StructuredPreview({
   data,
   mode = 'desktop',
-  showMeta = true,
-  showImage = true
+  showMeta = true
 }: StructuredPreviewProps) {
   const structuredContent = parseStructuredContent(data.content);
-  const displayImage = pickImageFromStructured(data, structuredContent);
   const summary = buildSummaryFromStructured(data, structuredContent);
 
   return (
@@ -121,16 +105,6 @@ export default function StructuredPreview({
             </div>
           )}
         </div>
-
-        {showImage && displayImage && (
-          <div className="overflow-hidden rounded-md border">
-            <img
-              src={displayImage}
-              alt={data.title}
-              className="h-48 w-full object-cover"
-            />
-          </div>
-        )}
 
         {structuredContent?.sections && structuredContent.sections.length > 0 && (
           <div className="space-y-3 text-sm">
