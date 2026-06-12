@@ -23,7 +23,101 @@ export interface AiGenerateOptions {
   model?: string;
   configId?: number;
   signal?: AbortSignal;
+  /** transient 错误的最大重试次数（含首次外的额外尝试）。默认 2。 */
+  maxRetries?: number;
 }
+
+/**
+ * AI 调用错误的分类，供上层（评分服务、清洗脚本、feedback digest）据此决定
+ * 是否计入 retry_count、是否退避、是否熔断。
+ *
+ * - `transient`: 网关层瞬时故障（Cloudflare 502/524/403 HTML、网络抖动、超时）。
+ *   不代表内容有问题，应退避重试、不应累计 retry_count 把 item 拖入 failed。
+ * - `invalid_response`: 拿到了模型响应，但无法解析成预期结构（JSON 非法、schema 不符）。
+ *   可 reprompt 一次，仍失败则计入 retry_count。
+ * - `auth`: 鉴权/配置错误（401/403 JSON、缺 key、配置禁用）。不应重试，需人工处理。
+ * - `unknown`: 未归类，保守按不可重试处理。
+ */
+export type AiCallErrorKind = 'transient' | 'invalid_response' | 'auth' | 'unknown';
+
+export class AiCallError extends Error {
+  readonly kind: AiCallErrorKind;
+  readonly status?: number;
+  /** 原始响应体的截断摘要，避免把整页 HTML 灌进 DB / 日志。 */
+  readonly detail?: string;
+
+  constructor(kind: AiCallErrorKind, message: string, opts?: { status?: number; detail?: string }) {
+    super(message);
+    this.name = 'AiCallError';
+    this.kind = kind;
+    this.status = opts?.status;
+    this.detail = opts?.detail;
+  }
+
+  get retriable(): boolean {
+    return this.kind === 'transient';
+  }
+}
+
+const MAX_DETAIL_CHARS = 300;
+
+const summarizeBody = (body: string): string => {
+  const trimmed = body.trim();
+  if (trimmed.length <= MAX_DETAIL_CHARS) return trimmed;
+  return `${trimmed.slice(0, MAX_DETAIL_CHARS)}…[truncated ${trimmed.length - MAX_DETAIL_CHARS} chars]`;
+};
+
+const looksLikeHtml = (body: string, contentType: string): boolean => {
+  if (contentType.toLowerCase().includes('text/html')) return true;
+  const head = body.slice(0, 200).toLowerCase();
+  return head.includes('<!doctype html') || head.includes('<html');
+};
+
+/**
+ * 把一次 HTTP 失败响应分类为 AiCallError。
+ *
+ * 关键规则：网关返回的 HTML 错误页（Cloudflare 502/524/403、nginx 错误页）一律视为
+ * transient，并且只保留截断摘要而非整页 HTML —— 这是本 feature 修复"整页 HTML 被
+ * 当成 error 灌进 ai_score_details"和"无限重撞不稳定网关"的核心。
+ */
+export const classifyHttpError = (status: number, body: string, contentType: string): AiCallError => {
+  const isHtml = looksLikeHtml(body, contentType);
+
+  if (isHtml) {
+    return new AiCallError('transient', `Upstream gateway error (HTTP ${status})`, {
+      status,
+      detail: summarizeBody(body),
+    });
+  }
+
+  if (status === 401) {
+    return new AiCallError('auth', `Authentication failed (HTTP ${status})`, {
+      status,
+      detail: summarizeBody(body),
+    });
+  }
+
+  if (status === 408 || status === 429 || status >= 500) {
+    return new AiCallError('transient', `Upstream transient error (HTTP ${status})`, {
+      status,
+      detail: summarizeBody(body),
+    });
+  }
+
+  return new AiCallError('unknown', summarizeBody(body) || `Request failed (HTTP ${status})`, {
+    status,
+    detail: summarizeBody(body),
+  });
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** 指数退避 + jitter，base 250ms。第 n 次重试约 250ms*2^n ± 25%。 */
+const backoffDelay = (attempt: number): number => {
+  const base = 250 * 2 ** attempt;
+  const jitter = base * 0.25 * (Math.random() * 2 - 1);
+  return Math.round(base + jitter);
+};
 
 const normalizeBaseUrl = (value: string) => value.replace(/\/+$/, '');
 
@@ -120,13 +214,24 @@ async function openaiGenerateText(config: ResolvedTextConfig, options: AiGenerat
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(errorText || 'OpenAI request failed');
+    const contentType = response.headers.get('content-type') ?? '';
+    throw classifyHttpError(response.status, errorText, contentType);
   }
 
   const contentType = response.headers.get('content-type') ?? '';
   if (!contentType.toLowerCase().includes('application/json')) {
     const raw = await response.text();
-    throw new Error(raw || 'OpenAI request failed (non-JSON response)');
+    // 200 但非 JSON（常见于网关把错误页以 200 返回）—— 按 transient 处理，保留摘要。
+    if (looksLikeHtml(raw, contentType)) {
+      throw new AiCallError('transient', 'Upstream returned non-JSON HTML body', {
+        status: response.status,
+        detail: summarizeBody(raw),
+      });
+    }
+    throw new AiCallError('invalid_response', 'OpenAI request failed (non-JSON response)', {
+      status: response.status,
+      detail: summarizeBody(raw),
+    });
   }
 
   const result: any = await response.json();
@@ -190,7 +295,8 @@ async function anthropicGenerateText(config: ResolvedTextConfig, options: AiGene
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(errorText || 'Anthropic request failed');
+    const contentType = response.headers.get('content-type') ?? '';
+    throw classifyHttpError(response.status, errorText, contentType);
   }
 
   type AnthropicResponse = {
@@ -212,9 +318,45 @@ async function anthropicGenerateText(config: ResolvedTextConfig, options: AiGene
 
 export async function serverGenerateText(options: AiGenerateOptions): Promise<string> {
   const config = await resolveTextConfig(options);
-  if (config.provider === 'anthropic') return anthropicGenerateText(config, options);
-  return openaiGenerateText(config, options);
+  const generate = config.provider === 'anthropic' ? anthropicGenerateText : openaiGenerateText;
+
+  const maxRetries = options.maxRetries ?? 2;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      return await generate(config, options);
+    } catch (error) {
+      lastError = error;
+      // 仅对 transient（网关 HTML 错误页 / 5xx / 429）退避重试；
+      // invalid_response / auth / unknown 立即抛出，不浪费配额重撞。
+      const retriable = error instanceof AiCallError && error.retriable;
+      if (!retriable || attempt === maxRetries) {
+        throw error;
+      }
+      await sleep(backoffDelay(attempt));
+    }
+  }
+
+  // 理论不可达：循环要么 return 要么 throw。
+  throw lastError ?? new AiCallError('unknown', 'AI request failed');
 }
+
+/**
+ * 宽松修复常见的 LLM 非法 JSON 输出，再交给 JSON.parse。
+ * 覆盖本 feature DB 取证中实际出现的坏样本：
+ * - `.0` / `.5` 这类缺前导 0 的小数（`"content": .0` → `"content": 0.0`）
+ * - 对象/数组结尾的尾逗号（`,}` / `,]`）
+ * 仅做保守的字符级修复，不尝试补全截断的 JSON。
+ */
+export const repairLooseJson = (input: string): string => {
+  let out = input;
+  // 缺前导 0 的小数：匹配 `: .5` / `[ .5` / `, .5`，补成 `0.5`。
+  out = out.replace(/([:[,]\s*)\.(\d)/g, '$10.$2');
+  // 尾逗号：`,}` → `}`，`,]` → `]`（允许中间空白）。
+  out = out.replace(/,(\s*[}\]])/g, '$1');
+  return out;
+};
 
 export async function serverGenerateJSON<T>(options: AiGenerateOptions): Promise<T> {
   const text = await serverGenerateText({
@@ -229,8 +371,16 @@ export async function serverGenerateJSON<T>(options: AiGenerateOptions): Promise
 
   try {
     return JSON.parse(jsonText) as T;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Invalid JSON';
-    throw new Error(`Failed to parse JSON: ${message}`);
+  } catch {
+    // 首次失败：尝试宽松修复后再解析。
+    try {
+      return JSON.parse(repairLooseJson(jsonText)) as T;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Invalid JSON';
+      // 拿到了响应但无法解析 —— 归类 invalid_response，让上层决定是否 reprompt / 计 retry。
+      throw new AiCallError('invalid_response', `Failed to parse JSON: ${message}`, {
+        detail: summarizeBody(jsonText),
+      });
+    }
   }
 }

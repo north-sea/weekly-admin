@@ -40,6 +40,8 @@ export type AiScoreDetails = {
   score_weight: number;
   retry_count: number;
   error?: string;
+  /** 最近一次失败的错误分类，供清洗脚本和 feedback digest 消费。 */
+  error_kind?: 'transient' | 'invalid_response' | 'auth' | 'unknown';
   last_scored_at?: string;
   scored_at?: string;
   model?: string;

@@ -39,6 +39,7 @@ vi.mock('@/lib/services/inbox-scoring-promotion', () => ({
 }));
 
 import { InboxScoringService } from '@/lib/services/inbox-scoring';
+import { AiCallError } from '@/lib/ai/server/client';
 
 function settingValue<T>(value: T) {
   return { value: { value } };
@@ -56,7 +57,8 @@ describe('InboxScoringService.runOne', () => {
   });
 
   it('CAS 抢占失败时返回 scored:false 且不执行评分', async () => {
-    updateManyMock.mockResolvedValueOnce({ count: 0 });
+    // CAS 现在走 $executeRaw（保留 retry_count）。返回 0 = 抢占失败。
+    executeRawMock.mockResolvedValueOnce(0);
 
     const result = await InboxScoringService.runOne(BigInt(1));
 
@@ -65,14 +67,12 @@ describe('InboxScoringService.runOne', () => {
   });
 
   it('并发场景下只一个 runOne 实际执行评分（V2 / CAS）', async () => {
+    // $executeRaw 的 CAS：第一个抢到（返回 1），第二个抢占失败（返回 0）。
     let claimed = false;
-    updateManyMock.mockImplementation(async ({ where }: { where: { scoring_status?: string } }) => {
-      if (where?.scoring_status === 'pending') {
-        if (claimed) return { count: 0 };
-        claimed = true;
-        return { count: 1 };
-      }
-      return { count: 1 };
+    executeRawMock.mockImplementation(async () => {
+      if (claimed) return 0;
+      claimed = true;
+      return 1;
     });
     scoreInboxItemMock.mockResolvedValue(true);
     findUniqueMock.mockResolvedValue({ ai_score: 50, ai_score_details: { topic: 5 } });
@@ -91,7 +91,7 @@ describe('InboxScoringService.runOne', () => {
   });
 
   it('评分得分 >= 阈值时调用 promoteAtomic', async () => {
-    updateManyMock.mockResolvedValueOnce({ count: 1 });
+    executeRawMock.mockResolvedValueOnce(1);
     scoreInboxItemMock.mockResolvedValue(true);
     findUniqueMock.mockResolvedValue({
       ai_score: 85,
@@ -112,7 +112,7 @@ describe('InboxScoringService.runOne', () => {
   });
 
   it('评分得分 < 阈值时不晋升，状态置为 done', async () => {
-    updateManyMock.mockResolvedValueOnce({ count: 1 });
+    executeRawMock.mockResolvedValueOnce(1);
     scoreInboxItemMock.mockResolvedValue(true);
     findUniqueMock.mockResolvedValue({ ai_score: 50, ai_score_details: { topic: 5 } });
     updateMock.mockResolvedValue({});
@@ -127,23 +127,43 @@ describe('InboxScoringService.runOne', () => {
     expect(result).toEqual({ scored: true, score: 50 });
   });
 
-  it('force=true 时先重置 status 为 pending', async () => {
-    updateManyMock.mockResolvedValue({ count: 1 });
+  it('force=true 时先 reset（清零 retry）再 CAS 抢占', async () => {
+    // force 用一条 $executeRaw 重置，CAS 再用一条 $executeRaw 抢占。
+    executeRawMock.mockResolvedValue(1);
     scoreInboxItemMock.mockResolvedValue(true);
     findUniqueMock.mockResolvedValue({ ai_score: 30, ai_score_details: null });
     updateMock.mockResolvedValue({});
 
     await InboxScoringService.runOne(BigInt(4), { force: true });
 
-    const firstCall = updateManyMock.mock.calls[0][0];
-    expect(firstCall).toEqual({
-      where: { id: BigInt(4) },
-      data: { scoring_status: 'pending' },
-    });
+    // 第一条 raw 是 force reset，第二条是 CAS 抢占。
+    expect(executeRawMock.mock.calls.length).toBeGreaterThanOrEqual(2);
+    const resetSql = Array.from(executeRawMock.mock.calls[0][0] as TemplateStringsArray).join('?');
+    expect(resetSql).toContain("scoring_status = 'pending'");
+    expect(resetSql).toContain('JSON_REMOVE');
   });
 
-  it('评分抛错时调用 markFailed，递增 retry_count', async () => {
-    updateManyMock.mockResolvedValueOnce({ count: 1 });
+  it('transient 错误不计入 retry_count，保持 pending 等下轮', async () => {
+    executeRawMock.mockResolvedValueOnce(1);
+    scoreInboxItemMock.mockRejectedValueOnce(
+      new AiCallError('transient', 'Upstream gateway error (HTTP 524)', { status: 524, detail: '<html>...' }),
+    );
+    findUniqueMock.mockResolvedValueOnce({ ai_score_details: { retry_count: 1 } });
+    updateMock.mockResolvedValue({});
+
+    const result = await InboxScoringService.runOne(BigInt(7));
+
+    expect(result.scored).toBe(false);
+    expect(result.errorKind).toBe('transient');
+    const updateCall = updateMock.mock.calls.at(-1)?.[0];
+    // transient 不递增 retry_count（保持已有的 1），状态回 pending 等下一轮。
+    expect(updateCall.data.ai_score_details.retry_count).toBe(1);
+    expect(updateCall.data.scoring_status).toBe('pending');
+    expect(updateCall.data.ai_score_details.error_kind).toBe('transient');
+  });
+
+  it('评分抛错（非 transient）时调用 markFailed，递增 retry_count', async () => {
+    executeRawMock.mockResolvedValueOnce(1);
     scoreInboxItemMock.mockRejectedValueOnce(new Error('LLM timeout'));
     findUniqueMock.mockResolvedValueOnce({ ai_score_details: { retry_count: 1 } });
     updateMock.mockResolvedValue({});
@@ -158,7 +178,7 @@ describe('InboxScoringService.runOne', () => {
   });
 
   it('retry_count 达到 3 时状态置为 failed（V4）', async () => {
-    updateManyMock.mockResolvedValueOnce({ count: 1 });
+    executeRawMock.mockResolvedValueOnce(1);
     scoreInboxItemMock.mockRejectedValueOnce(new Error('persistent error'));
     findUniqueMock.mockResolvedValueOnce({ ai_score_details: { retry_count: 2 } });
     updateMock.mockResolvedValue({});
@@ -231,7 +251,10 @@ describe('InboxScoringService.runBatch', () => {
       { id: BigInt(2), ai_score_details: { retry_count: 1 } },
       { id: BigInt(3), ai_score_details: null },
     ]);
-    updateManyMock.mockResolvedValue({ count: 1 });
+    // sweepStaleProcessing 返回 0；CAS 抢占返回 1（每次 runOne 都抢到）。
+    executeRawMock.mockReset();
+    executeRawMock.mockResolvedValueOnce(0); // sweep
+    executeRawMock.mockResolvedValue(1); // CAS 抢占
     scoreInboxItemMock.mockResolvedValue(true);
     findUniqueMock.mockResolvedValue({ ai_score: 30, ai_score_details: null });
     updateMock.mockResolvedValue({});
@@ -240,5 +263,27 @@ describe('InboxScoringService.runBatch', () => {
 
     expect(scoreInboxItemMock).toHaveBeenCalledTimes(2);
     expect(result.scored).toBe(2);
+  });
+
+  it('连续 transient 错误触发熔断，提前终止整批', async () => {
+    // 6 个待评分项，全部撞 transient，连续 5 次触发熔断。
+    findManyMock.mockResolvedValueOnce(
+      Array.from({ length: 6 }, (_, i) => ({ id: BigInt(i + 1), ai_score_details: null })),
+    );
+    executeRawMock.mockReset();
+    executeRawMock.mockResolvedValueOnce(0); // sweep
+    executeRawMock.mockResolvedValue(1); // CAS 抢占都成功
+    const { AiCallError } = await import('@/lib/ai/server/client');
+    scoreInboxItemMock.mockRejectedValue(
+      new AiCallError('transient', 'Upstream gateway error (HTTP 524)', { status: 524 }),
+    );
+    findUniqueMock.mockResolvedValue({ ai_score_details: null });
+    updateMock.mockResolvedValue({});
+
+    const result = await InboxScoringService.runBatch({ delayMs: 0 });
+
+    // 熔断在第 5 次连续 transient 后触发，scoreInboxItem 不应跑满 6 次。
+    expect(scoreInboxItemMock.mock.calls.length).toBeLessThan(6);
+    expect(result.errors.some((e) => e.includes('circuit open'))).toBe(true);
   });
 });
