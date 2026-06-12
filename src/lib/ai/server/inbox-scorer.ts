@@ -2,7 +2,7 @@ import 'server-only';
 
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
-import { serverGenerateJSON } from '@/lib/ai/server/client';
+import { serverGenerateJSONStream } from '@/lib/ai/server/client';
 import { AiPromptService } from '@/lib/services/ai-prompt';
 import { renderPromptTemplate } from '@/lib/ai/server/prompt-template';
 
@@ -252,7 +252,7 @@ export async function scoreInboxItem(inboxId: bigint): Promise<InboxScore | null
     content: truncate(item.content ?? '', 8000),
   });
 
-  const result = await serverGenerateJSON<unknown>({
+  const result = await serverGenerateJSONStream<unknown>({
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 800,
     temperature: 0.2,

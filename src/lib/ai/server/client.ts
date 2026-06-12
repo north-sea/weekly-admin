@@ -1,6 +1,15 @@
 import 'server-only';
 
 import { AiConfigService, type AiProvider } from '@/lib/services/ai-config';
+import {
+  APIError,
+  APIConnectionError,
+  APIConnectionTimeoutError,
+  AuthenticationError,
+  RateLimitError,
+  InternalServerError,
+} from 'openai';
+import OpenAI from 'openai';
 
 const getRequiredEnv = (key: string) => {
   const value = process.env[key];
@@ -71,6 +80,76 @@ const looksLikeHtml = (body: string, contentType: string): boolean => {
   if (contentType.toLowerCase().includes('text/html')) return true;
   const head = body.slice(0, 200).toLowerCase();
   return head.includes('<!doctype html') || head.includes('<html');
+};
+
+/**
+ * 将 OpenAI SDK 抛出的错误映射到 AiCallError 分类体系。
+ *
+ * 映射规则：
+ * - APIConnectionError / APIConnectionTimeoutError → transient（网络层瞬时故障）
+ * - AuthenticationError → auth（鉴权错误，不应重试）
+ * - RateLimitError / InternalServerError → transient（429/5xx 可退避重试）
+ * - SyntaxError → invalid_response（JSON 解析失败）
+ * - 其他 → unknown（保守处理）
+ */
+export const classifyAiError = (error: unknown): AiCallError => {
+  // 网络层连接/超时错误 → transient
+  if (error instanceof APIConnectionError || error instanceof APIConnectionTimeoutError) {
+    return new AiCallError('transient', error.message, {
+      status: error.status,
+      detail: summarizeBody(error.message),
+    });
+  }
+
+  // 鉴权错误 → auth
+  if (error instanceof AuthenticationError) {
+    return new AiCallError('auth', error.message, {
+      status: error.status,
+      detail: summarizeBody(error.message),
+    });
+  }
+
+  // 限流和服务端错误 → transient
+  if (error instanceof RateLimitError || error instanceof InternalServerError) {
+    return new AiCallError('transient', error.message, {
+      status: error.status,
+      detail: summarizeBody(error.message),
+    });
+  }
+
+  // 通用 APIError，根据 status 判断
+  if (error instanceof APIError) {
+    const status = error.status ?? 0;
+    if (status === 429 || status >= 500) {
+      return new AiCallError('transient', error.message, {
+        status,
+        detail: summarizeBody(error.message),
+      });
+    }
+    if (status === 401 || status === 403) {
+      return new AiCallError('auth', error.message, {
+        status,
+        detail: summarizeBody(error.message),
+      });
+    }
+    return new AiCallError('unknown', error.message, {
+      status,
+      detail: summarizeBody(error.message),
+    });
+  }
+
+  // JSON 解析失败 → invalid_response
+  if (error instanceof SyntaxError) {
+    return new AiCallError('invalid_response', error.message, {
+      detail: summarizeBody(error.message),
+    });
+  }
+
+  // 其他未归类错误 → unknown
+  const message = error instanceof Error ? error.message : String(error);
+  return new AiCallError('unknown', message, {
+    detail: summarizeBody(message),
+  });
 };
 
 /**
@@ -383,4 +462,103 @@ export async function serverGenerateJSON<T>(options: AiGenerateOptions): Promise
       });
     }
   }
+}
+
+/**
+ * 流式 JSON 生成函数（基于 OpenAI SDK）。
+ *
+ * 核心特性：
+ * - 使用 OpenAI SDK 的 stream: true 模式
+ * - 累积所有 chunk 的 delta.content 后再解析 JSON
+ * - 复用 repairLooseJson 宽松修复逻辑
+ * - 流式中断错误自动映射为 transient（通过 classifyAiError）
+ * - 支持 Anthropic 兼容层（100xlabs / 官方 OpenAI SDK 兼容）
+ *
+ * @param options - 与 serverGenerateJSON 相同的参数接口
+ * @returns 解析后的 JSON 对象
+ * @throws AiCallError - 分类错误（transient/invalid_response/auth/unknown）
+ */
+export async function serverGenerateJSONStream<T>(options: AiGenerateOptions): Promise<T> {
+  const config = await resolveTextConfig(options);
+
+  // 创建 OpenAI 客户端实例
+  const client = new OpenAI({
+    apiKey: config.apiKey,
+    baseURL: config.baseUrl,
+  });
+
+  const maxRetries = options.maxRetries ?? 2;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      // 流式调用
+      const stream = await client.chat.completions.create({
+        model: options.model ?? config.model,
+        messages: [
+          ...(options.system
+            ? [{ role: 'system' as const, content: `${options.system}\n\nReturn ONLY valid JSON.` }]
+            : [{ role: 'system' as const, content: 'Return ONLY valid JSON.' }]),
+          ...options.messages,
+        ],
+        temperature: 0,
+        max_tokens: options.maxTokens ?? 512,
+        stream: true,
+      });
+
+      // 累积所有 chunk
+      let accumulatedText = '';
+      for await (const chunk of stream) {
+        const delta = chunk.choices[0]?.delta?.content;
+        if (delta) {
+          accumulatedText += delta;
+        }
+      }
+
+      // 清理 markdown 代码块标记
+      const jsonText = accumulatedText
+        .trim()
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim();
+
+      // 解析 JSON（复用宽松修复逻辑）
+      try {
+        return JSON.parse(jsonText) as T;
+      } catch {
+        try {
+          return JSON.parse(repairLooseJson(jsonText)) as T;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Invalid JSON';
+          throw new AiCallError('invalid_response', `Failed to parse JSON: ${message}`, {
+            detail: summarizeBody(jsonText),
+          });
+        }
+      }
+    } catch (error) {
+      lastError = error;
+
+      // 如果已经是 AiCallError，直接判断是否可重试
+      if (error instanceof AiCallError) {
+        if (!error.retriable || attempt === maxRetries) {
+          throw error;
+        }
+      } else {
+        // OpenAI SDK 错误，先映射再判断
+        const classified = classifyAiError(error);
+        if (!classified.retriable || attempt === maxRetries) {
+          throw classified;
+        }
+        lastError = classified;
+      }
+
+      // 退避重试
+      await sleep(backoffDelay(attempt));
+    }
+  }
+
+  // 理论不可达
+  throw lastError instanceof AiCallError
+    ? lastError
+    : new AiCallError('unknown', 'AI request failed');
 }
