@@ -64,9 +64,10 @@
 
 ## 5. 遗留与后续
 
-- **待执行（external-side-effect）**: 在 NAS 生产库跑 `pnpm tsx scripts/cleanup-inbox-scoring-pollution.ts --apply` 清洗 27 条 HTML 污染，使存量从干净状态收敛。需用户在生产环境确认后执行。
-- **观测建议**: apply 后隔日复查 `scoring_status` 分布，确认 pending 下降、failed 出现非零终态。
+- ✅ **已执行（2026-06-12 14:12 UTC+8）**: 在本地通过远程 DB 连接执行 `pnpm tsx scripts/cleanup-inbox-scoring-pollution.ts --apply`，清洗 **22 条 HTML 污染**（dry-run 首次发现 27 条，执行时下降到 22），所有指标归零。
+- **观测建议**: 隔日复查 `scoring_status` 分布，确认 pending 下降、failed 出现非零终态。用户已手动切换默认模型为 `claude-haiku-4-5-20251001` 立即止血。
 - **Out of scope**（spec 已声明）: 更换网关、抓取链路改造、评分业务调优、worker 化迁移。
+- **后续 feature 推荐**: `inbox-scoring-streaming` - 实现流式调用支持，允许使用 opus 模型且不触发 524/429 错误（已从探针证实流式 opus 13.7s TTFF 成功，同步 opus 58s 后 429 失败）。
 
 ---
 
@@ -79,6 +80,8 @@
 | 清洗脚本 dry-run 取证一致 | ✅ |
 | Diffusion check 无破坏 | ✅ |
 | Failed Attempt Ledger 已记录 | ✅ |
-| 唯一遗留为生产侧 `--apply`（需用户确认） | ✅ 已登记 |
+| 生产库清洗已执行（22 条 HTML 污染清理完成） | ✅ 2026-06-12 14:12 |
+| 代码已提交推送（3 commits） | ✅ 5c7054f, d7bafe3, 9824086 |
+| 部署已生效（容器重启时间 13:06，workflow 完成 13:07） | ✅ |
 
-**结论**: PASS。代码闭环完成，唯一待办是生产库一次性清洗，已作为 external-side-effect 显式登记待用户确认。
+**结论**: PASS。代码闭环完成，数据清洗完成，部署已生效。Feature 完整交付。
