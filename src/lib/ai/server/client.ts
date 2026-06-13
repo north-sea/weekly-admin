@@ -79,7 +79,12 @@ const summarizeBody = (body: string): string => {
 const looksLikeHtml = (body: string, contentType: string): boolean => {
   if (contentType.toLowerCase().includes('text/html')) return true;
   const head = body.slice(0, 200).toLowerCase();
-  return head.includes('<!doctype html') || head.includes('<html');
+  if (head.includes('<!doctype html') || head.includes('<html')) return true;
+
+  // WAF/Cloudflare 特征消息
+  if (/your request was blocked|access denied|cloudflare/i.test(body)) return true;
+
+  return false;
 };
 
 /**
