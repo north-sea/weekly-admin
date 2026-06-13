@@ -31,7 +31,7 @@ export function getJobRedisConnection(config: EnvironmentConfig = getCurrentConf
   if (!sharedConnection) {
     sharedConnection = new IORedis(config.redisUrl, {
       enableOfflineQueue: false,
-      lazyConnect: true,
+      lazyConnect: false,
       maxRetriesPerRequest: null,
     });
   }

@@ -73,7 +73,7 @@ describe('job Redis connection', () => {
       url: 'redis://localhost:6379',
       options: expect.objectContaining({
         enableOfflineQueue: false,
-        lazyConnect: true,
+        lazyConnect: false,
         maxRetriesPerRequest: null,
       }),
     });
