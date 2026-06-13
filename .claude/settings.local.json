@@ -61,7 +61,8 @@
       "Bash(rtk grep *)",
       "Bash(NODE_OPTIONS=\"--conditions=react-server\" pnpm tsx *)",
       "Bash(pnpm next *)",
-      "Bash(NODE_OPTIONS=\"--conditions=react-server\" pnpm next build)"
+      "Bash(NODE_OPTIONS=\"--conditions=react-server\" pnpm next build)",
+      "Bash(ssh *)"
     ],
     "deny": [],
     "ask": []
