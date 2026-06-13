@@ -120,21 +120,32 @@ export const classifyAiError = (error: unknown): AiCallError => {
   // 通用 APIError，根据 status 判断
   if (error instanceof APIError) {
     const status = error.status ?? 0;
-    if (status === 429 || status >= 500) {
-      return new AiCallError('transient', error.message, {
+    const message = error.message || '';
+
+    // 先检查是否是 HTML 错误页（网关层拦截）
+    const isHtml = looksLikeHtml(message, '');
+    if (isHtml) {
+      return new AiCallError('transient', `Upstream gateway error (HTTP ${status})`, {
         status,
-        detail: summarizeBody(error.message),
+        detail: summarizeBody(message),
+      });
+    }
+
+    if (status === 429 || status >= 500) {
+      return new AiCallError('transient', message, {
+        status,
+        detail: summarizeBody(message),
       });
     }
     if (status === 401 || status === 403) {
-      return new AiCallError('auth', error.message, {
+      return new AiCallError('auth', message, {
         status,
-        detail: summarizeBody(error.message),
+        detail: summarizeBody(message),
       });
     }
-    return new AiCallError('unknown', error.message, {
+    return new AiCallError('unknown', message, {
       status,
-      detail: summarizeBody(error.message),
+      detail: summarizeBody(message),
     });
   }
 
