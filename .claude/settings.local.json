@@ -59,7 +59,9 @@
       "Bash(git push *)",
       "Bash(gh run *)",
       "Bash(rtk grep *)",
-      "Bash(NODE_OPTIONS=\"--conditions=react-server\" pnpm tsx *)"
+      "Bash(NODE_OPTIONS=\"--conditions=react-server\" pnpm tsx *)",
+      "Bash(pnpm next *)",
+      "Bash(NODE_OPTIONS=\"--conditions=react-server\" pnpm next build)"
     ],
     "deny": [],
     "ask": []

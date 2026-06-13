@@ -22,8 +22,8 @@ async function main() {
   });
 
   // 2. pending 项详情（如果有）
-  const pendingCount = statusDist.find((r) => r.status === 'pending')?.count ?? 0n;
-  if (pendingCount > 0) {
+  const pendingCount = statusDist.find((r) => r.status === 'pending')?.count ?? BigInt(0);
+  if (pendingCount > BigInt(0)) {
     const pendingSample = await prisma.inbox_items.findMany({
       where: { scoring_status: 'pending' },
       select: {
@@ -73,7 +73,7 @@ async function main() {
   }
 
   // 4. failed 项（如果有）
-  const failedCount = statusDist.find((r) => r.status === 'failed')?.count ?? 0n;
+  const failedCount = statusDist.find((r) => r.status === 'failed')?.count ?? BigInt(0);
   if (failedCount > 0) {
     const failedSample = await prisma.inbox_items.findMany({
       where: { scoring_status: 'failed' },
