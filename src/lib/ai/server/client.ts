@@ -487,6 +487,10 @@ export async function serverGenerateJSON<T>(options: AiGenerateOptions): Promise
       return JSON.parse(repairLooseJson(jsonText)) as T;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Invalid JSON';
+      console.error('[ai-client] JSON parse failed after repair');
+      console.error('[ai-client] Original text length:', jsonText.length);
+      console.error('[ai-client] First 300 chars:', jsonText.substring(0, 300));
+      console.error('[ai-client] Last 300 chars:', jsonText.substring(Math.max(0, jsonText.length - 300)));
       // 拿到了响应但无法解析 —— 归类 invalid_response，让上层决定是否 reprompt / 计 retry。
       throw new AiCallError('invalid_response', `Failed to parse JSON: ${message}`, {
         detail: summarizeBody(jsonText),
