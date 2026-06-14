@@ -573,6 +573,10 @@ export async function serverGenerateJSONStream<T>(options: AiGenerateOptions): P
           return JSON.parse(repairLooseJson(jsonText)) as T;
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Invalid JSON';
+          console.error('[ai-client] JSON parse failed in stream mode after repair');
+          console.error('[ai-client] Original text length:', jsonText.length);
+          console.error('[ai-client] First 300 chars:', jsonText.substring(0, 300));
+          console.error('[ai-client] Last 300 chars:', jsonText.substring(Math.max(0, jsonText.length - 300)));
           throw new AiCallError('invalid_response', `Failed to parse JSON: ${message}`, {
             detail: summarizeBody(jsonText),
           });
