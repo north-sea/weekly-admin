@@ -252,11 +252,19 @@ export async function scoreInboxItem(inboxId: bigint): Promise<InboxScore | null
     content: truncate(item.content ?? '', 8000),
   });
 
-  const result = await serverGenerateJSONStream<unknown>({
-    messages: [{ role: 'user', content: prompt }],
-    maxTokens: 800,
-    temperature: 0.2,
-  });
+  console.log(`[inbox-scorer] Scoring item ${inboxId}...`);
+  let result: unknown;
+  try {
+    result = await serverGenerateJSONStream<unknown>({
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 800,
+      temperature: 0.2,
+    });
+    console.log('[inbox-scorer] AI response received, validating...');
+  } catch (error) {
+    console.error('[inbox-scorer] AI request failed:', error instanceof Error ? error.message : String(error));
+    throw error;
+  }
 
   const parsed = ScoreSchema.safeParse(result);
   if (!parsed.success) {

@@ -63,7 +63,11 @@
       "Bash(pnpm next *)",
       "Bash(NODE_OPTIONS=\"--conditions=react-server\" pnpm next build)",
       "Bash(ssh *)",
-      "Bash(pkill -f \"ssh yqg@\")"
+      "Bash(pkill -f \"ssh yqg@\")",
+      "Bash(rtk docker *)",
+      "Bash(colima start *)",
+      "Bash(xxd -r -p)",
+      "Bash(rtk bash *)"
     ],
     "deny": [],
     "ask": []
