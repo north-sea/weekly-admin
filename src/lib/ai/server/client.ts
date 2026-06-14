@@ -505,7 +505,13 @@ export async function serverGenerateJSON<T>(options: AiGenerateOptions): Promise
 export async function serverGenerateJSONStream<T>(options: AiGenerateOptions): Promise<T> {
   const config = await resolveTextConfig(options);
 
-  // 创建 OpenAI 客户端实例
+  // OpenAI provider 使用非流式模式（兼容性更好，避免某些网关的流式接口问题）
+  // Anthropic provider 保持流式（官方 SDK 和大多数网关都支持良好）
+  if (config.provider === 'openai') {
+    return serverGenerateJSON(options);
+  }
+
+  // 创建 OpenAI 客户端实例（仅用于 Anthropic，因为上面已经 return）
   const client = new OpenAI({
     apiKey: config.apiKey,
     baseURL: config.baseUrl,
@@ -531,11 +537,13 @@ export async function serverGenerateJSONStream<T>(options: AiGenerateOptions): P
       });
 
       // 累积所有 chunk
+      // 兼容标准 OpenAI API (delta.content) 和 DeepSeek API (delta.reasoning_content)
       let accumulatedText = '';
       for await (const chunk of stream) {
-        const delta = chunk.choices[0]?.delta?.content;
-        if (delta) {
-          accumulatedText += delta;
+        const delta = chunk.choices[0]?.delta;
+        const content = delta?.content || (delta as any)?.reasoning_content;
+        if (content) {
+          accumulatedText += content;
         }
       }
 

@@ -62,7 +62,8 @@
       "Bash(NODE_OPTIONS=\"--conditions=react-server\" pnpm tsx *)",
       "Bash(pnpm next *)",
       "Bash(NODE_OPTIONS=\"--conditions=react-server\" pnpm next build)",
-      "Bash(ssh *)"
+      "Bash(ssh *)",
+      "Bash(pkill -f \"ssh yqg@\")"
     ],
     "deny": [],
     "ask": []
