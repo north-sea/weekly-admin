@@ -317,6 +317,7 @@ async function openaiGenerateText(config: ResolvedTextConfig, options: AiGenerat
       ],
       temperature: options.temperature ?? 0.2,
       max_tokens: options.maxTokens ?? 512,
+      stream: false,
     }),
     signal: options.signal,
   });
