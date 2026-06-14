@@ -262,7 +262,7 @@ export async function scoreInboxItem(inboxId: bigint): Promise<InboxScore | null
   if (!parsed.success) {
     console.error('[inbox-scorer] Zod validation failed');
     console.error('[inbox-scorer] Raw result:', JSON.stringify(result));
-    console.error('[inbox-scorer] Validation errors:', JSON.stringify(parsed.error.errors));
+    console.error('[inbox-scorer] Validation errors:', JSON.stringify(parsed.error.issues));
     throw new Error('AI 返回不符合预期的评分结构');
   }
 
