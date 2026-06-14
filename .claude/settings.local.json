@@ -67,7 +67,8 @@
       "Bash(rtk docker *)",
       "Bash(colima start *)",
       "Bash(xxd -r -p)",
-      "Bash(rtk bash *)"
+      "Bash(rtk bash *)",
+      "Bash(rtk node *)"
     ],
     "deny": [],
     "ask": []

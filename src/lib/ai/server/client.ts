@@ -294,6 +294,7 @@ async function openaiGenerateText(config: ResolvedTextConfig, options: AiGenerat
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${config.apiKey}`,
+      'User-Agent': 'claude-code/1.0',
     },
     body: JSON.stringify({
       model: options.model ?? config.model,
@@ -377,6 +378,7 @@ async function anthropicGenerateText(config: ResolvedTextConfig, options: AiGene
       'Content-Type': 'application/json',
       'x-api-key': config.apiKey,
       'anthropic-version': '2023-06-01',
+      'User-Agent': 'claude-code/1.0',
     },
     body: JSON.stringify({
       model: options.model ?? config.model,
