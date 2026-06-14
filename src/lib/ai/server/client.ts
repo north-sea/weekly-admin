@@ -252,14 +252,20 @@ type ResolvedTextConfig = {
 };
 
 const resolveTextConfig = async (options: AiGenerateOptions): Promise<ResolvedTextConfig> => {
+  console.log('[ai-client] resolveTextConfig: configId=', options.configId);
+
   if (typeof options.configId === 'number') {
-    const config = await AiConfigService.getResolvedById(options.configId).catch(() => null);
+    const config = await AiConfigService.getResolvedById(options.configId).catch((err) => {
+      console.error('[ai-client] getResolvedById failed:', err.message);
+      return null;
+    });
     if (!config) {
       throw new Error('AI 配置不存在');
     }
     if (!config.enabled) {
       throw new Error('AI 配置已禁用');
     }
+    console.log('[ai-client] Using configId:', config.id, config.name);
     return {
       provider: config.provider,
       apiKey: config.apiKey,
@@ -268,8 +274,14 @@ const resolveTextConfig = async (options: AiGenerateOptions): Promise<ResolvedTe
     };
   }
 
-  const defaultConfig = await AiConfigService.getResolvedDefault().catch(() => null);
+  console.log('[ai-client] No configId, trying getResolvedDefault...');
+  const defaultConfig = await AiConfigService.getResolvedDefault().catch((err) => {
+    console.error('[ai-client] getResolvedDefault failed:', err.message);
+    return null;
+  });
+
   if (defaultConfig && defaultConfig.enabled) {
+    console.log('[ai-client] Using default config:', defaultConfig.id, defaultConfig.name);
     return {
       provider: defaultConfig.provider,
       apiKey: defaultConfig.apiKey,
@@ -278,6 +290,7 @@ const resolveTextConfig = async (options: AiGenerateOptions): Promise<ResolvedTe
     };
   }
 
+  console.log('[ai-client] No default config found, falling back to env vars');
   const provider = getProvider();
   if (provider === 'anthropic') {
     const { apiKey, baseUrl, model } = getAnthropicConfig();
